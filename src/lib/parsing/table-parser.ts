@@ -1,4 +1,4 @@
-import { normalizeText } from './row-parser';
+import { normalizeText } from '../posts/formatters';
 
 export function parseTsvWithQuotedMultiline(text: string): string[][] {
   const rows: string[][] = [];

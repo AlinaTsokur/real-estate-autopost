@@ -29,11 +29,11 @@ export function validatePostData(data: Partial<PostData>): void {
   }
 
   if (isVillaObject(data.objectType || 'Apartment')) {
-    if (data.grossArea === '' || data.grossArea === undefined) {
+    if (data.grossAreaM2 === '' || data.grossAreaM2 === undefined) {
       throw new Error('Gross Area (m2) is required for Villa/Townhouse/Condo');
     }
   } else {
-    if (data.area === '' || data.area === undefined) {
+    if (data.areaM2 === '' || data.areaM2 === undefined) {
       throw new Error('Area (m2) is required for Apartment');
     }
     if (!data.floor) {

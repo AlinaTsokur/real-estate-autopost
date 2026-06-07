@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getBot, sendMediaGroupWithCaption, sendTextMessage } from '@/lib/telegram/bot';
+import { getBot, sendMediaGroupWithCaption, sendTextMessage, sendPlainTextMessage, sendPhoto } from '@/lib/telegram/bot';
 import { getDriveImages, getProjectPhotoFolderId } from '@/lib/google/drive';
 import { getConfig2 } from '@/lib/google/sheets';
 import { buildTelegramHtmlPost, buildWhatsAppMarkdown, PostData } from '@/lib/posts/templates';
@@ -13,8 +13,8 @@ export async function POST(request: Request) {
     validatePostData(data);
 
     const cfg = await getConfig2(data.project);
-    const telegramHtml = buildTelegramHtmlPost(data, cfg);
-    const whatsappText = buildWhatsAppMarkdown(data, cfg);
+    const telegramHtml = await buildTelegramHtmlPost(data);
+    const whatsappText = await buildWhatsAppMarkdown(data);
 
     const chatId = process.env.TELEGRAM_REVIEW_CHAT_ID;
     if (!chatId) throw new Error('TELEGRAM_REVIEW_CHAT_ID not configured');
@@ -23,6 +23,7 @@ export async function POST(request: Request) {
       // Reduced posts send old link first, then new post text
       // We assume old link is sent in another step or combined, but if only sending text:
       await sendTextMessage(chatId, telegramHtml, data.code);
+      await sendPlainTextMessage(chatId, whatsappText);
       return NextResponse.json({ ok: true, whatsappText });
     }
 
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
 
     try {
       const folderId = await getProjectPhotoFolderId(data.project);
-      const images = await getDriveImages(folderId, 4); // Get up to 4 to make 5 total
+      const images = await getDriveImages(folderId, 5); // Get up to 5 to make 6 total with slide
 
       images.forEach(img => {
         media.push({ type: 'photo', media: { source: img } });
@@ -52,7 +53,10 @@ export async function POST(request: Request) {
       // throw new Error('Failed to load project photos from Drive');
     }
 
-    await sendMediaGroupWithCaption(chatId, media, telegramHtml, data.code || data.unit);
+    await sendMediaGroupWithCaption(chatId, media, telegramHtml, data.code || data.unit || 'Unknown');
+    
+    // Send the WhatsApp plain text version as a separate message with the slide photo
+    await sendPhoto(chatId, slideBuffer, whatsappText);
 
     return NextResponse.json({ ok: true, whatsappText });
   } catch (error: any) {

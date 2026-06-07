@@ -62,3 +62,13 @@ export async function sendTextMessage(chatId: string, textHtml: string, unitCode
   }
   return msg;
 }
+
+export async function sendPlainTextMessage(chatId: string, text: string) {
+  const bot = getBot();
+  return bot.telegram.sendMessage(chatId, text);
+}
+
+export async function sendPhoto(chatId: string, source: Buffer, caption: string) {
+  const bot = getBot();
+  return bot.telegram.sendPhoto(chatId, { source }, { caption });
+}

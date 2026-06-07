@@ -1,19 +1,23 @@
-export function normalizeText(value: string | null | undefined): string {
-  if (!value) return '';
-  return String(value)
-    .replace(/\\s+/g, ' ')
+import { getProjectParseConfig, getConfig2Handover, findApproxRentalRateForObject } from '../google/sheets';
+import { normalizeText, extractLeadingNumberText, formatHandoverDate } from '../posts/formatters';
+
+export function splitPastedRow(raw: string): string[] {
+  let parts = String(raw || '')
     .trim()
-    .toLowerCase();
+    .split('\t')
+    .map(v => String(v || '').trim());
+
+  if (parts.length < 5) {
+    parts = String(raw || '')
+      .trim()
+      .split(/\s{2,}/)
+      .map(v => String(v || '').trim());
+  }
+
+  return parts;
 }
 
-export function extractLeadingNumberText(value: string | null | undefined): string {
-  const s = String(value || '').trim();
-  if (!s) return '';
-  const match = s.match(/[0-9][0-9.,\\s]*/);
-  return match ? match[0].trim() : '';
-}
-
-export function looksLikeFloor(value: string | null | undefined): boolean {
+export function looksLikeFloor(value: string): boolean {
   const s = String(value || '').trim().toLowerCase();
   if (!s) return false;
   return (
@@ -21,12 +25,12 @@ export function looksLikeFloor(value: string | null | undefined): boolean {
     /^g$/.test(s) ||
     /^gf$/.test(s) ||
     /^ground/.test(s) ||
-    /^\\d+$/.test(s) ||
-    /^\\d+(st|nd|rd|th)$/i.test(s)
+    /^\d+$/.test(s) ||
+    /^\d+(st|nd|rd|th)$/i.test(s)
   );
 }
 
-export function getC3FloorByUnit(unit: string | null | undefined): string {
+export function getC3FloorByUnit(unit: string): string {
   const s = String(unit || '').trim().toUpperCase();
   if (!s) return '';
   if (s.startsWith('G')) return 'Ground Floor';
@@ -34,12 +38,50 @@ export function getC3FloorByUnit(unit: string | null | undefined): string {
   return '';
 }
 
-export function parseRowByFormat(parts: string[], config: { parseFormat: string; objectType: string }, selectedProject: string) {
-  const format = config.parseFormat || 'APART_STANDARD';
-  const objectType = config.objectType || 'Apartment';
+function parseC3ApartAuto(parts: string[], selectedProject: string, empty: any) {
+  const unit = String(parts[0] || '').trim();
+  const secondValue = String(parts[1] || '').trim();
+  const hasFloor = looksLikeFloor(secondValue);
+
+  if (hasFloor) {
+    return {
+      ...empty,
+      objectType: 'Apartment',
+      code: unit,
+      unit: unit,
+      floor: getC3FloorByUnit(unit) || parts[1] || '',
+      type: parts[2] || '',
+      view: parts[3] || '',
+      originalPrice: '',
+      sellingPrice: extractLeadingNumberText(parts[4] || ''),
+      areaM2: extractLeadingNumberText(parts[6] || ''),
+      project: selectedProject || '',
+      handover: 'Ready to move'
+    };
+  }
+
+  return {
+    ...empty,
+    objectType: 'Apartment',
+    code: unit,
+    unit: unit,
+    floor: getC3FloorByUnit(unit) || '',
+    type: parts[1] || '',
+    view: parts[2] || '',
+    originalPrice: '',
+    sellingPrice: extractLeadingNumberText(parts[3] || ''),
+    areaM2: extractLeadingNumberText(parts[5] || ''),
+    project: selectedProject || '',
+    handover: 'Ready to move'
+  };
+}
+
+export function parseRowByFormat(parts: string[], config: any, selectedProject: string) {
+  const format = String(config.parseFormat || 'APART_STANDARD').trim();
+  const objectType = String(config.objectType || 'Apartment').trim();
 
   const empty = {
-    objectType,
+    objectType: objectType,
     parseFormat: format,
     code: '',
     unit: '',
@@ -54,7 +96,8 @@ export function parseRowByFormat(parts: string[], config: { parseFormat: string;
     paymentPlan: '',
     project: selectedProject || '',
     handover: '',
-    floor: ''
+    floor: '',
+    approxRentalRate: ''
   };
 
   switch (format) {
@@ -183,40 +226,63 @@ export function parseRowByFormat(parts: string[], config: { parseFormat: string;
   }
 }
 
-function parseC3ApartAuto(parts: string[], selectedProject: string, empty: any) {
-  const unit = String(parts[0] || '').trim();
-  const secondValue = String(parts[1] || '').trim();
-  const hasFloor = looksLikeFloor(secondValue);
+export async function getAutoHandoverForPostBuilder(projectName: string, code: string, rawRowText: string) {
+  const raw = String(rawRowText || '').toLowerCase();
 
-  if (hasFloor) {
-    return {
-      ...empty,
-      objectType: 'Apartment',
-      code: unit,
-      unit: unit,
-      floor: getC3FloorByUnit(unit) || parts[1] || '',
-      type: parts[2] || '',
-      view: parts[3] || '',
-      originalPrice: '',
-      sellingPrice: extractLeadingNumberText(parts[4] || ''),
-      areaM2: extractLeadingNumberText(parts[6] || ''),
-      project: selectedProject || '',
-      handover: 'Ready to move'
-    };
+  // If readiness is inside the row text itself
+  if (raw.includes('ready to move') || raw.includes('ready-to-move') || raw.includes('сдан')) {
+    return 'Ready to move';
   }
 
-  return {
-    ...empty,
-    objectType: 'Apartment',
-    code: unit,
-    unit: unit,
-    floor: getC3FloorByUnit(unit) || '',
-    type: parts[1] || '',
-    view: parts[2] || '',
-    originalPrice: '',
-    sellingPrice: extractLeadingNumberText(parts[3] || ''),
-    areaM2: extractLeadingNumberText(parts[5] || ''),
-    project: selectedProject || '',
-    handover: 'Ready to move'
-  };
+  // Use CONFIG2 handover prefix logic (already have getConfig2Handover from Catalog Builder logic)
+  const codePrefix = String(code).replace(/\D/g, '').slice(0, 4);
+  const result = await getConfig2Handover(projectName, codePrefix);
+
+  if (!result || !result.value) {
+    return '';
+  }
+
+  // Try to format to string Month YYYY and remove "from " for post builder
+  return formatHandoverDate(result.value);
+}
+
+export async function parsePastedRow(pastedText: string, projectName: string) {
+  const raw = String(pastedText || '').trim();
+  if (!raw) throw new Error('Вставь строку с данными');
+
+  const project = String(projectName || '').trim();
+  
+  // 1. Get config
+  const config = await getProjectParseConfig(project);
+  
+  // 2. Split parts
+  const parts = splitPastedRow(raw);
+
+  // 3. Parse by format
+  const parsed = parseRowByFormat(parts, config, project);
+
+  // 4. Special overrides (e.g. C3 Garden Residence)
+  if (normalizeText(parsed.project || project) === normalizeText('C3 Garden Residence')) {
+    parsed.approxRentalRate = await findApproxRentalRateForObject(
+      parsed.project || project,
+      parsed.code,
+      parsed.unit
+    );
+    parsed.handover = 'Ready to move';
+    parsed.floor = getC3FloorByUnit(parsed.unit || parsed.code) || parsed.floor || '';
+  } else {
+    // Standard automatic handover
+    parsed.handover = await getAutoHandoverForPostBuilder(
+      parsed.project || project,
+      parsed.code || parsed.unit,
+      raw
+    );
+  }
+
+  // Final format check to ensure dates like 31/01/2027 become January 2027
+  if (parsed.handover) {
+    parsed.handover = formatHandoverDate(parsed.handover);
+  }
+
+  return parsed;
 }

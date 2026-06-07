@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { normalizeText } from '../parsing/row-parser';
+import { normalizeText } from '../posts/formatters';
 import { getGoogleAuthClient } from './auth';
 
 export async function getGoogleSheetsClient() {
@@ -185,4 +185,77 @@ function getColLetter(index: number) {
     temp = Math.floor(temp / 26) - 1;
   }
   return letter;
+}
+
+export async function findApproxRentalRateForObject(projectName: string, code: string, unit: string) {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
+  if (!spreadsheetId) return '';
+
+  const data = await getSheetData(spreadsheetId, 'Abu Dhabi');
+  if (data.length < 2) return '';
+
+  const headers = data[0].map(h => normalizeText(String(h || '').trim()));
+  
+  const projectCol = headers.findIndex(h => h === normalizeText('Project Name') || h === normalizeText('Проект'));
+  const codeCol = headers.findIndex(h => h === normalizeText('Code') || h === normalizeText('Код'));
+  const unitCol = headers.findIndex(h => h === normalizeText('Unit'));
+  const rentalCol = headers.findIndex(h => h === normalizeText('Approx. rental rate'));
+
+  if (projectCol === -1 || rentalCol === -1) return '';
+
+  const targetProject = normalizeText(projectName);
+  const targetCode = String(code || '').replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase();
+  const targetUnit = String(unit || '').replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase();
+
+  if (!targetProject || (!targetCode && !targetUnit)) return '';
+
+  for (let i = 1; i < data.length; i++) {
+    const rowProject = normalizeText(data[i][projectCol]);
+    if (rowProject !== targetProject) continue;
+
+    const rowCode = codeCol !== -1 ? String(data[i][codeCol]).replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase() : '';
+    const rowUnit = unitCol !== -1 ? String(data[i][unitCol]).replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase() : '';
+
+    const matchByCode = targetCode && rowCode && rowCode === targetCode;
+    const matchByUnit = targetUnit && rowUnit && rowUnit === targetUnit;
+    const matchCodeToUnit = targetCode && rowUnit && rowCode === targetUnit;
+    const matchUnitToCode = targetUnit && rowCode && rowUnit === targetCode;
+
+    if (matchByCode || matchByUnit || matchCodeToUnit || matchUnitToCode) {
+      return String(data[i][rentalCol] || '').trim();
+    }
+  }
+
+  return '';
+}
+
+export async function getOriginalPriceForObject(unitCode: string) {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
+  if (!spreadsheetId) return '';
+
+  const data = await getSheetData(spreadsheetId, 'Abu Dhabi');
+  if (data.length < 2) return '';
+
+  const headers = data[0].map(h => normalizeText(String(h || '').trim()));
+  
+  const codeCol = headers.findIndex(h => h === normalizeText('Code') || h === normalizeText('Код'));
+  const unitCol = headers.findIndex(h => h === normalizeText('Unit'));
+  const priceCol = headers.findIndex(h => h === normalizeText('Original Price') || h === normalizeText('Цена'));
+
+  if ((codeCol === -1 && unitCol === -1) || priceCol === -1) return '';
+
+  const targetCode = String(unitCode || '').replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase();
+
+  if (!targetCode) return '';
+
+  for (let i = 1; i < data.length; i++) {
+    const rowCode = codeCol !== -1 ? String(data[i][codeCol]).replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase() : '';
+    const rowUnit = unitCol !== -1 ? String(data[i][unitCol]).replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase() : '';
+
+    if (rowCode === targetCode || rowUnit === targetCode) {
+      return String(data[i][priceCol] || '').trim();
+    }
+  }
+
+  return '';
 }

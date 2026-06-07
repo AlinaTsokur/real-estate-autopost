@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getGoogleSheetsClient } from './sheets';
-import { normalizeText } from '../parsing/row-parser';
+import { normalizeText } from '../posts/formatters';
 import { getGoogleAuthClient } from './auth';
 
 export async function getGoogleDriveClient() {
@@ -35,7 +35,7 @@ export async function getProjectPhotoFolderId(projectName: string): Promise<stri
       const url = String(data[i][folderCol] || '').trim();
       if (!url) throw new Error(`Photos Folder URL is empty for project ${projectName}`);
       
-      const match = url.match(/\\/folders\\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      const match = url.match(/\/folders\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
       if (match) return match[1];
       throw new Error(`Could not parse Folder ID from URL: ${url}`);
     }
@@ -52,6 +52,8 @@ export async function getDriveImages(folderId: string, limit = 5): Promise<Buffe
     fields: 'files(id, name)',
     orderBy: 'name',
     pageSize: limit,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
 
   const files = res.data.files || [];

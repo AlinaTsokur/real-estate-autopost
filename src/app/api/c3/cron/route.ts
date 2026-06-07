@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getSheetData, updatePublicationDate, getGoogleSheetsClient } from '@/lib/google/sheets';
+import { getSheetData, updatePublicationDate, getGoogleSheetsClient, getProjectParseConfig, getConfig2 } from '@/lib/google/sheets';
 import { getDriveImages, getProjectPhotoFolderId } from '@/lib/google/drive';
-import { normalizeText } from '@/lib/parsing/row-parser';
+import { normalizeText } from '@/lib/posts/formatters';
 import { sendMediaGroupWithCaption, getBot } from '@/lib/telegram/bot';
+import { parseRowByFormat } from '@/lib/parsing/row-parser';
+import { buildTelegramHtmlPost } from '@/lib/posts/templates';
 
 export async function GET(request: Request) {
   try {
@@ -100,8 +102,7 @@ export async function GET(request: Request) {
     const rentalCol = headers.findIndex(h => h === normalizeText('Approx. rental rate'));
     parsed.approxRentalRate = rentalCol !== -1 ? nextUnit.rowData[rentalCol] : '';
 
-    const cfg = await import('@/lib/google/sheets').then(m => m.getConfig2('C3 Garden Residence'));
-    const telegramHtml = await import('@/lib/posts/templates').then(m => m.buildTelegramHtmlPost({ ...parsed, postType: 'READY_TO_MOVE' } as any, cfg));
+    const telegramHtml = await import('@/lib/posts/templates').then(m => m.buildTelegramHtmlPost({ ...parsed, postType: 'READY_TO_MOVE' } as any));
 
     // Send to Review Group
     const chatId = process.env.TELEGRAM_REVIEW_CHAT_ID;
