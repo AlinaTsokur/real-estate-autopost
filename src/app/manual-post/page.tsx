@@ -128,11 +128,13 @@ export default function ManualPostPage() {
       setOldPostsResult(data);
       
       // If exactly one post is found, auto-fill it
-      if (data.posts && data.posts.length === 1 && data.extractedOldPrice) {
-        setParsedData((prev: any) => ({ ...prev, oldPrice: data.extractedOldPrice }));
-      } else if (data.posts && data.posts.length === 1 && data.originalPrice) {
-        // Fallback if we couldn't extract Selling Price
-        setParsedData((prev: any) => ({ ...prev, oldPrice: data.originalPrice }));
+      if (data.posts && data.posts.length === 1) {
+        if (data.extractedOldPrice) {
+          setParsedData((prev: any) => ({ ...prev, oldPrice: data.extractedOldPrice, oldPostUrl: data.posts[0].url }));
+        } else if (data.originalPrice) {
+          // Fallback if we couldn't extract Selling Price
+          setParsedData((prev: any) => ({ ...prev, oldPrice: data.originalPrice, oldPostUrl: data.posts[0].url }));
+        }
       }
     } catch (e: any) {
       if (!overrideUnit) alert("Error searching: " + e.message);
@@ -351,7 +353,10 @@ export default function ManualPostPage() {
                                 <p className="text-[10px] text-slate-400 line-clamp-3 mb-2">{post.text}</p>
                                 <div className="flex items-center justify-between">
                                   <a href={post.url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-400 hover:underline">View Post</a>
-                                  <button onClick={() => updateField('oldPrice', post.extractedSellingPrice || oldPostsResult.originalPrice)} className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded hover:bg-indigo-500/40">
+                                  <button onClick={() => {
+                                    updateField('oldPrice', post.extractedSellingPrice || oldPostsResult.originalPrice);
+                                    updateField('oldPostUrl', post.url);
+                                  }} className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded hover:bg-indigo-500/40">
                                     Use Price {post.extractedSellingPrice ? `(${post.extractedSellingPrice})` : ''}
                                   </button>
                                 </div>

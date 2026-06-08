@@ -21,7 +21,10 @@ export async function POST(request: Request) {
 
     if (data.postType === 'REDUCED') {
       // Reduced posts send old link first, then new post text
-      // We assume old link is sent in another step or combined, but if only sending text:
+      if (data.oldPostUrl) {
+        await sendPlainTextMessage(chatId, data.oldPostUrl);
+      }
+      
       await sendTextMessage(chatId, telegramHtml, data.code);
       await sendPlainTextMessage(chatId, whatsappText);
       return NextResponse.json({ ok: true, whatsappText });

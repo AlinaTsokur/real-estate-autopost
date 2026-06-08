@@ -56,7 +56,7 @@ export async function searchOldPosts(priceStr: string): Promise<SearchedPost[]> 
       limit: 5,
       maxId: 0,
       minId: 0,
-      hash: BigInt(0),
+      hash: 0 as any,
     })
   );
 

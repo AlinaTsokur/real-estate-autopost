@@ -31,6 +31,7 @@ export interface PostData {
   approxRentalRate?: string;
   slideDataUrl?: string;
   slideName?: string;
+  oldPostUrl?: string;
 }
 
 export async function buildTelegramHtmlPost(data: any) {
