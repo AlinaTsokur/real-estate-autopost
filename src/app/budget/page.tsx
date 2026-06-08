@@ -1,12 +1,44 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+const convertRuToEn = (str: string) => {
+  const ru = 'йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,';
+  const en = 'qwertyuiop[]asdfghjkl;\'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL:"ZXCVBNM<>?';
+  let res = '';
+  for (let i = 0; i < str.length; i++) {
+    const idx = ru.indexOf(str[i]);
+    res += idx !== -1 ? en[idx] : str[i];
+  }
+  return res;
+};
 
 export default function BudgetPage() {
+  const [projects, setProjects] = useState<string[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectSearch, setProjectSearch] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
   const [project, setProject] = useState('');
   const [rawText, setRawText] = useState('');
   const [parsedData, setParsedData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/projects')
+      .then(res => res.json())
+      .then(data => {
+        if (data.projects && data.projects.length > 0) {
+          setProjects(data.projects);
+        }
+      })
+      .catch(err => console.error('Failed to load projects:', err))
+      .finally(() => setProjectsLoading(false));
+  }, []);
+
+  const filteredProjects = projects.filter(p => 
+    p.toLowerCase().includes(projectSearch.toLowerCase())
+  );
 
   const handleParse = async () => {
     if (!project || !rawText) return alert('Select project and paste table');
@@ -28,59 +60,125 @@ export default function BudgetPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto w-full">
+    <div className="max-w-6xl mx-auto w-full">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white tracking-tight mb-2">Budget Builder</h1>
         <p className="text-slate-400">Paste your raw TSV table data to generate a budget plan.</p>
       </div>
 
-      <div className="p-6 rounded-2xl bg-slate-900/60 border border-white/5 backdrop-blur-xl relative overflow-hidden">
-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent" />
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        {/* Left Column: Form */}
+        <div className="space-y-8">
+          <div className="p-6 rounded-2xl bg-slate-900/60 border border-white/5 backdrop-blur-xl relative overflow-hidden">
+            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent" />
 
-        <div className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Project Name</label>
-            <input
-              type="text"
-              value={project}
-              onChange={(e) => setProject(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 outline-none transition-all text-white placeholder-slate-500"
-              placeholder="e.g. Sobha Orbis"
-            />
+            <div className="space-y-6">
+              <div className="relative">
+                <label className="block text-sm font-medium text-slate-300 mb-2">Project Name</label>
+                {projectsLoading ? (
+                  <div className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl text-slate-500 flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
+                    Loading projects...
+                  </div>
+                ) : projects.length > 0 ? (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={projectSearch}
+                      onChange={(e) => {
+                        const enVal = convertRuToEn(e.target.value);
+                        setProjectSearch(enVal);
+                        setIsDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
+                      placeholder="Search project..."
+                      className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 outline-none transition-all text-white placeholder-slate-500"
+                    />
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                    
+                    {isDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl shadow-black/50 max-h-60 overflow-y-auto overflow-x-hidden p-1 custom-scrollbar">
+                        {filteredProjects.length > 0 ? (
+                          filteredProjects.map((p) => (
+                            <div
+                              key={p}
+                              onClick={() => {
+                                setProject(p);
+                                setProjectSearch(p);
+                                setIsDropdownOpen(false);
+                              }}
+                              className={`px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors ${project === p ? 'bg-emerald-500/20 text-emerald-300 font-medium' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}
+                            >
+                              {p}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-slate-500 text-center">No projects found</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-full px-4 py-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-sm">
+                    Failed to load projects.
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Paste Full Table (TSV)</label>
+                <textarea
+                  rows={6}
+                  value={rawText}
+                  onChange={(e) => setRawText(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 outline-none transition-all text-white placeholder-slate-500 font-mono text-sm"
+                  placeholder="Paste table data here..."
+                />
+              </div>
+
+              <button
+                onClick={handleParse}
+                disabled={loading || !project}
+                className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg shadow-emerald-500/25 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {loading ? 'Calculating...' : 'Generate Budget'}
+              </button>
+            </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Paste Full Table (TSV)</label>
-            <textarea
-              rows={6}
-              value={rawText}
-              onChange={(e) => setRawText(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 outline-none transition-all text-white placeholder-slate-500 font-mono text-sm"
-              placeholder="Paste table data here..."
-            />
-          </div>
-
-          <button
-            onClick={handleParse}
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg shadow-emerald-500/25 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-          >
-            {loading ? 'Calculating...' : 'Generate Budget'}
-          </button>
         </div>
+
+        {/* Right Column: Result */}
+        {parsedData && (
+          <div className="p-6 rounded-2xl bg-slate-900/40 border border-white/5 backdrop-blur-md h-fit">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                WhatsApp text preview
+              </h3>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(parsedData.text || '');
+                  alert('Copied to clipboard!');
+                }}
+                className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg transition-colors border border-white/10"
+              >
+                Copy text
+              </button>
+            </div>
+            
+            <div className="bg-[#f0fdf4] p-5 rounded-xl border border-emerald-100 text-sm font-sans whitespace-pre-wrap text-[#166534] overflow-auto max-h-[600px] custom-scrollbar shadow-inner">
+              {parsedData.text}
+            </div>
+            
+            <div className="mt-4 text-xs text-slate-500 text-right">
+              Selected {parsedData.selectedRows} units out of {parsedData.totalRows} parsed.
+            </div>
+          </div>
+        )}
       </div>
-
-      {parsedData && (
-        <div className="mt-8 p-6 rounded-2xl bg-slate-900/40 border border-white/5 backdrop-blur-md">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Result ({parsedData.selectedRows} units)
-          </h3>
-          <div className="bg-slate-950/50 p-6 rounded-xl border border-white/5 text-sm font-mono whitespace-pre-wrap text-slate-300 overflow-auto max-h-96">
-            {JSON.stringify(parsedData.selected, null, 2)}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

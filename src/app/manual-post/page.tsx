@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 
 export default function ManualPostPage() {
   const [projects, setProjects] = useState<string[]>([]);
+  const [floors, setFloors] = useState<string[]>([]);
   const [project, setProject] = useState('');
   const [postType, setPostType] = useState('NEW');
   const [rawText, setRawText] = useState('');
@@ -19,7 +20,7 @@ export default function ManualPostPage() {
   const [searchingOldPrice, setSearchingOldPrice] = useState(false);
   const [oldPostsResult, setOldPostsResult] = useState<any>(null);
 
-  // Fetch projects from Google Sheets on page load
+  // Fetch projects and floors from Google Sheets on page load
   useEffect(() => {
     fetch('/api/projects')
       .then(res => res.json())
@@ -27,8 +28,11 @@ export default function ManualPostPage() {
         if (data.projects && data.projects.length > 0) {
           setProjects(data.projects);
         }
+        if (data.floors && data.floors.length > 0) {
+          setFloors(data.floors);
+        }
       })
-      .catch(err => console.error('Failed to load projects:', err))
+      .catch(err => console.error('Failed to load metadata:', err))
       .finally(() => setProjectsLoading(false));
   }, []);
 
@@ -150,6 +154,17 @@ export default function ManualPostPage() {
 
   const isVilla = ['villa', 'townhouse', 'condo'].includes(String(parsedData?.objectType || '').toLowerCase());
 
+  const convertRuToEn = (str: string) => {
+    const ru = 'йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,';
+    const en = 'qwertyuiop[]asdfghjkl;\'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL:"ZXCVBNM<>?';
+    let res = '';
+    for (let i = 0; i < str.length; i++) {
+      const idx = ru.indexOf(str[i]);
+      res += idx !== -1 ? en[idx] : str[i];
+    }
+    return res;
+  };
+
   return (
     <div className="max-w-6xl mx-auto w-full">
       <div className="mb-8">
@@ -177,7 +192,8 @@ export default function ManualPostPage() {
                       type="text"
                       value={projectSearch}
                       onChange={(e) => {
-                        setProjectSearch(e.target.value);
+                        const enVal = convertRuToEn(e.target.value);
+                        setProjectSearch(enVal);
                         setIsDropdownOpen(true);
                       }}
                       onFocus={() => setIsDropdownOpen(true)}
@@ -304,7 +320,14 @@ export default function ManualPostPage() {
                   <label className="block text-xs text-slate-400 mb-1">Selling Price (AED)</label>
                   <input type="text" value={parsedData.sellingPrice} onChange={(e) => updateField('sellingPrice', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-emerald-400 font-medium outline-none focus:ring-2 focus:ring-indigo-500/50" />
                 </div>
-                {(postType === 'NEW_PRICE' || postType === 'REDUCED') && (
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Original Price (AED)</label>
+                  <input type="text" value={parsedData.originalPrice || ''} onChange={(e) => updateField('originalPrice', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {(postType === 'NEW_PRICE' || postType === 'REDUCED') ? (
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs text-slate-400">Old Price (AED)</label>
@@ -341,14 +364,10 @@ export default function ManualPostPage() {
                       </div>
                     )}
                   </div>
+                ) : (
+                  <div></div> /* Empty div to keep grid layout */
                 )}
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Original Price (AED)</label>
-                  <input type="text" value={parsedData.originalPrice || ''} onChange={(e) => updateField('originalPrice', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/50" />
-                </div>
                 {postType !== 'REDUCED' && (
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">Approx. Rental Rate</label>
@@ -380,7 +399,20 @@ export default function ManualPostPage() {
                   {!isVilla && (
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Floor</label>
-                      <input type="text" value={parsedData.floor || ''} onChange={(e) => updateField('floor', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                      {floors.length > 0 ? (
+                        <select
+                          value={parsedData.floor || ''}
+                          onChange={(e) => updateField('floor', e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50 appearance-none cursor-pointer"
+                        >
+                          <option value="">Select floor...</option>
+                          {floors.map((f, idx) => (
+                            <option key={idx} value={f}>{f}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input type="text" value={parsedData.floor || ''} onChange={(e) => updateField('floor', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                      )}
                     </div>
                   )}
                 </div>

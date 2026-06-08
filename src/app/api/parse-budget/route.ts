@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getProjectParseConfig } from '@/lib/google/sheets';
 import { parseTsvWithQuotedMultiline, isEmptyRow, isHeaderRow, selectLowestByExactType } from '@/lib/parsing/table-parser';
 import { parseRowByFormat } from '@/lib/parsing/row-parser';
-import { extractLeadingNumberText, formatNumberLikeSheet, formatArea2 } from '@/lib/posts/formatters';
+import { extractLeadingNumberText, formatNumberLikeSheet, formatArea2, toNumber } from '@/lib/posts/formatters';
 
 export async function POST(request: Request) {
   try {
@@ -29,14 +29,14 @@ export async function POST(request: Request) {
 
       if (!type || !sellingPriceText) return;
 
-      const sellingPriceNumber = Number(sellingPriceText.replace(/[^\\d.-]/g, ''));
+      const sellingPriceNumber = Number(toNumber(sellingPriceText));
       if (isNaN(sellingPriceNumber) || sellingPriceNumber === 0) return;
 
       parsed.objectType = objectType;
       parsed.sellingPriceNumber = sellingPriceNumber;
-      parsed.areaNumber = Number(extractLeadingNumberText(parsed.areaM2).replace(/[^\\d.-]/g, '')) || '';
-      parsed.grossAreaNumber = Number(extractLeadingNumberText(parsed.grossAreaM2).replace(/[^\\d.-]/g, '')) || '';
-      parsed.plotAreaNumber = Number(extractLeadingNumberText(parsed.plotAreaM2).replace(/[^\\d.-]/g, '')) || '';
+      parsed.areaNumber = Number(toNumber(extractLeadingNumberText(parsed.areaM2))) || '';
+      parsed.grossAreaNumber = Number(toNumber(extractLeadingNumberText(parsed.grossAreaM2))) || '';
+      parsed.plotAreaNumber = Number(toNumber(extractLeadingNumberText(parsed.plotAreaM2))) || '';
 
       parsedRows.push(parsed);
     });
@@ -60,11 +60,54 @@ export async function POST(request: Request) {
       paymentPlan: item.paymentPlan || ''
     }));
 
+    const cfg2 = await import('@/lib/google/sheets').then(m => m.getConfig2(projectName));
+    const isVilla = import('@/lib/posts/formatters').then(m => m.isVillaObject(objectType));
+
+    let title = '💰 Best Budget Units | ' + projectName;
+    if (cfg2.island) title += ' - ' + cfg2.island;
+    if (cfg2.emoji) title += ' ' + cfg2.emoji;
+
+    let text = '*' + title + '*\n\n';
+
+    formattedSelected.forEach((item, index) => {
+      if (index > 0) text += '\n\n';
+
+      text += '*' + item.type + '*\n';
+
+      if (objectType.toLowerCase().includes('villa') || objectType.toLowerCase().includes('townhouse')) {
+        if (item.unit) text += item.unit + '\n';
+        if (item.rowName) text += 'Row: ' + item.rowName + '\n';
+
+        if (item.grossAreaM2) {
+          const sqft = new Intl.NumberFormat('de-DE', { useGrouping: true }).format(Math.round(Number(selected[index].grossAreaNumber) * 10.7639));
+          text += 'Gross area ' + item.grossAreaM2 + ' sqm / ' + sqft + ' sqft\n';
+        }
+        if (item.plotAreaM2) {
+          const sqft = new Intl.NumberFormat('de-DE', { useGrouping: true }).format(Math.round(Number(selected[index].plotAreaNumber) * 10.7639));
+          text += 'Plot area ' + item.plotAreaM2 + ' sqm / ' + sqft + ' sqft\n';
+        }
+      } else {
+        if (item.view) text += item.view + '\n';
+
+        if (item.areaM2) {
+          const sqft = new Intl.NumberFormat('de-DE', { useGrouping: true }).format(Math.round(Number(selected[index].areaNumber) * 10.7639));
+          text += item.areaM2 + ' sqm / ' + sqft + ' sqft\n';
+        }
+      }
+
+      if (item.paymentPlan) {
+        text += 'Payment plan: ' + item.paymentPlan + '\n';
+      }
+
+      text += '💰 Price: ' + item.sellingPrice + ' AED';
+    });
+
     return NextResponse.json({
       project: projectName,
       objectType,
       totalRows: parsedRows.length,
       selectedRows: selected.length,
+      text: text,
       selected: formattedSelected,
       rawSelected: selected // for generating text on client or server
     });

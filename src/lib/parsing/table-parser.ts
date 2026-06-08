@@ -6,7 +6,7 @@ export function parseTsvWithQuotedMultiline(text: string): string[][] {
   let cell = '';
   let inQuotes = false;
 
-  const s = String(text || '').replace(/\\r\\n/g, '\\n').replace(/\\r/g, '\\n');
+  const s = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
@@ -22,13 +22,13 @@ export function parseTsvWithQuotedMultiline(text: string): string[][] {
       continue;
     }
 
-    if (ch === '\\t' && !inQuotes) {
+    if (ch === '\t' && !inQuotes) {
       row.push(cleanCell(cell));
       cell = '';
       continue;
     }
 
-    if (ch === '\\n' && !inQuotes) {
+    if (ch === '\n' && !inQuotes) {
       row.push(cleanCell(cell));
       rows.push(row);
       row = [];
@@ -47,9 +47,9 @@ export function parseTsvWithQuotedMultiline(text: string): string[][] {
 
 function cleanCell(value: string): string {
   return String(value || '')
-    .replace(/[\\u00A0]/g, ' ')
-    .replace(/\\n+/g, ' ')
-    .replace(/\\s+/g, ' ')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\n+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
