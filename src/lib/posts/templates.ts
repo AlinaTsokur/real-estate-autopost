@@ -42,7 +42,7 @@ export async function buildTelegramHtmlPost(data: any) {
 }
 
 export async function buildWhatsAppMarkdown(data: any) {
-  if (data.postType === 'REDUCED') {
+  if (data.postType === 'PRICE_CHANGE') {
     return buildReducedPriceWhatsAppText(data);
   }
   if (isVillaObject(data.objectType)) {
@@ -58,7 +58,7 @@ export async function buildWhatsAppMarkdown(data: any) {
 async function buildApartmentPostText(data: any) {
   const cfg = await getConfig2(data.project);
 
-  if (data.postType === 'REDUCED') {
+  if (data.postType === 'PRICE_CHANGE') {
     return buildReducedPriceText(data, cfg);
   }
 
@@ -101,7 +101,7 @@ async function buildApartmentPostText(data: any) {
 async function buildVillaPostText(data: any) {
   const cfg = await getConfig2(data.project);
 
-  if (data.postType === 'REDUCED') {
+  if (data.postType === 'PRICE_CHANGE') {
     return buildReducedPriceText(data, cfg);
   }
 
@@ -141,16 +141,29 @@ async function buildVillaPostText(data: any) {
   return text;
 }
 
+function cleanPriceForComparison(price: string | number | undefined): number {
+  if (typeof price === 'number') return price;
+  if (!price) return 0;
+  return parseInt(String(price).replace(/[^\d]/g, ''), 10) || 0;
+}
+
 function buildReducedPriceText(data: any, cfg: any) {
   let projectLabel = data.project;
   if (cfg.emoji) projectLabel += ' ' + cfg.emoji;
 
+  const oldP = cleanPriceForComparison(data.oldPrice);
+  const newP = cleanPriceForComparison(data.sellingPrice);
+  const isIncreased = oldP > 0 && newP > oldP;
+
+  const header = isIncreased ? '<b>❗ The price has been increased ❗</b>' : '<b>❗ The price has been reduced ❗</b>';
+  const footer = isIncreased ? '' : '\n\n<b>The price of the property is below the market price!</b>';
+
   return (
-    '<b>❗ The price has been reduced ❗</b>\n\n' +
-    '<b>🏡 ' + escapeHtml(data.code) + ' in ' + escapeHtml(projectLabel) + '</b>\n\n' +
-    '<i><u>Old price:</u> <s>' + escapeHtml(formatNumberLikeSheet(data.oldPrice)) + ' AED</s></i>\n' +
-    '<i><u>New Selling price:</u> ' + escapeHtml(formatNumberLikeSheet(data.sellingPrice)) + ' AED</i>\n\n' +
-    '<b>The price of the property is below the market price!</b>'
+    `${header}\n\n` +
+    `<b>🏡 ${escapeHtml(data.code)} in ${escapeHtml(projectLabel)}</b>\n\n` +
+    `<i><u>Old price:</u> <s>${escapeHtml(formatNumberLikeSheet(data.oldPrice))} AED</s></i>\n` +
+    `<i><u>New Selling price:</u> ${escapeHtml(formatNumberLikeSheet(data.sellingPrice))} AED</i>` +
+    footer
   );
 }
 
@@ -237,16 +250,19 @@ async function buildVillaWhatsAppPostText(data: any) {
 
 function buildReducedPriceWhatsAppText(data: any) {
   let projectLabel = data.project;
-  // We don't have synchronous cfg here, but since it's called inside async wrapper, we can assume caller handled it, 
-  // actually let's fetch cfg directly. Wait, the old code didn't use cfg for Reduced Price WhatsApp except for emoji. 
-  // Let's just return basic for now to avoid async complexity in the sub-function if not fully needed, or better, pass cfg.
-  // Wait, I will just let the caller handle it.
+
+  const oldP = cleanPriceForComparison(data.oldPrice);
+  const newP = cleanPriceForComparison(data.sellingPrice);
+  const isIncreased = oldP > 0 && newP > oldP;
+
+  const header = isIncreased ? '*❗ The price has been increased ❗*' : '*❗ The price has been reduced ❗*';
+  const footer = isIncreased ? '' : '\n\n*The price of the property is below the market price!*';
   
   return (
-    '*❗ The price has been reduced ❗*\n\n' +
-    '*🏡 ' + data.code + ' in ' + projectLabel + '*\n\n' +
-    '_Old price: ~' + formatNumberLikeSheet(data.oldPrice) + ' AED~_\n' +
-    '_New Selling price: ' + formatNumberLikeSheet(data.sellingPrice) + ' AED_\n\n' +
-    '*The price of the property is below the market price!*'
-  );
+    `${header}\n\n` +
+    `*🏡 ${data.code} in ${projectLabel}*\n\n` +
+    `_Old price: ~${formatNumberLikeSheet(data.oldPrice)} AED~_\n` +
+    `_New Selling price: ${formatNumberLikeSheet(data.sellingPrice)} AED_\n` +
+    footer
+  ).trim();
 }

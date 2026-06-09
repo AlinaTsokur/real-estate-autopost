@@ -145,7 +145,7 @@ export default function ManualPostPage() {
 
   useEffect(() => {
     if (!parsedData) return;
-    if (postType !== 'REDUCED' && postType !== 'NEW_PRICE') return;
+    if (postType !== 'PRICE_CHANGE' && postType !== 'NEW_PRICE') return;
     
     const unit = parsedData.code || parsedData.unit;
     if (unit && unit !== lastSearchedUnit) {
@@ -248,7 +248,7 @@ export default function ManualPostPage() {
                   <option value="DISTRESS">⚡ QUICK SALE</option>
                   <option value="NEW_PRICE">🔥 NEW PRICE</option>
                   <option value="READY_TO_MOVE">❗️ READY TO MOVE</option>
-                  <option value="REDUCED">❗️ REDUCED</option>
+                  <option value="PRICE_CHANGE">❗️ PRICE CHANGE</option>
                 </select>
               </div>
 
@@ -309,7 +309,7 @@ export default function ManualPostPage() {
                   <label className="block text-xs text-slate-400 mb-1">Unit / Code</label>
                   <input type="text" value={parsedData.code || parsedData.unit} onChange={(e) => updateField('code', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
                 </div>
-                {postType !== 'REDUCED' && (
+                {postType !== 'PRICE_CHANGE' && (
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">Type</label>
                     <input type="text" value={parsedData.type} onChange={(e) => updateField('type', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
@@ -329,7 +329,7 @@ export default function ManualPostPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                {(postType === 'NEW_PRICE' || postType === 'REDUCED') ? (
+                {(postType === 'NEW_PRICE' || postType === 'PRICE_CHANGE') ? (
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs text-slate-400">Old Price (AED)</label>
@@ -349,8 +349,9 @@ export default function ManualPostPage() {
                         {oldPostsResult.posts?.length > 0 ? (
                           <div className="space-y-2">
                             {oldPostsResult.posts.map((post: any) => (
-                              <div key={post.id} className="p-2 bg-slate-900 border border-white/5 rounded">
-                                <p className="text-[10px] text-slate-400 line-clamp-3 mb-2">{post.text}</p>
+                              <div key={post.id} className="p-2 bg-slate-900 border border-white/5 rounded relative">
+                                {post.date && <div className="absolute top-2 right-2 text-[9px] text-slate-500/70">{post.date}</div>}
+                                <p className="text-[10px] text-slate-400 line-clamp-3 mb-2 pr-12">{post.text}</p>
                                 <div className="flex items-center justify-between">
                                   <a href={post.url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-400 hover:underline">View Post</a>
                                   <button onClick={() => {
@@ -373,7 +374,7 @@ export default function ManualPostPage() {
                   <div></div> /* Empty div to keep grid layout */
                 )}
 
-                {postType !== 'REDUCED' && (
+                {postType !== 'PRICE_CHANGE' && (
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">Approx. Rental Rate</label>
                     <input type="text" value={parsedData.approxRentalRate || ''} onChange={(e) => updateField('approxRentalRate', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/50" placeholder="e.g. 10%" />
@@ -381,7 +382,7 @@ export default function ManualPostPage() {
                 )}
               </div>
 
-              {postType !== 'REDUCED' && (
+              {postType !== 'PRICE_CHANGE' && (
                 <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
                   {!isVilla && (
                     <div>
@@ -423,7 +424,7 @@ export default function ManualPostPage() {
                 </div>
               )}
 
-              {postType !== 'REDUCED' && (
+              {postType !== 'PRICE_CHANGE' && (
                 <div className="grid grid-cols-2 gap-4">
                   {!isVilla && (
                     <div>
@@ -451,7 +452,7 @@ export default function ManualPostPage() {
                 </div>
               )}
 
-              {postType !== 'REDUCED' && (
+              {postType !== 'PRICE_CHANGE' && (
                 <div className="pt-4 border-t border-white/5">
                   <label className="block text-sm font-medium text-slate-300 mb-2">Slide Image</label>
                   

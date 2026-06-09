@@ -31,6 +31,7 @@ export interface SearchedPost {
   id: number;
   text: string;
   url: string;
+  date?: string;
 }
 
 export async function searchOldPosts(priceStr: string): Promise<SearchedPost[]> {
@@ -75,10 +76,20 @@ export async function searchOldPosts(priceStr: string): Promise<SearchedPost[]> 
           url = `https://t.me/${String(chatId).replace('@', '')}/${msg.id}`;
         }
         
+        let dateStr = '';
+        if (msg.date) {
+          const d = new Date(msg.date * 1000);
+          const dd = String(d.getDate()).padStart(2, '0');
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const yy = String(d.getFullYear()).slice(-2);
+          dateStr = `${dd}/${mm}/${yy}`;
+        }
+        
         posts.push({
           id: msg.id,
           text: msg.message,
-          url: url
+          url: url,
+          date: dateStr
         });
       }
     }
