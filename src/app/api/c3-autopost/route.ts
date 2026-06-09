@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getC3Units, getRawRowData } from '@/lib/google/sheets';
-import { parsePastedRow } from '@/lib/parsing/row-parser';
+import { getC3Units, getC3UnitData } from '@/lib/google/sheets';
 import { findC3SlideByUnit } from '@/lib/google/drive';
 import { buildTelegramHtmlPost } from '@/lib/posts/templates';
 
@@ -27,15 +26,11 @@ export async function POST(req: Request) {
 
     const projectName = 'C3 Garden Residence';
     
-    // 1. Get raw row
-    const rawRow = await getRawRowData(projectName, unit);
-    if (!rawRow) {
-      return NextResponse.json({ error: `Row not found for unit ${unit}` }, { status: 404 });
+    // 1. Get parsed data directly from config sheet
+    const parsed = await getC3UnitData(unit);
+    if (!parsed) {
+      return NextResponse.json({ error: `Data not found for unit ${unit} in OBJECTS sheet` }, { status: 404 });
     }
-
-    // 2. Parse row
-    const parsed = await parsePastedRow(rawRow, projectName);
-    parsed.postType = 'READY_TO_MOVE';
 
     // 3. Find slide image on Google Drive
     let slideDataUrl = '';

@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { normalizeText } from '../posts/formatters';
+import { normalizeText, extractLeadingNumberText } from '../posts/formatters';
 import { getGoogleAuthClient } from './auth';
 
 export async function getGoogleSheetsClient() {
@@ -271,14 +271,14 @@ export async function getOriginalPriceForObject(unitCode: string) {
 }
 
 export async function getC3Units(): Promise<string[]> {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
+  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
   if (!spreadsheetId) return [];
 
-  const data = await getSheetData(spreadsheetId, 'Abu Dhabi');
+  const data = await getSheetData(spreadsheetId, 'OBJECTS');
   if (data.length < 2) return [];
 
   const headers = data[0].map(h => normalizeText(String(h || '').trim()));
-  const projectCol = headers.findIndex(h => h === normalizeText('Project Name') || h === normalizeText('Проект'));
+  const projectCol = headers.findIndex(h => h === normalizeText('Project Name'));
   const unitCol = headers.findIndex(h => h === normalizeText('Unit'));
 
   if (projectCol === -1 || unitCol === -1) return [];
@@ -294,23 +294,31 @@ export async function getC3Units(): Promise<string[]> {
     }
   }
 
-  return units.sort();
+  return units;
 }
 
-export async function getRawRowData(projectName: string, unitStr: string): Promise<string> {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
-  if (!spreadsheetId) return '';
+export async function getC3UnitData(unitStr: string): Promise<any> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
 
-  const data = await getSheetData(spreadsheetId, 'Abu Dhabi');
-  if (data.length < 2) return '';
+  const data = await getSheetData(spreadsheetId, 'OBJECTS');
+  if (data.length < 2) throw new Error('OBJECTS tab is empty');
 
   const headers = data[0].map(h => normalizeText(String(h || '').trim()));
-  const projectCol = headers.findIndex(h => h === normalizeText('Project Name') || h === normalizeText('Проект'));
+  const projectCol = headers.findIndex(h => h === normalizeText('Project Name'));
   const unitCol = headers.findIndex(h => h === normalizeText('Unit'));
+  
+  const codeCol = headers.findIndex(h => h === normalizeText('Code'));
+  const typeCol = headers.findIndex(h => h === normalizeText('Type'));
+  const viewCol = headers.findIndex(h => h === normalizeText('View'));
+  const floorCol = headers.findIndex(h => h === normalizeText('Floor'));
+  const priceCol = headers.findIndex(h => h === normalizeText('Selling Price, AED'));
+  const areaCol = headers.findIndex(h => h === normalizeText('Area, m2'));
+  const rentalCol = headers.findIndex(h => h === normalizeText('Approx. rental rate'));
 
-  if (projectCol === -1 || unitCol === -1) return '';
+  if (projectCol === -1 || unitCol === -1) throw new Error('Missing columns in OBJECTS');
 
-  const targetProject = normalizeText(projectName);
+  const targetProject = normalizeText('C3 Garden Residence');
   const targetUnit = String(unitStr).replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase();
 
   for (let i = 1; i < data.length; i++) {
@@ -318,9 +326,22 @@ export async function getRawRowData(projectName: string, unitStr: string): Promi
     const rowUnit = String(data[i][unitCol] || '').replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase();
 
     if (rowProject === targetProject && rowUnit === targetUnit) {
-      return data[i].join('\t');
+      return {
+        objectType: 'Apartment',
+        project: 'C3 Garden Residence',
+        code: codeCol !== -1 ? String(data[i][codeCol] || '').trim() : '',
+        unit: String(data[i][unitCol] || '').trim(),
+        type: typeCol !== -1 ? String(data[i][typeCol] || '').trim() : '',
+        view: viewCol !== -1 ? String(data[i][viewCol] || '').trim() : '',
+        floor: floorCol !== -1 ? String(data[i][floorCol] || '').trim() : '',
+        sellingPrice: priceCol !== -1 ? extractLeadingNumberText(String(data[i][priceCol] || '')) : '',
+        areaM2: areaCol !== -1 ? extractLeadingNumberText(String(data[i][areaCol] || '')) : '',
+        approxRentalRate: rentalCol !== -1 ? String(data[i][rentalCol] || '').trim() : '',
+        handover: 'Ready to move',
+        postType: 'READY_TO_MOVE'
+      };
     }
   }
 
-  return '';
+  return null;
 }
