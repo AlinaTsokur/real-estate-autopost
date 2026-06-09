@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const chatId = process.env.TELEGRAM_REVIEW_CHAT_ID;
     if (!chatId) throw new Error('TELEGRAM_REVIEW_CHAT_ID not configured');
 
-    if (data.postType === 'REDUCED') {
+    if (data.postType === 'PRICE_CHANGE') {
       // Reduced posts send old link first, then new post text
       if (data.oldPostUrl) {
         await sendPlainTextMessage(chatId, data.oldPostUrl);
