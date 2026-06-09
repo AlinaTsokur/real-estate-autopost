@@ -61,11 +61,11 @@ export default function RootLayout({
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Automations</span>
               </div>
               <Link
-                href="/c3-autopilot"
+                href="/c3-autopost"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-indigo-300 hover:text-indigo-200 hover:bg-indigo-600/10 transition-all duration-200"
               >
-                <span className="text-base">🤖</span>
-                <span>C3 Autopilot</span>
+                <span className="text-base">🏢</span>
+                <span>C3 Autopost</span>
               </Link>
             </nav>
           </aside>

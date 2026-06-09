@@ -74,3 +74,45 @@ export async function getDriveImages(folderId: string, limit = 5): Promise<Buffe
 }
 
 // TODO: cache photo IDs
+
+export async function findC3SlideByUnit(unit: string): Promise<string> {
+  const folderId = process.env.GOOGLE_DRIVE_C3_SLIDES_FOLDER_ID;
+  if (!folderId) throw new Error('GOOGLE_DRIVE_C3_SLIDES_FOLDER_ID not configured');
+
+  const drive = await getGoogleDriveClient();
+  
+  const res = await drive.files.list({
+    q: `'${folderId}' in parents and (mimeType='image/jpeg' or mimeType='image/png' or mimeType='image/webp') and trashed=false`,
+    fields: 'files(id, name)',
+    pageSize: 1000,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+
+  const files = res.data.files || [];
+  if (files.length === 0) throw new Error('No slide images found in C3 folder');
+
+  const targetName = String(unit).toLowerCase().trim();
+
+  const matchedFile = files.find(f => {
+    if (!f.name) return false;
+    const nameWithoutExt = f.name.replace(/\.[^/.]+$/, '').toLowerCase().trim();
+    return nameWithoutExt === targetName;
+  });
+
+  if (!matchedFile || !matchedFile.id) {
+    throw new Error(`Slide image not found for unit: ${unit}`);
+  }
+
+  const fileRes = await drive.files.get(
+    { fileId: matchedFile.id, alt: 'media' },
+    { responseType: 'arraybuffer' }
+  );
+  
+  const buffer = Buffer.from(fileRes.data as ArrayBuffer);
+  let mimeType = 'image/jpeg';
+  if (matchedFile.name?.toLowerCase().endsWith('.png')) mimeType = 'image/png';
+  if (matchedFile.name?.toLowerCase().endsWith('.webp')) mimeType = 'image/webp';
+  
+  return `data:${mimeType};base64,${buffer.toString('base64')}`;
+}

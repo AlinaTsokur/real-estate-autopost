@@ -269,3 +269,58 @@ export async function getOriginalPriceForObject(unitCode: string) {
 
   return '';
 }
+
+export async function getC3Units(): Promise<string[]> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
+  if (!spreadsheetId) return [];
+
+  const data = await getSheetData(spreadsheetId, 'Abu Dhabi');
+  if (data.length < 2) return [];
+
+  const headers = data[0].map(h => normalizeText(String(h || '').trim()));
+  const projectCol = headers.findIndex(h => h === normalizeText('Project Name') || h === normalizeText('Проект'));
+  const unitCol = headers.findIndex(h => h === normalizeText('Unit'));
+
+  if (projectCol === -1 || unitCol === -1) return [];
+
+  const targetProject = normalizeText('C3 Garden Residence');
+  const units: string[] = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const rowProject = normalizeText(data[i][projectCol]);
+    if (rowProject === targetProject) {
+      const unit = String(data[i][unitCol] || '').trim();
+      if (unit) units.push(unit);
+    }
+  }
+
+  return units.sort();
+}
+
+export async function getRawRowData(projectName: string, unitStr: string): Promise<string> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
+  if (!spreadsheetId) return '';
+
+  const data = await getSheetData(spreadsheetId, 'Abu Dhabi');
+  if (data.length < 2) return '';
+
+  const headers = data[0].map(h => normalizeText(String(h || '').trim()));
+  const projectCol = headers.findIndex(h => h === normalizeText('Project Name') || h === normalizeText('Проект'));
+  const unitCol = headers.findIndex(h => h === normalizeText('Unit'));
+
+  if (projectCol === -1 || unitCol === -1) return '';
+
+  const targetProject = normalizeText(projectName);
+  const targetUnit = String(unitStr).replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase();
+
+  for (let i = 1; i < data.length; i++) {
+    const rowProject = normalizeText(data[i][projectCol]);
+    const rowUnit = String(data[i][unitCol] || '').replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase();
+
+    if (rowProject === targetProject && rowUnit === targetUnit) {
+      return data[i].join('\t');
+    }
+  }
+
+  return '';
+}

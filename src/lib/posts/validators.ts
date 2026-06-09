@@ -6,12 +6,10 @@ export function validatePostData(data: Partial<PostData>): void {
   if (!data.project) throw new Error('Choose Project');
   if (data.sellingPrice === '' || data.sellingPrice === undefined) throw new Error('Selling Price is missing');
 
-  if (data.postType === 'REDUCED') {
-    if (!data.code) throw new Error('Code is required for reduced-price post');
+  if (data.postType === 'PRICE_CHANGE') {
+    if (!data.code) throw new Error('Code is required for price change post');
     if (data.oldPrice === '' || data.oldPrice === undefined) throw new Error('Enter Old Price manually');
-    if ((data.sellingPrice as number) >= (data.oldPrice as number)) {
-      throw new Error('Selling Price must be lower than Old Price');
-    }
+    // We no longer throw if sellingPrice >= oldPrice, because we support price increases!
     return;
   }
 
