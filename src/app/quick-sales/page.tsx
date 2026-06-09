@@ -53,7 +53,14 @@ export default function QuickSalesPage() {
     <div className="max-w-6xl mx-auto w-full">
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight mb-2">⚡ Quick Sales</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold text-white tracking-tight">⚡ Quick Sales</h1>
+            {!loading && items.length > 0 && (
+              <span className="bg-indigo-500/20 text-indigo-300 text-xs font-semibold px-2.5 py-1 rounded-full border border-indigo-500/30">
+                {items.length} {items.length === 1 ? 'item' : 'items'}
+              </span>
+            )}
+          </div>
           <p className="text-slate-400">View and copy properties marked as "Quick Sale" from Abu Dhabi sheet.</p>
         </div>
         <div className="flex items-center gap-3">
