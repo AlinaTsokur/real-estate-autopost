@@ -48,17 +48,23 @@ export async function GET() {
       const row = rowData[i].values || [];
       const statusValue = getCellText(row[statusCol]).toLowerCase();
 
-      // Check background color of the first cell (or the status cell) to see if it's #f4cccc
-      // #f4cccc is rgb(244, 204, 204) -> red: ~0.95, green: ~0.8, blue: ~0.8
-      const bgColor = row[0]?.userEnteredFormat?.backgroundColor;
+      // Check background color of the Unit cell
       let isSold = false;
-      if (bgColor) {
-        const r = bgColor.red || 0;
-        const g = bgColor.green || 0;
-        const b = bgColor.blue || 0;
-        // Check if it's around #f4cccc
-        if (r > 0.9 && r < 1.0 && g > 0.75 && g < 0.85 && b > 0.75 && b < 0.85) {
-          isSold = true; // It's light red (#f4cccc)
+      if (unitCol !== -1) {
+        const unitBgColor = row[unitCol]?.userEnteredFormat?.backgroundColor;
+        if (unitBgColor) {
+          const r = unitBgColor.red || 0;
+          const g = unitBgColor.green || 0;
+          const b = unitBgColor.blue || 0;
+          
+          // Check if it's around #f4cccc (light red)
+          if (r > 0.9 && r <= 1.0 && g > 0.75 && g < 0.85 && b > 0.75 && b < 0.85) {
+            isSold = true;
+          }
+          // Also handle the case where it might be marked in other red shades or gray (#b7b7b7) if they mark it as sold
+          else if (r > 0.9 && g < 0.5 && b < 0.5) {
+            isSold = true; // bright red
+          }
         }
       }
 
