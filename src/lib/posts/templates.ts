@@ -72,7 +72,7 @@ async function buildApartmentPostText(data: any) {
   if (cfg.emoji) text += ' ' + escapeHtml(cfg.emoji);
   text += '</b>\n\n';
 
-  if (data.originalPrice !== '') {
+  if (data.originalPrice) {
     text += '<u>Original Price:</u> ' + escapeHtml(formatNumberLikeSheet(data.originalPrice)) + ' AED\n';
   }
 
@@ -115,7 +115,7 @@ async function buildVillaPostText(data: any) {
   if (cfg.emoji) text += ' ' + escapeHtml(cfg.emoji);
   text += '</b>\n\n';
 
-  if (data.originalPrice !== '') {
+  if (data.originalPrice) {
     text += '<u>Original Price:</u> ' + escapeHtml(formatNumberLikeSheet(data.originalPrice)) + ' AED\n';
   }
 
@@ -184,7 +184,7 @@ async function buildApartmentWhatsAppPostText(data: any) {
   if (cfg.emoji) text += ' ' + cfg.emoji;
   text += '*\n\n';
 
-  if (data.originalPrice !== '') {
+  if (data.originalPrice) {
     text += 'Original Price: ' + formatNumberLikeSheet(data.originalPrice) + ' AED\n';
   }
 
@@ -222,7 +222,7 @@ async function buildVillaWhatsAppPostText(data: any) {
   if (cfg.emoji) text += ' ' + cfg.emoji;
   text += '*\n\n';
 
-  if (data.originalPrice !== '') {
+  if (data.originalPrice) {
     text += 'Original Price: ' + formatNumberLikeSheet(data.originalPrice) + ' AED\n';
   }
 
