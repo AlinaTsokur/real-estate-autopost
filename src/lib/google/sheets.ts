@@ -89,23 +89,33 @@ export async function getConfig2Handover(projectName: string, codePrefix: string
   const targetProject = normalizeText(projectName);
 
   // 1. Exact match
+  let foundEmptyMatch = false;
   for (let i = 1; i < data.length; i++) {
     const rowProject = normalizeText(data[i][projectCol]);
-    const rowPrefix = String(data[i][prefixCol]).replace(/\\D/g, '').slice(0, 4);
+    const rowPrefix = String(data[i][prefixCol]).replace(/\D/g, '').slice(0, 4);
 
     if (rowProject === targetProject && rowPrefix === codePrefix) {
       const value = String(data[i][handoverCol] || '').trim();
-      return { value, warning: value ? '' : 'Handover empty for prefix ' + codePrefix };
+      if (value) {
+        return { value, warning: '' };
+      }
+      foundEmptyMatch = true;
     }
   }
 
   // 2. Prefix only match
   for (let i = 1; i < data.length; i++) {
-    const rowPrefix = String(data[i][prefixCol]).replace(/\\D/g, '').slice(0, 4);
+    const rowPrefix = String(data[i][prefixCol]).replace(/\D/g, '').slice(0, 4);
     if (rowPrefix === codePrefix) {
       const value = String(data[i][handoverCol] || '').trim();
-      return { value, warning: value ? '' : 'Handover empty for prefix ' + codePrefix };
+      if (value) {
+        return { value, warning: '' };
+      }
     }
+  }
+
+  if (foundEmptyMatch) {
+    return { value: '', warning: 'Handover empty for prefix ' + codePrefix };
   }
 
   return { value: '', warning: 'Handover not found in CONFIG2 for prefix ' + codePrefix };
