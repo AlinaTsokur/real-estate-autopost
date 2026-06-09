@@ -18,6 +18,7 @@ const navItems = [
   { href: '/budget', label: 'Budget Builder', icon: '💰' },
   { href: '/catalog', label: 'Catalog Builder', icon: '📄' },
   { href: '/reduced-price', label: 'Reduced Price Flow', icon: '📉' },
+  { href: '/quick-sales', label: 'Quick Sales', icon: '⚡' },
 ];
 
 export default function RootLayout({

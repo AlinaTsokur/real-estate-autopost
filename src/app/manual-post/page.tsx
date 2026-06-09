@@ -103,7 +103,7 @@ export default function ManualPostPage() {
   };
 
   const updateField = (field: string, value: string) => {
-    setParsedData({ ...parsedData, [field]: value });
+    setParsedData((prev: any) => ({ ...prev, [field]: value }));
   };
 
   const [lastSearchedUnit, setLastSearchedUnit] = useState('');
