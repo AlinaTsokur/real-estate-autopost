@@ -51,7 +51,9 @@ export async function GET() {
       // Check background color of the Unit cell
       let isSold = false;
       if (unitCol !== -1) {
-        const unitBgColor = row[unitCol]?.userEnteredFormat?.backgroundColor;
+        // effectiveFormat catches colors applied via conditional formatting
+        const unitBgColor = row[unitCol]?.effectiveFormat?.backgroundColor || row[unitCol]?.userEnteredFormat?.backgroundColor;
+        
         if (unitBgColor) {
           const r = unitBgColor.red || 0;
           const g = unitBgColor.green || 0;
