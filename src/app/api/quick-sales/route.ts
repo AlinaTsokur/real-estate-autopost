@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSheetData } from '@/lib/google/sheets';
+import { getGoogleSheetsClient } from '@/lib/google/sheets';
 import { normalizeText, formatNumberLikeSheet } from '@/lib/posts/formatters';
 
 export async function GET() {
@@ -7,13 +7,26 @@ export async function GET() {
     const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
     if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_OBJECTS_ID not configured');
 
-    const data = await getSheetData(spreadsheetId, 'Abu Dhabi');
+    const sheets = await getGoogleSheetsClient();
+    const res = await sheets.spreadsheets.get({
+      spreadsheetId,
+      ranges: ['Abu Dhabi!A:Z'],
+      includeGridData: true,
+    });
+
+    const gridData = res.data.sheets?.[0]?.data?.[0];
+    const rowData = gridData?.rowData;
     
-    if (!data || data.length < 2) {
+    if (!rowData || rowData.length < 2) {
       return NextResponse.json({ items: [] });
     }
 
-    const headers = data[0].map(h => normalizeText(String(h || '').trim()));
+    // Helper to get text from a cell
+    const getCellText = (cell: any) => String(cell?.formattedValue || cell?.userEnteredValue?.stringValue || cell?.userEnteredValue?.numberValue || '').trim();
+
+    // Extract headers
+    const headerRow = rowData[0].values || [];
+    const headers = headerRow.map(h => normalizeText(getCellText(h)));
     
     // Find required column indices
     const unitCol = headers.findIndex(h => h === normalizeText('Unit'));
@@ -22,8 +35,6 @@ export async function GET() {
     const origPriceCol = headers.findIndex(h => h === normalizeText('Original Price'));
     const sellPriceCol = headers.findIndex(h => h === normalizeText('Selling Price'));
     
-    // The exact column from the user: "Regular\nHot\nDistress"
-    // Let's find it flexibly
     const statusCol = headers.findIndex(h => h.includes(normalizeText('distress')) || h.includes(normalizeText('hot')) || h.includes(normalizeText('regular')));
 
     if (statusCol === -1) {
@@ -32,18 +43,32 @@ export async function GET() {
 
     const items: any[] = [];
 
-    // Loop through rows starting from index 1 (skipping header)
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const statusValue = String(row[statusCol] || '').trim().toLowerCase();
+    // Loop through rows starting from index 1
+    for (let i = 1; i < rowData.length; i++) {
+      const row = rowData[i].values || [];
+      const statusValue = getCellText(row[statusCol]).toLowerCase();
 
-      if (statusValue === 'quick sale') {
+      // Check background color of the first cell (or the status cell) to see if it's #f4cccc
+      // #f4cccc is rgb(244, 204, 204) -> red: ~0.95, green: ~0.8, blue: ~0.8
+      const bgColor = row[0]?.userEnteredFormat?.backgroundColor;
+      let isSold = false;
+      if (bgColor) {
+        const r = bgColor.red || 0;
+        const g = bgColor.green || 0;
+        const b = bgColor.blue || 0;
+        // Check if it's around #f4cccc
+        if (r > 0.9 && r < 1.0 && g > 0.75 && g < 0.85 && b > 0.75 && b < 0.85) {
+          isSold = true; // It's light red (#f4cccc)
+        }
+      }
+
+      if (statusValue === 'quick sale' && !isSold) {
         items.push({
-          unit: unitCol !== -1 ? String(row[unitCol] || '').trim() : '',
-          code: codeCol !== -1 ? String(row[codeCol] || '').trim() : '',
-          bedrooms: brCol !== -1 ? String(row[brCol] || '').trim() : '',
-          originalPrice: origPriceCol !== -1 ? String(row[origPriceCol] || '').trim() : '',
-          sellingPrice: sellPriceCol !== -1 ? String(row[sellPriceCol] || '').trim() : '',
+          unit: unitCol !== -1 ? getCellText(row[unitCol]) : '',
+          code: codeCol !== -1 ? getCellText(row[codeCol]) : '',
+          bedrooms: brCol !== -1 ? getCellText(row[brCol]) : '',
+          originalPrice: origPriceCol !== -1 ? getCellText(row[origPriceCol]) : '',
+          sellingPrice: sellPriceCol !== -1 ? getCellText(row[sellPriceCol]) : '',
         });
       }
     }
