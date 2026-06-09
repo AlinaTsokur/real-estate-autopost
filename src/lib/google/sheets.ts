@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { normalizeText, extractLeadingNumberText } from '../posts/formatters';
+import { normalizeText, toNumber } from '../posts/formatters';
 import { getGoogleAuthClient } from './auth';
 
 export async function getGoogleSheetsClient() {
@@ -341,8 +341,8 @@ export async function getC3UnitData(unitStr: string): Promise<any> {
         type: typeCol !== -1 ? String(data[i][typeCol] || '').trim() : '',
         view: viewCol !== -1 ? String(data[i][viewCol] || '').trim() : '',
         floor: floorVal,
-        sellingPrice: priceCol !== -1 ? extractLeadingNumberText(String(data[i][priceCol] || '')) : '',
-        areaM2: areaCol !== -1 ? extractLeadingNumberText(String(data[i][areaCol] || '')) : '',
+        sellingPrice: priceCol !== -1 ? toNumber(String(data[i][priceCol] || '')) : '',
+        areaM2: areaCol !== -1 ? toNumber(String(data[i][areaCol] || '')) : '',
         approxRentalRate: rentalCol !== -1 ? String(data[i][rentalCol] || '').trim() : '',
         handover: 'Ready to move',
         postType: 'READY_TO_MOVE'
