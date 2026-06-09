@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getGoogleSheetsClient } from '@/lib/google/sheets';
 import { normalizeText, formatNumberLikeSheet } from '@/lib/posts/formatters';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
