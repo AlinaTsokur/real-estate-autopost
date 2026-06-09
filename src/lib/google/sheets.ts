@@ -326,14 +326,21 @@ export async function getC3UnitData(unitStr: string): Promise<any> {
     const rowUnit = String(data[i][unitCol] || '').replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase();
 
     if (rowProject === targetProject && rowUnit === targetUnit) {
+      const unitVal = String(data[i][unitCol] || '').trim();
+      let floorVal = floorCol !== -1 ? String(data[i][floorCol] || '').trim() : '';
+      if (!floorVal) {
+        if (unitVal.toUpperCase().startsWith('G')) floorVal = 'Ground Floor';
+        else if (unitVal.startsWith('2')) floorVal = '2nd Floor';
+      }
+
       return {
         objectType: 'Apartment',
         project: 'C3 Garden Residence',
         code: codeCol !== -1 ? String(data[i][codeCol] || '').trim() : '',
-        unit: String(data[i][unitCol] || '').trim(),
+        unit: unitVal,
         type: typeCol !== -1 ? String(data[i][typeCol] || '').trim() : '',
         view: viewCol !== -1 ? String(data[i][viewCol] || '').trim() : '',
-        floor: floorCol !== -1 ? String(data[i][floorCol] || '').trim() : '',
+        floor: floorVal,
         sellingPrice: priceCol !== -1 ? extractLeadingNumberText(String(data[i][priceCol] || '')) : '',
         areaM2: areaCol !== -1 ? extractLeadingNumberText(String(data[i][areaCol] || '')) : '',
         approxRentalRate: rentalCol !== -1 ? String(data[i][rentalCol] || '').trim() : '',
