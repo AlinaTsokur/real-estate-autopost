@@ -56,6 +56,8 @@ export async function POST(request: Request) {
       // throw new Error('Failed to load project photos from Drive');
     }
 
+    console.log(`Sending telegram media group with ${media.length} items`);
+
     await sendMediaGroupWithCaption(chatId, media, telegramHtml, data.code || data.unit || 'Unknown');
     
     // Send the WhatsApp plain text version as a separate message with the slide photo
