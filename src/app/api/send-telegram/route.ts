@@ -39,15 +39,15 @@ export async function POST(request: Request) {
     
     // Media group
     const media: { type: 'photo'; media: any }[] = [
-      { type: 'photo', media: { source: slideBuffer } }
+      { type: 'photo', media: { source: slideBuffer, filename: 'slide.jpg' } }
     ];
 
     try {
       const folderId = await getProjectPhotoFolderId(data.project);
       const images = await getDriveImages(folderId, 5); // Get up to 5 to make 6 total with slide
 
-      images.forEach(img => {
-        media.push({ type: 'photo', media: { source: img } });
+      images.forEach((img, i) => {
+        media.push({ type: 'photo', media: { source: img, filename: `img_${i}.jpg` } });
       });
     } catch (e) {
       console.error('Failed to get drive images:', e);
