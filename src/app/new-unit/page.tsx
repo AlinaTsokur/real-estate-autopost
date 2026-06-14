@@ -43,7 +43,7 @@ interface Options {
 
 const EMPTY: FormState = {
   projectName: '', unit: '', code: '',
-  type: '', parkingSpace: '', view: '', floor: '', furnished: '',
+  type: '', parkingSpace: '1', view: '', floor: '', furnished: '',
   originalPrice: '', sellingPrice: '',
   areaM2: '', grossAreaM2: '', plotAreaM2: '',
   specification: '', finishes: '', pod: '', rowType: '', unitPosition: '',

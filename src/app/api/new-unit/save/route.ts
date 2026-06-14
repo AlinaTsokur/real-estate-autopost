@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     set('Unit',                form.unit ?? '');
     set('Code',                form.code ?? '');
     set('Type',                form.type ?? '');
-    set('Parking space',       numVal(form.parkingSpace));
+    set('Parking space',       numVal(form.parkingSpace || '1'));
     set('View',                form.view ?? '');
     set('Floor',               form.floor ?? '');
     set('Furnished',           form.furnished ?? '');
