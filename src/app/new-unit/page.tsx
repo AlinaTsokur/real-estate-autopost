@@ -241,6 +241,7 @@ export default function NewUnitPage() {
   const [handoverAuto, setHandoverAuto] = useState(false);
   const [handoverOptions, setHandoverOptions] = useState<HandoverOption[]>([]);
   const [handoverReadyToMove, setHandoverReadyToMove] = useState(false);
+  const [selectedHandoverBuilding, setSelectedHandoverBuilding] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/new-unit/options')
@@ -638,9 +639,9 @@ export default function NewUnitPage() {
                           <button
                             key={o.building + o.date}
                             type="button"
-                            onClick={() => { setForm(prev => ({ ...prev, handoverDate: o.date })); setHandoverAuto(true); }}
+                            onClick={() => { setForm(prev => ({ ...prev, handoverDate: o.date })); setHandoverAuto(true); setSelectedHandoverBuilding(o.building + o.date); }}
                             className={`text-[11px] px-2 py-1 rounded-lg border transition-colors ${
-                              form.handoverDate === o.date
+                              selectedHandoverBuilding === o.building + o.date
                                 ? 'bg-indigo-500/25 border-indigo-500/50 text-indigo-300'
                                 : 'border-white/10 text-slate-400 hover:text-white hover:bg-white/5'
                             }`}
@@ -654,7 +655,7 @@ export default function NewUnitPage() {
                     <input
                       type="text"
                       value={form.handoverDate}
-                      onChange={e => { setHandoverAuto(false); up('handoverDate')(e); }}
+                      onChange={e => { setHandoverAuto(false); setSelectedHandoverBuilding(null); up('handoverDate')(e); }}
                       placeholder="31/12/2026"
                       className={BASE_INPUT}
                     />
