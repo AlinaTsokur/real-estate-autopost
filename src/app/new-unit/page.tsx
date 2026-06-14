@@ -443,7 +443,16 @@ export default function NewUnitPage() {
           {/* Code */}
           <div>
             <label className={LABEL}>Код объекта</label>
-            <input value={form.code} onChange={up('code')} placeholder="1001-01" className={BASE_INPUT} />
+            <input
+              value={form.code}
+              onChange={e => {
+                const v = e.target.value;
+                const clean = v.startsWith('#') ? v : '#' + v.replace(/^#+/, '');
+                setForm(prev => ({ ...prev, code: clean }));
+              }}
+              placeholder="#1001-01"
+              className={BASE_INPUT}
+            />
           </div>
 
           {/* Type */}
