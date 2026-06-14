@@ -29,6 +29,12 @@ interface SaveResult {
   paymentError?: string;
 }
 
+interface HandoverOption {
+  building: string;
+  date: string;
+  isReadyToMove: boolean;
+}
+
 interface Options {
   projects: string[];
   objectKindByProject: Record<string, string>;
@@ -233,6 +239,8 @@ export default function NewUnitPage() {
   const [projectSearch, setProjectSearch] = useState(form.projectName);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [handoverAuto, setHandoverAuto] = useState(false);
+  const [handoverOptions, setHandoverOptions] = useState<HandoverOption[]>([]);
+  const [handoverReadyToMove, setHandoverReadyToMove] = useState(false);
 
   useEffect(() => {
     fetch('/api/new-unit/options')
@@ -259,15 +267,32 @@ export default function NewUnitPage() {
   // Auto-fill Handover Date from CONFIG2 when code has 4+ digits
   useEffect(() => {
     const prefix = form.code.replace(/\D/g, '').slice(0, 4);
-    if (!form.projectName || prefix.length < 4) return;
+    if (!form.projectName || prefix.length < 4) {
+      setHandoverOptions([]);
+      setHandoverReadyToMove(false);
+      return;
+    }
 
     fetch(`/api/new-unit/handover?project=${encodeURIComponent(form.projectName)}&code=${encodeURIComponent(form.code)}`)
       .then(r => r.json())
       .then(d => {
-        if (d.date) {
-          setForm(prev => ({ ...prev, handoverDate: d.date }));
+        const opts: HandoverOption[] = d.options ?? [];
+        setHandoverOptions(opts);
+
+        // All options are "Ready to move" — show badge, don't fill date
+        if (opts.length > 0 && opts.every(o => o.isReadyToMove)) {
+          setHandoverReadyToMove(true);
+          return;
+        }
+        setHandoverReadyToMove(false);
+
+        // Single non-RTM option → auto-fill
+        const nonRtm = opts.filter(o => !o.isReadyToMove);
+        if (nonRtm.length === 1) {
+          setForm(prev => ({ ...prev, handoverDate: nonRtm[0].date }));
           setHandoverAuto(true);
         }
+        // Multiple → show picker (handled in JSX)
       })
       .catch(() => {});
   }, [form.code, form.projectName]);
@@ -598,15 +623,39 @@ export default function NewUnitPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-1.5">
                       <label className={LABEL.replace('mb-1.5', '')}>Handover Date</label>
-                      {handoverAuto && (
+                      {handoverAuto && !handoverReadyToMove && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-medium">авто</span>
                       )}
+                      {handoverReadyToMove && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">Ready to move</span>
+                      )}
                     </div>
+
+                    {/* Multiple options picker */}
+                    {handoverOptions.filter(o => !o.isReadyToMove).length > 1 && (
+                      <div className="mb-2 flex flex-wrap gap-1.5">
+                        {handoverOptions.filter(o => !o.isReadyToMove).map(o => (
+                          <button
+                            key={o.building + o.date}
+                            type="button"
+                            onClick={() => { setForm(prev => ({ ...prev, handoverDate: o.date })); setHandoverAuto(true); }}
+                            className={`text-[11px] px-2 py-1 rounded-lg border transition-colors ${
+                              form.handoverDate === o.date
+                                ? 'bg-indigo-500/25 border-indigo-500/50 text-indigo-300'
+                                : 'border-white/10 text-slate-400 hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            {o.building ? `${o.building} — ` : ''}{o.date}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     <input
                       type="text"
                       value={form.handoverDate}
                       onChange={e => { setHandoverAuto(false); up('handoverDate')(e); }}
-                      placeholder="30/06/2026 или Ready to move"
+                      placeholder="31/12/2026"
                       className={BASE_INPUT}
                     />
                     {parseDateHint(form.handoverDate) && (
