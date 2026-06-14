@@ -8,7 +8,7 @@ import { toNumber, formatNumberLikeSheet } from '@/lib/posts/formatters';
 interface FormState {
   projectName: string; unit: string; code: string;
   type: string; parkingSpace: string; view: string; floor: string; furnished: string;
-  originalPrice: string; oldPrice: string; sellingPrice: string;
+  originalPrice: string; sellingPrice: string;
   areaM2: string; grossAreaM2: string; plotAreaM2: string;
   specification: string; finishes: string; pod: string; rowType: string; unitPosition: string;
   paymentPlan: string;
@@ -44,7 +44,7 @@ interface Options {
 const EMPTY: FormState = {
   projectName: '', unit: '', code: '',
   type: '', parkingSpace: '', view: '', floor: '', furnished: '',
-  originalPrice: '', oldPrice: '', sellingPrice: '',
+  originalPrice: '', sellingPrice: '',
   areaM2: '', grossAreaM2: '', plotAreaM2: '',
   specification: '', finishes: '', pod: '', rowType: '', unitPosition: '',
   paymentPlan: '',
@@ -515,7 +515,6 @@ export default function NewUnitPage() {
         {/* ── Section 3: Цены ── */}
         <SectionCard title="Цены" dot="bg-emerald-500">
           <PriceInput label="Original Price, AED" value={form.originalPrice} onChange={up('originalPrice')} />
-          <PriceInput label="Old Price, AED" value={form.oldPrice} onChange={up('oldPrice')} />
 
           <div>
             <PriceInput label="Selling Price, AED *" value={form.sellingPrice} onChange={up('sellingPrice')} accent />

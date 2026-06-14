@@ -90,7 +90,6 @@ export async function POST(req: NextRequest) {
     set('Furnished',           form.furnished ?? '');
 
     set('Original Price, AED', numVal(form.originalPrice));
-    set('Old Price, AED',      numVal(form.oldPrice));
     set('Selling Price, AED',  numVal(form.sellingPrice));
 
     set('Area, m2',            numVal(form.areaM2));

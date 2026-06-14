@@ -35,7 +35,7 @@ async function generateGoogleToken() {
     access_type: 'offline',
     scope: [
       'https://www.googleapis.com/auth/spreadsheets',
-      'https://www.googleapis.com/auth/drive.readonly',
+      'https://www.googleapis.com/auth/drive',
     ],
     prompt: 'consent' // Forces consent screen to ensure we get a refresh token
   });
