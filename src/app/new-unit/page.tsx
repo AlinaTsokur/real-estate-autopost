@@ -232,6 +232,7 @@ export default function NewUnitPage() {
   const [showPayments, setShowPayments] = useState(false);
   const [projectSearch, setProjectSearch] = useState(form.projectName);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [handoverAuto, setHandoverAuto] = useState(false);
 
   useEffect(() => {
     fetch('/api/new-unit/options')
@@ -254,6 +255,22 @@ export default function NewUnitPage() {
 
   const isVilla = options?.objectKindByProject[form.projectName] === 'Villa';
   const dealTag = calcDealTag(form.originalPrice, form.sellingPrice);
+
+  // Auto-fill Handover Date from CONFIG2 when code has 4+ digits
+  useEffect(() => {
+    const prefix = form.code.replace(/\D/g, '').slice(0, 4);
+    if (!form.projectName || prefix.length < 4) return;
+
+    fetch(`/api/new-unit/handover?project=${encodeURIComponent(form.projectName)}&code=${encodeURIComponent(form.code)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.date) {
+          setForm(prev => ({ ...prev, handoverDate: d.date }));
+          setHandoverAuto(true);
+        }
+      })
+      .catch(() => {});
+  }, [form.code, form.projectName]);
 
   // Project search with Ru→En transliteration
   const handleProjectSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -578,7 +595,26 @@ export default function NewUnitPage() {
               <div>
                 <p className="text-xs font-semibold text-purple-300 mb-3 uppercase tracking-wide">Handover</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <DateInput label="Handover Date" value={form.handoverDate} onChange={up('handoverDate')} />
+                  <div>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <label className={LABEL.replace('mb-1.5', '')}>Handover Date</label>
+                      {handoverAuto && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-medium">авто</span>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={form.handoverDate}
+                      onChange={e => { setHandoverAuto(false); up('handoverDate')(e); }}
+                      placeholder="30/06/2026 или Ready to move"
+                      className={BASE_INPUT}
+                    />
+                    {parseDateHint(form.handoverDate) && (
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        → <span className="text-slate-300">{parseDateHint(form.handoverDate)}</span>
+                      </p>
+                    )}
+                  </div>
                   <PriceInput label="Handover AED" value={form.handoverAed} onChange={up('handoverAed')} />
                 </div>
               </div>
