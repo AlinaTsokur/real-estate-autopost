@@ -223,15 +223,18 @@ export default function NewUnitPage() {
   const [optLoading, setOptLoading] = useState(true);
   const [optError, setOptError] = useState('');
 
-  const [form, setForm] = useState<FormState>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('newUnit_draft');
-        if (raw) return { ...EMPTY, ...JSON.parse(raw) };
-      } catch {}
-    }
-    return EMPTY;
-  });
+  const [form, setForm] = useState<FormState>(EMPTY);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('newUnit_draft');
+      if (raw) {
+        const draft = { ...EMPTY, ...JSON.parse(raw) };
+        setForm(draft);
+        if (draft.projectName) setProjectSearch(draft.projectName);
+      }
+    } catch {}
+  }, []);
 
   const [loadCode, setLoadCode] = useState('');
   const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'found' | 'notfound'>('idle');
@@ -263,7 +266,7 @@ export default function NewUnitPage() {
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<SaveResult | null>(null);
   const [showPayments, setShowPayments] = useState(false);
-  const [projectSearch, setProjectSearch] = useState(form.projectName);
+  const [projectSearch, setProjectSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [handoverAuto, setHandoverAuto] = useState(false);
   const [handoverOptions, setHandoverOptions] = useState<HandoverOption[]>([]);
