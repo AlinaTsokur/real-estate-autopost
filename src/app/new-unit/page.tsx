@@ -243,14 +243,17 @@ export default function NewUnitPage() {
       const res = await fetch(`/api/new-unit/load-row?code=${encodeURIComponent(loadCode.trim())}`);
       const d = await res.json();
       if (!d.found) { setLoadStatus('notfound'); return; }
+      const newCode = loadCode.trim().startsWith('#') ? loadCode.trim() : '#' + loadCode.trim();
       setForm(prev => ({
         ...prev,
+        code:          newCode,
+        projectName:   d.projectName   || prev.projectName,
         unit:          d.unit          || prev.unit,
         originalPrice: d.originalPrice || prev.originalPrice,
         sellingPrice:  d.sellingPrice  || prev.sellingPrice,
         manager:       d.manager       || prev.manager,
-        code:          loadCode.trim().startsWith('#') ? loadCode.trim() : '#' + loadCode.trim(),
       }));
+      if (d.projectName) setProjectSearch(d.projectName);
       setLoadStatus('found');
     } catch {
       setLoadStatus('notfound');
