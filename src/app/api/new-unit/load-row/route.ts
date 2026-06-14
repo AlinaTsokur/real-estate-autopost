@@ -3,7 +3,7 @@ import { getSheetData } from '@/lib/google/sheets';
 
 const OBJECTS_ID = process.env.GOOGLE_SHEETS_OBJECTS_ID ?? '';
 
-const SHEETS_TO_SEARCH = ['Abu Dhabi', 'C3 Garden Res', 'Hudariyat'];
+const SHEETS_TO_SEARCH = ['Abu Dhabi'];
 
 function stripAed(v: string): string {
   return v.replace(/\s*AED\s*/gi, '').replace(/\s+/g, ' ').trim();
