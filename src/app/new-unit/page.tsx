@@ -233,6 +233,30 @@ export default function NewUnitPage() {
     return EMPTY;
   });
 
+  const [loadCode, setLoadCode] = useState('');
+  const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'found' | 'notfound'>('idle');
+
+  const handleLoadRow = async () => {
+    if (!loadCode.trim()) return;
+    setLoadStatus('loading');
+    try {
+      const res = await fetch(`/api/new-unit/load-row?code=${encodeURIComponent(loadCode.trim())}`);
+      const d = await res.json();
+      if (!d.found) { setLoadStatus('notfound'); return; }
+      setForm(prev => ({
+        ...prev,
+        unit:          d.unit          || prev.unit,
+        originalPrice: d.originalPrice || prev.originalPrice,
+        sellingPrice:  d.sellingPrice  || prev.sellingPrice,
+        manager:       d.manager       || prev.manager,
+        code:          loadCode.trim().startsWith('#') ? loadCode.trim() : '#' + loadCode.trim(),
+      }));
+      setLoadStatus('found');
+    } catch {
+      setLoadStatus('notfound');
+    }
+  };
+
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<SaveResult | null>(null);
   const [showPayments, setShowPayments] = useState(false);
@@ -374,6 +398,28 @@ export default function NewUnitPage() {
           Заполни поля — цены и площади принимаются в любом формате.
           Черновик сохраняется автоматически.
         </p>
+      </div>
+
+      {/* ── Загрузить из рабочей таблицы ── */}
+      <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 mb-6 flex gap-3 items-center">
+        <input
+          type="text"
+          value={loadCode}
+          onChange={e => { setLoadCode(e.target.value); setLoadStatus('idle'); }}
+          onKeyDown={e => e.key === 'Enter' && handleLoadRow()}
+          placeholder="Введи код (#010511) — подтянет данные из таблицы"
+          className={BASE_INPUT + ' flex-1'}
+        />
+        <button
+          type="button"
+          onClick={handleLoadRow}
+          disabled={loadStatus === 'loading'}
+          className="shrink-0 px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition-colors disabled:opacity-50"
+        >
+          {loadStatus === 'loading' ? '...' : 'Загрузить'}
+        </button>
+        {loadStatus === 'found' && <span className="text-emerald-400 text-sm shrink-0">✓ Данные подтянуты</span>}
+        {loadStatus === 'notfound' && <span className="text-rose-400 text-sm shrink-0">Не найдено</span>}
       </div>
 
       {optLoading && (
