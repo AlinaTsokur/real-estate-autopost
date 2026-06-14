@@ -658,11 +658,6 @@ export default function NewUnitPage() {
                       placeholder="31/12/2026"
                       className={BASE_INPUT}
                     />
-                    {parseDateHint(form.handoverDate) && (
-                      <p className="mt-1 text-[11px] text-slate-500">
-                        → <span className="text-slate-300">{parseDateHint(form.handoverDate)}</span>
-                      </p>
-                    )}
                   </div>
                   <PriceInput label="Handover AED" value={form.handoverAed} onChange={up('handoverAed')} />
                 </div>
