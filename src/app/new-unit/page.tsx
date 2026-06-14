@@ -6,19 +6,27 @@ import { toNumber, formatNumberLikeSheet } from '@/lib/posts/formatters';
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface FormState {
-  projectName: string; building: string; unit: string; code: string;
+  projectName: string; unit: string; code: string;
   type: string; parkingSpace: string; view: string; floor: string; furnished: string;
-  originalPrice: string; oldPrice: string; sellingPrice: string; approxRentalRate: string;
+  originalPrice: string; oldPrice: string; sellingPrice: string;
   areaM2: string; grossAreaM2: string; plotAreaM2: string;
   specification: string; finishes: string; pod: string; rowType: string; unitPosition: string;
-  paymentPlan: string; status: string; mortgage: string;
+  paymentPlan: string;
   handoverDate: string; handoverAed: string;
   payment2Date: string; payment2Aed: string;
   payment3Date: string; payment3Aed: string;
   payment4Date: string; payment4Aed: string;
   payment5Date: string; payment5Aed: string;
   payment6Date: string; payment6Aed: string;
-  manager: string; notes: string;
+  manager: string;
+}
+
+interface SaveResult {
+  ok: boolean;
+  text: string;
+  folderUrl?: string;
+  paymentSheetUrl?: string;
+  paymentError?: string;
 }
 
 interface Options {
@@ -34,28 +42,42 @@ interface Options {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const EMPTY: FormState = {
-  projectName: '', building: '', unit: '', code: '',
+  projectName: '', unit: '', code: '',
   type: '', parkingSpace: '', view: '', floor: '', furnished: '',
-  originalPrice: '', oldPrice: '', sellingPrice: '', approxRentalRate: '',
+  originalPrice: '', oldPrice: '', sellingPrice: '',
   areaM2: '', grossAreaM2: '', plotAreaM2: '',
   specification: '', finishes: '', pod: '', rowType: '', unitPosition: '',
-  paymentPlan: '', status: '', mortgage: '',
+  paymentPlan: '',
   handoverDate: '', handoverAed: '',
   payment2Date: '', payment2Aed: '',
   payment3Date: '', payment3Aed: '',
   payment4Date: '', payment4Aed: '',
   payment5Date: '', payment5Aed: '',
   payment6Date: '', payment6Aed: '',
-  manager: '', notes: '',
+  manager: '',
 };
 
-// ─── Pure helpers (no hooks) ─────────────────────────────────────────────────
+// ─── Russian → English keyboard transliteration ──────────────────────────────
+
+const RU_EN: Record<string, string> = {
+  'й':'q','ц':'w','у':'e','к':'r','е':'t','н':'y','г':'u','ш':'i','щ':'o','з':'p','х':'[','ъ':']',
+  'ф':'a','ы':'s','в':'d','а':'f','п':'g','р':'h','о':'j','л':'k','д':'l','ж':';','э':"'",
+  'я':'z','ч':'x','с':'c','м':'v','и':'b','т':'n','ь':'m','б':',','ю':'.',
+  'Й':'Q','Ц':'W','У':'E','К':'R','Е':'T','Н':'Y','Г':'U','Ш':'I','Щ':'O','З':'P','Х':'{','Ъ':'}',
+  'Ф':'A','Ы':'S','В':'D','А':'F','П':'G','Р':'H','О':'J','Л':'K','Д':'L','Ж':':','Э':'"',
+  'Я':'Z','Ч':'X','С':'C','М':'V','И':'B','Т':'N','Ь':'M','Б':'<','Ю':'>',
+};
+
+function transliterateRuEn(s: string): string {
+  return s.split('').map(c => RU_EN[c] ?? c).join('');
+}
+
+// ─── Pure helpers ─────────────────────────────────────────────────────────────
 
 function parseAedPreview(value: string): string {
   const s = value.trim().replace(/\s/g, '');
   if (!s) return '';
 
-  // M/K suffix
   const mMatch = s.match(/^([\d.,]+)[Mm]$/);
   if (mMatch) {
     const n = toNumber(mMatch[1]);
@@ -88,7 +110,7 @@ function parseDateHint(value: string): string {
 }
 
 function calcDealTag(orig: string, sell: string): { label: string; color: 'red' | 'amber' } | null {
-  const o = toNumber(orig.replace(/[MmKk].*$/, ''));  // rough check; server does precise
+  const o = toNumber(orig.replace(/[MmKk].*$/, ''));
   const s = toNumber(sell.replace(/[MmKk].*$/, ''));
   if (o === '' || s === '' || Number(o) === 0) return null;
   if (Number(s) <= Number(o)) return { label: 'Quick Sale', color: 'red' };
@@ -96,7 +118,7 @@ function calcDealTag(orig: string, sell: string): { label: string; color: 'red' 
   return null;
 }
 
-// ─── Shared CSS constants ────────────────────────────────────────────────────
+// ─── Shared CSS ───────────────────────────────────────────────────────────────
 
 const BASE_INPUT = 'w-full px-3 py-2.5 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all placeholder-slate-500';
 const SELECT_INPUT = BASE_INPUT + ' appearance-none cursor-pointer';
@@ -206,12 +228,11 @@ export default function NewUnitPage() {
   });
 
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [saveResult, setSaveResult] = useState<SaveResult | null>(null);
   const [showPayments, setShowPayments] = useState(false);
   const [projectSearch, setProjectSearch] = useState(form.projectName);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Load options
   useEffect(() => {
     fetch('/api/new-unit/options')
       .then(r => r.json())
@@ -220,7 +241,6 @@ export default function NewUnitPage() {
       .finally(() => setOptLoading(false));
   }, []);
 
-  // Persist draft to localStorage
   useEffect(() => {
     try { localStorage.setItem('newUnit_draft', JSON.stringify(form)); } catch {}
   }, [form]);
@@ -233,15 +253,22 @@ export default function NewUnitPage() {
   );
 
   const isVilla = options?.objectKindByProject[form.projectName] === 'Villa';
-  const buildings = options?.buildingsByProject[form.projectName] ?? [];
   const dealTag = calcDealTag(form.originalPrice, form.sellingPrice);
+
+  // Project search with Ru→En transliteration
+  const handleProjectSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const converted = transliterateRuEn(raw);
+    setProjectSearch(converted);
+    setDropdownOpen(true);
+  };
 
   const filteredProjects = (options?.projects ?? []).filter(p =>
     p.toLowerCase().includes(projectSearch.toLowerCase())
   );
 
   const selectProject = (p: string) => {
-    setForm(prev => ({ ...prev, projectName: p, building: '', floor: '', furnished: '' }));
+    setForm(prev => ({ ...prev, projectName: p, floor: '', furnished: '' }));
     setProjectSearch(p);
     setDropdownOpen(false);
   };
@@ -249,7 +276,7 @@ export default function NewUnitPage() {
   const clearForm = () => {
     setForm(EMPTY);
     setProjectSearch('');
-    setSaveMsg(null);
+    setSaveResult(null);
     try { localStorage.removeItem('newUnit_draft'); } catch {}
   };
 
@@ -262,10 +289,10 @@ export default function NewUnitPage() {
 
   const handleSave = async () => {
     const err = validate();
-    if (err) { setSaveMsg({ ok: false, text: err }); return; }
+    if (err) { setSaveResult({ ok: false, text: err }); return; }
 
     setSaving(true);
-    setSaveMsg(null);
+    setSaveResult(null);
     try {
       const res = await fetch('/api/new-unit/save', {
         method: 'POST',
@@ -274,19 +301,22 @@ export default function NewUnitPage() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setSaveMsg({ ok: true, text: `Юнит сохранён! ${data.updatedRange ? `(${data.updatedRange})` : ''}` });
-      // Keep project/manager for quick next entry; clear property-specific fields
+      setSaveResult({
+        ok: true,
+        text: `Юнит сохранён! ${data.updatedRange ? `(${data.updatedRange})` : ''}`,
+        folderUrl: data.folderUrl,
+        paymentSheetUrl: data.paymentSheetUrl,
+        paymentError: data.paymentError,
+      });
       setForm(prev => ({
         ...EMPTY,
         projectName: prev.projectName,
         manager: prev.manager,
         paymentPlan: prev.paymentPlan,
-        status: prev.status,
-        mortgage: prev.mortgage,
       }));
       setProjectSearch(form.projectName);
     } catch (e: any) {
-      setSaveMsg({ ok: false, text: e.message });
+      setSaveResult({ ok: false, text: e.message });
     } finally {
       setSaving(false);
     }
@@ -303,7 +333,6 @@ export default function NewUnitPage() {
         </p>
       </div>
 
-      {/* Options loading */}
       {optLoading && (
         <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-900/60 border border-white/5 mb-6 text-sm text-slate-400">
           <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin shrink-0" />
@@ -317,17 +346,50 @@ export default function NewUnitPage() {
       )}
 
       {/* Save status */}
-      {saveMsg && (
-        <div className={`p-4 rounded-xl border text-sm mb-6 flex items-start gap-2 ${
-          saveMsg.ok
+      {saveResult && (
+        <div className={`p-4 rounded-xl border text-sm mb-6 ${
+          saveResult.ok
             ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
             : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
         }`}>
-          {saveMsg.ok
-            ? <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
-            : <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          }
-          {saveMsg.text}
+          <div className="flex items-start gap-2">
+            {saveResult.ok
+              ? <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+              : <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            }
+            <span>{saveResult.text}</span>
+          </div>
+          {saveResult.ok && (saveResult.folderUrl || saveResult.paymentSheetUrl) && (
+            <div className="mt-3 flex flex-col gap-1.5 pl-7">
+              {saveResult.folderUrl && (
+                <a
+                  href={saveResult.folderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+                  Открыть папку в Drive
+                </a>
+              )}
+              {saveResult.paymentSheetUrl && (
+                <a
+                  href={saveResult.paymentSheetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H9L5 8v10a2 2 0 002 2z"/></svg>
+                  Открыть Payment Plan
+                </a>
+              )}
+            </div>
+          )}
+          {saveResult.paymentError && (
+            <div className="mt-2 pl-7 text-xs text-amber-400">
+              Внимание: ошибка создания Payment Plan — {saveResult.paymentError}
+            </div>
+          )}
         </div>
       )}
 
@@ -343,10 +405,10 @@ export default function NewUnitPage() {
               <input
                 type="text"
                 value={projectSearch}
-                onChange={e => { setProjectSearch(e.target.value); setDropdownOpen(true); }}
+                onChange={handleProjectSearch}
                 onFocus={() => setDropdownOpen(true)}
                 onBlur={() => setTimeout(() => setDropdownOpen(false), 150)}
-                placeholder="Начни вводить название проекта..."
+                placeholder="Начни вводить (можно русскими буквами)..."
                 className={BASE_INPUT}
               />
               {dropdownOpen && filteredProjects.length > 0 && (
@@ -369,19 +431,6 @@ export default function NewUnitPage() {
               <p className="text-xs text-amber-400 mt-1.5 flex items-center gap-1">
                 <span>🏡</span> Villa / Townhouse проект — дополнительные поля показаны ниже
               </p>
-            )}
-          </div>
-
-          {/* Building */}
-          <div>
-            <label className={LABEL}>Здание</label>
-            {buildings.length > 0 ? (
-              <select value={form.building} onChange={up('building')} className={SELECT_INPUT}>
-                <option value="">— выбрать —</option>
-                {buildings.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-            ) : (
-              <input value={form.building} onChange={up('building')} placeholder="Tower A" className={BASE_INPUT} />
             )}
           </div>
 
@@ -422,7 +471,7 @@ export default function NewUnitPage() {
           </div>
 
           {/* Furnished */}
-          <div>
+          <div className="col-span-2">
             <label className={LABEL}>Мебель</label>
             <SelOrInput value={form.furnished} onChange={up('furnished')} options={options?.furnishedOptions} placeholder="Furnished / Unfurnished" />
           </div>
@@ -485,42 +534,17 @@ export default function NewUnitPage() {
             <label className={LABEL}>Area, m²</label>
             <input value={form.areaM2} onChange={up('areaM2')} placeholder="85.50" className={BASE_INPUT} />
           </div>
-
-          <div className="col-span-2">
-            <label className={LABEL}>Approx. rental rate</label>
-            <input value={form.approxRentalRate} onChange={up('approxRentalRate')} placeholder="8% annual / 80 000 AED" className={BASE_INPUT} />
-          </div>
         </SectionCard>
 
         {/* ── Section 4: Сделка ── */}
         <SectionCard title="Сделка" dot="bg-blue-400">
-          <div>
+          <div className="col-span-2">
             <label className={LABEL}>Payment Plan</label>
             <SelOrInput value={form.paymentPlan} onChange={up('paymentPlan')} options={options?.paymentPlans} placeholder="30/70, 50/50..." />
           </div>
-          <div>
-            <label className={LABEL}>Status</label>
-            <select value={form.status} onChange={up('status')} className={SELECT_INPUT}>
-              <option value="">— выбрать —</option>
-              {(options?.statusOptions ?? ['Ready to move', 'Off plan']).map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className={LABEL}>Mortgage</label>
-            <select value={form.mortgage} onChange={up('mortgage')} className={SELECT_INPUT}>
-              <option value="">— выбрать —</option>
-              {(options?.mortgageOptions ?? ['available', 'not available']).map(m => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </div>
-          <DateInput label="Handover Date" value={form.handoverDate} onChange={up('handoverDate')} />
-          <PriceInput label="Handover AED" value={form.handoverAed} onChange={up('handoverAed')} />
         </SectionCard>
 
-        {/* ── Section 5: Payment schedule (collapsible) ── */}
+        {/* ── Section 5: График платежей (collapsible) ── */}
         <div className="rounded-2xl bg-slate-900/60 border border-white/5 overflow-hidden">
           <button
             type="button"
@@ -530,7 +554,7 @@ export default function NewUnitPage() {
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
               <span className="text-sm font-semibold text-slate-200">График платежей</span>
-              <span className="text-xs text-slate-500 ml-1">Payment 2 – 6</span>
+              <span className="text-xs text-slate-500 ml-1">Handover + Payment 6 → 2</span>
             </div>
             <svg
               className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${showPayments ? 'rotate-180' : ''}`}
@@ -542,7 +566,16 @@ export default function NewUnitPage() {
 
           {showPayments && (
             <div className="px-5 pb-5 space-y-4 border-t border-white/5 pt-4">
-              {([2, 3, 4, 5, 6] as const).map(n => (
+              {/* Handover first */}
+              <div>
+                <p className="text-xs font-semibold text-purple-300 mb-3 uppercase tracking-wide">Handover</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <DateInput label="Handover Date" value={form.handoverDate} onChange={up('handoverDate')} />
+                  <PriceInput label="Handover AED" value={form.handoverAed} onChange={up('handoverAed')} />
+                </div>
+              </div>
+              {/* Payment 6 → 2 descending */}
+              {([6, 5, 4, 3, 2] as const).map(n => (
                 <div key={n} className="grid grid-cols-2 gap-4">
                   <DateInput
                     label={`Payment ${n} Date`}
@@ -562,19 +595,9 @@ export default function NewUnitPage() {
 
         {/* ── Section 6: Прочее ── */}
         <SectionCard title="Прочее" dot="bg-slate-400">
-          <div>
+          <div className="col-span-2">
             <label className={LABEL}>Менеджер</label>
             <input value={form.manager} onChange={up('manager')} placeholder="Nataly" className={BASE_INPUT} />
-          </div>
-          <div className="col-span-2">
-            <label className={LABEL}>Примечания</label>
-            <textarea
-              value={form.notes}
-              onChange={up('notes')}
-              rows={3}
-              placeholder="Любые дополнительные заметки..."
-              className={BASE_INPUT + ' resize-y'}
-            />
           </div>
         </SectionCard>
 

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetData, getGoogleSheetsClient } from '@/lib/google/sheets';
 import { toNumber, normalizeText } from '@/lib/posts/formatters';
+import { createFolderAndPaymentPlan } from '@/lib/payment/create-plan';
 
-// Extends the standard toNumber with M/K suffix support
 function parseAed(value: unknown): number | '' {
   const s = String(value ?? '').trim().replace(/\s/g, '');
   if (!s) return '';
@@ -23,7 +23,6 @@ function parseAed(value: unknown): number | '' {
   return n === '' ? '' : Number(n);
 }
 
-// DD.MM.YYYY / DD/MM/YYYY / DD-MM-YY → ISO YYYY-MM-DD; text stays as-is
 function parseDate(value: unknown): string {
   const s = String(value ?? '').trim();
   if (!s) return '';
@@ -38,7 +37,7 @@ function parseDate(value: unknown): string {
     return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }
 
-  return s; // "Ready to move", "Q4 2025", etc.
+  return s;
 }
 
 function dealTag(original: unknown, selling: unknown): string {
@@ -50,13 +49,18 @@ function dealTag(original: unknown, selling: unknown): string {
   return '';
 }
 
+// Parse "OBJECTS!A2:Z2" → row number
+function parseRowNumber(updatedRange: string): number | null {
+  const m = updatedRange.match(/(\d+)$/);
+  return m ? Number(m[1]) : null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const form = await req.json();
     const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID ?? '';
     if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
 
-    // Read only the header row — no need to load all data
     const headerData = await getSheetData(spreadsheetId, 'OBJECTS!1:1');
     if (!headerData?.[0]?.length) throw new Error('OBJECTS sheet missing or has no headers');
 
@@ -71,58 +75,47 @@ export async function POST(req: NextRequest) {
       if (idx[k] !== undefined) row[idx[k]] = val;
     };
 
-    const num = (v: unknown) => { const n = parseAed(v); return n === '' ? '' : n; };
-    const dt  = (v: unknown) => parseDate(v);
+    const numVal = (v: unknown) => { const n = parseAed(v); return n === '' ? '' : n; };
+    const dt     = (v: unknown) => parseDate(v);
 
-    // Identity fields
     set('Template Type',       form.projectName ?? '');
     set('Project Name',        form.projectName ?? '');
     set('Building',            form.building ?? '');
     set('Unit',                form.unit ?? '');
     set('Code',                form.code ?? '');
     set('Type',                form.type ?? '');
-    set('Parking space',       num(form.parkingSpace));
+    set('Parking space',       numVal(form.parkingSpace));
     set('View',                form.view ?? '');
     set('Floor',               form.floor ?? '');
     set('Furnished',           form.furnished ?? '');
 
-    // Pricing
-    set('Original Price, AED', num(form.originalPrice));
-    set('Old Price, AED',      num(form.oldPrice));
-    set('Selling Price, AED',  num(form.sellingPrice));
-    set('Approx. rental rate', form.approxRentalRate ?? '');
+    set('Original Price, AED', numVal(form.originalPrice));
+    set('Old Price, AED',      numVal(form.oldPrice));
+    set('Selling Price, AED',  numVal(form.sellingPrice));
 
-    // Area
-    set('Area, m2',            num(form.areaM2));
-    set('Gross Area, m2',      num(form.grossAreaM2));
-    set('Plot Area, m2',       num(form.plotAreaM2));
+    set('Area, m2',            numVal(form.areaM2));
+    set('Gross Area, m2',      numVal(form.grossAreaM2));
+    set('Plot Area, m2',       numVal(form.plotAreaM2));
 
-    // Villa-specific
     set('Specification',       form.specification ?? '');
     set('Finishes',            form.finishes ?? '');
     set('POD',                 form.pod ?? '');
     set('Row',                 form.rowType ?? '');
     set('Unit Position',       form.unitPosition ?? '');
 
-    // Deal
     set('Payment Plan',        form.paymentPlan ?? '');
-    set('Status',              form.status ?? '');
-    set('Mortgage',            form.mortgage ?? '');
     set('Handover Date',       dt(form.handoverDate));
-    set('Handover AED',        num(form.handoverAed));
+    set('Handover AED',        numVal(form.handoverAed));
 
-    // Payment schedule 2–6
     for (const n of [2, 3, 4, 5, 6]) {
       set(`Payment ${n} Date`, dt(form[`payment${n}Date`]));
-      set(`Payment ${n} AED`,  num(form[`payment${n}Aed`]));
+      set(`Payment ${n} AED`,  numVal(form[`payment${n}Aed`]));
     }
 
-    // Computed & meta
     set('Distress | Hot Deal', dealTag(form.originalPrice, form.sellingPrice));
     set('Manager',             form.manager ?? '');
     set('Folder Link',         '');
     set('Payment Sheet Link',  '');
-    set('Notes',               form.notes ?? '');
     set('Created At',          new Date().toISOString().slice(0, 10));
 
     const sheets = await getGoogleSheetsClient();
@@ -134,12 +127,95 @@ export async function POST(req: NextRequest) {
       requestBody: { values: [row] },
     });
 
+    const updatedRange = result.data.updates?.updatedRange ?? '';
+
+    // Build a record for the payment plan function (uses display names)
+    const record: Record<string, unknown> = {
+      'Project Name':        form.projectName ?? '',
+      'Building':            form.building ?? '',
+      'Unit':                form.unit ?? '',
+      'Code':                form.code ?? '',
+      'Type':                form.type ?? '',
+      'View':                form.view ?? '',
+      'Floor':               form.floor ?? '',
+      'Furnished':           form.furnished ?? '',
+      'Specification':       form.specification ?? '',
+      'Finishes':            form.finishes ?? '',
+      'POD':                 form.pod ?? '',
+      'Row':                 form.rowType ?? '',
+      'Unit Position':       form.unitPosition ?? '',
+      'Parking space':       numVal(form.parkingSpace),
+      'Original Price, AED': numVal(form.originalPrice),
+      'Selling Price, AED':  numVal(form.sellingPrice),
+      'Area, m2':            numVal(form.areaM2),
+      'Gross Area, m2':      numVal(form.grossAreaM2),
+      'Plot Area, m2':       numVal(form.plotAreaM2),
+      'Payment Plan':        form.paymentPlan ?? '',
+      'Handover Date':       dt(form.handoverDate),
+      'Handover AED':        numVal(form.handoverAed),
+      'Manager':             form.manager ?? '',
+      'Distress | Hot Deal': dealTag(form.originalPrice, form.sellingPrice),
+    };
+
+    for (const n of [2, 3, 4, 5, 6]) {
+      record[`Payment ${n} Date`] = dt(form[`payment${n}Date`]);
+      record[`Payment ${n} AED`]  = numVal(form[`payment${n}Aed`]);
+    }
+
+    // Create folder + payment plan (non-blocking error — row is already saved)
+    let folderUrl       = '';
+    let paymentSheetUrl = '';
+    let paymentError    = '';
+
+    try {
+      const plan = await createFolderAndPaymentPlan(record, spreadsheetId);
+      folderUrl       = plan.folderUrl;
+      paymentSheetUrl = plan.paymentSheetUrl;
+
+      // Write links back to OBJECTS row
+      const rowNum = parseRowNumber(updatedRange);
+      if (rowNum !== null) {
+        const folderIdx  = idx[normalizeText('Folder Link')];
+        const paymentIdx = idx[normalizeText('Payment Sheet Link')];
+        const backfills: Array<{ range: string; values: unknown[][] }> = [];
+
+        if (folderIdx !== undefined && folderUrl) {
+          backfills.push({ range: `OBJECTS!${colLetter(folderIdx)}${rowNum}`, values: [[folderUrl]] });
+        }
+        if (paymentIdx !== undefined && paymentSheetUrl) {
+          backfills.push({ range: `OBJECTS!${colLetter(paymentIdx)}${rowNum}`, values: [[paymentSheetUrl]] });
+        }
+
+        if (backfills.length) {
+          await sheets.spreadsheets.values.batchUpdate({
+            spreadsheetId,
+            requestBody: { valueInputOption: 'USER_ENTERED', data: backfills },
+          });
+        }
+      }
+    } catch (e: any) {
+      paymentError = e.message;
+    }
+
     return NextResponse.json({
       ok: true,
       message: 'Unit saved to OBJECTS',
-      updatedRange: result.data.updates?.updatedRange ?? '',
+      updatedRange,
+      folderUrl,
+      paymentSheetUrl,
+      paymentError: paymentError || undefined,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
+}
+
+function colLetter(idx: number): string {
+  let letter = '';
+  let n = idx;
+  do {
+    letter = String.fromCharCode(65 + (n % 26)) + letter;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return letter;
 }
