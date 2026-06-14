@@ -14,6 +14,7 @@ export const metadata: Metadata = {
 };
 
 const navItems = [
+  { href: '/new-unit', label: 'New Unit', icon: '➕' },
   { href: '/manual-post', label: 'Manual Post Builder', icon: '✏️' },
   { href: '/budget', label: 'Budget Builder', icon: '💰' },
   { href: '/catalog', label: 'Catalog Builder', icon: '📄' },
