@@ -182,7 +182,8 @@ async function getOrCreateFolder(
   const res = await drive.files.list({
     q: `name='${escaped}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: 'files(id,webViewLink)',
-    spaces: 'drive',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
 
   if (res.data.files?.length) {
@@ -193,6 +194,7 @@ async function getOrCreateFolder(
   const created = await drive.files.create({
     requestBody: { name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] },
     fields: 'id,webViewLink',
+    supportsAllDrives: true,
   });
   return {
     id: created.data.id!,
@@ -207,7 +209,8 @@ async function archiveOldPaymentPlans(
   const res = await drive.files.list({
     q: `'${folderId}' in parents and trashed=false`,
     fields: 'files(id,name)',
-    spaces: 'drive',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
 
   const toArchive = (res.data.files ?? []).filter(f => /^Payment plan\b/i.test(String(f.name ?? '')));
@@ -223,6 +226,7 @@ async function archiveOldPaymentPlans(
       removeParents: folderId,
       requestBody: { name: `${file.name} - archived ${stamp}` },
       fields: 'id',
+      supportsAllDrives: true,
     });
   }
 }
@@ -386,6 +390,7 @@ export async function createFolderAndPaymentPlan(
     fileId: templateFileId,
     requestBody: { name: copyName, parents: [objectFolder.id] },
     fields: 'id,webViewLink',
+    supportsAllDrives: true,
   });
 
   const copiedId = copied.data.id!;
