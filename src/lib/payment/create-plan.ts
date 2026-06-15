@@ -366,6 +366,33 @@ export async function createFolderAndPaymentPlan(
 
   if (!parentFolderId) throw new Error(`Parent Folder ID not found for project: ${safe(record['Project Name'])}`);
 
+  // Check CONFIG_DRIVE for a cluster subfolder override (e.g. Saadiyat Lagoons by code prefix)
+  const objectsId = process.env.GOOGLE_SHEETS_OBJECTS_ID ?? '';
+  if (objectsId) {
+    try {
+      const cfgDriveData = await getSheetData(objectsId, 'CONFIG_DRIVE');
+      if (cfgDriveData.length > 1) {
+        const cdHeaders = (cfgDriveData[0] ?? []).map(h => String(h).trim());
+        const cdPrefix    = cdHeaders.indexOf('Code Prefix');
+        const cdCluster   = cdHeaders.indexOf('Cluster Folder ID');
+        if (cdPrefix >= 0 && cdCluster >= 0) {
+          const rawCode   = safe(record['Code']).replace(/^#/, '');
+          const codePrefix = rawCode.replace(/\D/g, '').slice(0, 4);
+          for (let i = 1; i < cfgDriveData.length; i++) {
+            const rowPrefix  = String(cfgDriveData[i][cdPrefix] ?? '').replace(/\D/g, '').padStart(4, '0').slice(0, 4);
+            const clusterFid = String(cfgDriveData[i][cdCluster] ?? '').trim();
+            if (rowPrefix === codePrefix && clusterFid) {
+              parentFolderId = clusterFid;
+              break;
+            }
+          }
+        }
+      }
+    } catch {
+      // cluster lookup failure is non-fatal — fall back to project-level folder
+    }
+  }
+
   const drive = await getGoogleDriveClient();
 
   // Build folder name: "CODE UNIT (Manager)"
