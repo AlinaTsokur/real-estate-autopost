@@ -632,10 +632,12 @@ export default function NewUnitPage() {
             )}
           </div>
 
-          <div>
-            <label className={LABEL}>Area, m² *</label>
-            <input value={form.areaM2} onChange={up('areaM2')} placeholder="85.50" className={BASE_INPUT} />
-          </div>
+          {!isVilla && (
+            <div>
+              <label className={LABEL}>Area, m² *</label>
+              <input value={form.areaM2} onChange={up('areaM2')} placeholder="85.50" className={BASE_INPUT} />
+            </div>
+          )}
         </SectionCard>
 
         {/* ── Section 4: Сделка ── */}
