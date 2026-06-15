@@ -372,19 +372,20 @@ export async function createFolderAndPaymentPlan(
     try {
       const cfgDriveData = await getSheetData(objectsId, 'CONFIG_DRIVE');
       if (cfgDriveData.length > 1) {
-        const cdHeaders = (cfgDriveData[0] ?? []).map(h => String(h).trim());
-        const cdPrefix    = cdHeaders.indexOf('Code Prefix');
-        const cdCluster   = cdHeaders.indexOf('Cluster Folder ID');
+        const cdHeaders = (cfgDriveData[0] ?? []).map(h => String(h).trim().toLowerCase());
+        const cdPrefix  = cdHeaders.findIndex(h => h === 'code prefix');
+        const cdCluster = cdHeaders.findIndex(h => h === 'cluster folder id');
         if (cdPrefix >= 0 && cdCluster >= 0) {
-          const rawCode   = safe(record['Code']).replace(/^#/, '');
+          const rawCode    = safe(record['Code']).replace(/^#/, '');
           const codePrefix = rawCode.replace(/\D/g, '').slice(0, 4);
           for (let i = 1; i < cfgDriveData.length; i++) {
-            const rowPrefix  = String(cfgDriveData[i][cdPrefix] ?? '').replace(/\D/g, '').padStart(4, '0').slice(0, 4);
-            const clusterFid = String(cfgDriveData[i][cdCluster] ?? '').trim();
-            if (rowPrefix === codePrefix && clusterFid) {
-              parentFolderId = clusterFid;
-              break;
-            }
+            const rowPrefix = String(cfgDriveData[i][cdPrefix] ?? '').replace(/\D/g, '').padStart(4, '0').slice(0, 4);
+            const raw       = String(cfgDriveData[i][cdCluster] ?? '').trim();
+            if (rowPrefix !== codePrefix || !raw) continue;
+            // accept both a bare ID and a full Drive URL
+            const urlMatch = raw.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+            parentFolderId = urlMatch ? urlMatch[1] : raw;
+            break;
           }
         }
       }
