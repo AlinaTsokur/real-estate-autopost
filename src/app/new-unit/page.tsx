@@ -358,7 +358,7 @@ export default function NewUnitPage() {
     if (!form.code)         return 'Заполни Код объекта';
     if (!form.unit)         return 'Заполни Номер юнита';
     if (!form.view)         return 'Заполни Вид';
-    if (!form.areaM2)       return 'Заполни Площадь (Area, m²)';
+    if (!isVilla && !form.areaM2) return 'Заполни Площадь (Area, m²)';
     if (!form.sellingPrice) return 'Заполни Selling Price';
     if (!form.manager)      return 'Заполни Менеджера';
     return '';
