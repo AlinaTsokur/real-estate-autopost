@@ -159,8 +159,8 @@ export default function DriveAuditPage() {
                         {row.code}
                       </a>
                     </td>
-                    <td className="px-4 py-3 text-slate-300 max-w-[180px] truncate" title={row.unit}>
-                      {row.unitFolderName || row.unit}
+                    <td className="px-4 py-3 text-slate-300 max-w-[180px] truncate" title={row.folderName || row.unit}>
+                      {row.folderName || row.unit}
                     </td>
                     <td className="px-4 py-3 text-slate-400 text-xs">{row.comment || '—'}</td>
                     <td className="px-4 py-3 text-slate-300 text-xs">{EXPECTED_LABEL[row.expected]}</td>

@@ -4,8 +4,9 @@ import { getGoogleDriveClient } from '@/lib/google/drive';
 
 const OBJECTS_ID = process.env.GOOGLE_SHEETS_OBJECTS_ID ?? '';
 
-const SOLD_VALUES    = new Set(['продано через нас', 'продано']);
-const REMOVED_VALUES = new Set(['снято с продажи']);
+// Normalize comment — also handle typos from the data
+const SOLD_VARIANTS    = new Set(['продано через нас', 'продано']);
+const REMOVED_VARIANTS = new Set(['снято с продажи', 'снять с продажи', 'снато с продажи']);
 
 function normalizeComment(v: unknown): string {
   return String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -19,6 +20,11 @@ function extractFolderId(urlOrId: unknown): string {
   return '';
 }
 
+// Same pattern as App Script: DF_makeCodePattern_
+function makeCodePattern(cleanCode: string): RegExp {
+  return new RegExp('(^|[^0-9])#?' + cleanCode + '([^0-9]|$)', 'i');
+}
+
 type ExpectedLocation = 'search' | 'sold' | 'removed';
 
 export interface AuditRow {
@@ -27,6 +33,7 @@ export interface AuditRow {
   code: string;
   comment: string;
   unitFolderId: string;
+  folderName: string;
   expected: ExpectedLocation;
   actualParentId: string;
   actualParentName: string;
@@ -34,14 +41,12 @@ export interface AuditRow {
   detail: string;
 }
 
-// List all subfolders of a Drive folder (one API call, handles pagination)
 async function listSubfolders(
   drive: Awaited<ReturnType<typeof getGoogleDriveClient>>,
   parentId: string
 ): Promise<{ id: string; name: string }[]> {
   const items: { id: string; name: string }[] = [];
   let pageToken: string | undefined;
-
   do {
     const res: any = await drive.files.list({
       q: `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
@@ -51,12 +56,9 @@ async function listSubfolders(
       includeItemsFromAllDrives: true,
       ...(pageToken ? { pageToken } : {}),
     });
-    for (const f of res.data.files ?? []) {
-      items.push({ id: f.id!, name: f.name ?? '' });
-    }
+    for (const f of res.data.files ?? []) items.push({ id: f.id!, name: f.name ?? '' });
     pageToken = res.data.nextPageToken ?? undefined;
   } while (pageToken);
-
   return items;
 }
 
@@ -72,71 +74,61 @@ export async function GET() {
     // ── Parse CONFIG_DRIVE ──────────────────────────────────────────────────
     const cfgHeaders = (cfgRows[0] ?? []).map(h => String(h).trim());
     const ci = {
-      prefix:   cfgHeaders.indexOf('Code Prefix'),
-      search:   cfgHeaders.indexOf('Search Folder Link'),
-      sold:     cfgHeaders.indexOf('Sold Folder Link'),
-      removed:  cfgHeaders.indexOf('Removed Folder Link'),
+      prefix:  cfgHeaders.indexOf('Code Prefix'),
+      search:  cfgHeaders.indexOf('Search Folder Link'),
+      sold:    cfgHeaders.indexOf('Sold Folder Link'),
+      removed: cfgHeaders.indexOf('Removed Folder Link'),
     };
 
-    // prefix → { searchIds, soldIds, removedIds }
     type PrefixConfig = { searchIds: Set<string>; soldIds: Set<string>; removedIds: Set<string> };
     const prefixMap = new Map<string, PrefixConfig>();
-
-    // Collect all unique parent folder IDs we need to scan
-    // folderId → { parentId, role: 'search'|'sold'|'removed' }
-    const parentMeta = new Map<string, { role: ExpectedLocation }>();
+    const allParentIds = new Set<string>(); // all Search/Sold/Removed folder IDs to scan
 
     for (let i = 1; i < cfgRows.length; i++) {
       const r = cfgRows[i] as unknown[];
       const searchLink = String(r[ci.search] ?? '').trim();
       if (!searchLink) continue;
 
-      const rawPrefix = String(r[ci.prefix] ?? '').replace(/\D/g, '').padStart(4, '0').slice(0, 4);
-      if (!rawPrefix || rawPrefix === '0000') continue;
+      const prefix = String(r[ci.prefix] ?? '').replace(/\D/g, '').padStart(4, '0').slice(0, 4);
+      if (!prefix || prefix === '0000') continue;
 
-      if (!prefixMap.has(rawPrefix)) {
-        prefixMap.set(rawPrefix, { searchIds: new Set(), soldIds: new Set(), removedIds: new Set() });
-      }
-      const pc = prefixMap.get(rawPrefix)!;
+      if (!prefixMap.has(prefix)) prefixMap.set(prefix, { searchIds: new Set(), soldIds: new Set(), removedIds: new Set() });
+      const pc = prefixMap.get(prefix)!;
 
       const sId  = extractFolderId(searchLink);
       const soId = extractFolderId(String(r[ci.sold]    ?? ''));
       const rId  = extractFolderId(String(r[ci.removed] ?? ''));
 
-      if (sId)  { pc.searchIds.add(sId);  parentMeta.set(sId,  { role: 'search' }); }
-      if (soId) { pc.soldIds.add(soId);   parentMeta.set(soId, { role: 'sold' }); }
-      if (rId)  { pc.removedIds.add(rId); parentMeta.set(rId,  { role: 'removed' }); }
+      if (sId)  { pc.searchIds.add(sId);  allParentIds.add(sId); }
+      if (soId) { pc.soldIds.add(soId);   allParentIds.add(soId); }
+      if (rId)  { pc.removedIds.add(rId); allParentIds.add(rId); }
     }
 
-    // ── Scan all parent folders → build reverse index ───────────────────────
-    // unitFolderId → { parentId, parentName }
-    const folderIndex = new Map<string, { parentId: string; parentName: string }>();
+    // ── Scan all parent folders → build index ──────────────────────────────
+    // folderId → { parentId, parentName, folderName }
+    const byId   = new Map<string, { parentId: string; parentName: string; folderName: string }>();
+    // parentId → folder name (for display)
+    const parentNames = new Map<string, string>();
 
-    const parentIds = [...parentMeta.keys()];
-
-    // Scan in parallel batches of 10 to stay within rate limits
+    const parentIds = [...allParentIds];
     const BATCH = 10;
+
     for (let i = 0; i < parentIds.length; i += BATCH) {
-      const batch = parentIds.slice(i, i + BATCH);
-      const results = await Promise.allSettled(
-        batch.map(async parentId => {
-          const children = await listSubfolders(drive, parentId);
-          // Get parent name once per parent
+      await Promise.allSettled(
+        parentIds.slice(i, i + BATCH).map(async parentId => {
           let parentName = parentId;
           try {
             const pRes = await drive.files.get({ fileId: parentId, fields: 'name', supportsAllDrives: true });
             parentName = pRes.data.name ?? parentId;
           } catch {}
-          return { parentId, parentName, children };
+          parentNames.set(parentId, parentName);
+
+          const children = await listSubfolders(drive, parentId);
+          for (const child of children) {
+            byId.set(child.id, { parentId, parentName, folderName: child.name });
+          }
         })
       );
-      for (const r of results) {
-        if (r.status !== 'fulfilled') continue;
-        const { parentId, parentName, children } = r.value;
-        for (const child of children) {
-          folderIndex.set(child.id, { parentId, parentName });
-        }
-      }
     }
 
     // ── Parse Abu Dhabi ──────────────────────────────────────────────────────
@@ -152,26 +144,25 @@ export async function GET() {
 
     for (let i = 1; i < abuRows.length; i++) {
       const r = abuRows[i] as unknown[];
-      const rawFolderId = String(r[ai.unitFolderId] ?? '').trim();
-      if (!rawFolderId) continue;
-
       const code = String(r[ai.code] ?? '').replace(/\s/g, '').replace(/^#/, '');
-      if (!code) continue;
+      if (!code) continue; // skip header/empty rows
 
-      const prefix  = code.replace(/\D/g, '').slice(0, 4);
-      const comment = normalizeComment(r[ai.comment]);
+      const comment    = normalizeComment(r[ai.comment]);
+      const folderId   = String(r[ai.unitFolderId] ?? '').trim();
+      const prefix     = code.replace(/\D/g, '').slice(0, 4);
 
       const expected: ExpectedLocation =
-        SOLD_VALUES.has(comment)    ? 'sold' :
-        REMOVED_VALUES.has(comment) ? 'removed' :
-                                      'search';
+        SOLD_VARIANTS.has(comment)    ? 'sold' :
+        REMOVED_VARIANTS.has(comment) ? 'removed' :
+                                        'search';
 
       const row: AuditRow = {
         rowNum:           i + 1,
         unit:             String(r[ai.unit] ?? '').trim(),
         code:             '#' + code,
         comment,
-        unitFolderId:     rawFolderId,
+        unitFolderId:     folderId,
+        folderName:       '',
         expected,
         actualParentId:   '',
         actualParentName: '',
@@ -187,14 +178,29 @@ export async function GET() {
         continue;
       }
 
-      const indexed = folderIndex.get(rawFolderId);
+      // Find the unit folder: by stored ID first, then by code pattern in names
+      let indexed = folderId ? byId.get(folderId) : undefined;
+
+      if (!indexed) {
+        // Search by code pattern in all scanned subfolders
+        const pattern = makeCodePattern(code);
+        for (const [id, info] of byId) {
+          if (pattern.test(info.folderName)) {
+            indexed = info;
+            row.unitFolderId = id;
+            break;
+          }
+        }
+      }
+
       if (!indexed) {
         row.status = 'not_found';
-        row.detail = 'Папка не найдена ни в одной из папок CONFIG_DRIVE';
+        row.detail = 'Папка не найдена в Drive';
         results.push(row);
         continue;
       }
 
+      row.folderName       = indexed.folderName;
       row.actualParentId   = indexed.parentId;
       row.actualParentName = indexed.parentName;
 
@@ -207,7 +213,9 @@ export async function GET() {
         row.status = 'ok';
       } else {
         row.status = 'wrong';
-        row.detail = `Ожидается в: ${[...expectedIds].map(id => `https://drive.google.com/drive/folders/${id}`).join(', ')}`;
+        row.detail = `Ожидается в: ${[...expectedIds].map(id =>
+          `https://drive.google.com/drive/folders/${id}`
+        ).join(', ')}`;
       }
 
       results.push(row);
