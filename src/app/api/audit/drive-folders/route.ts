@@ -1,12 +1,38 @@
 import { NextResponse } from 'next/server';
-import { getSheetData } from '@/lib/google/sheets';
+import { getSheetData, getGoogleSheetsClient } from '@/lib/google/sheets';
 import { getGoogleDriveClient } from '@/lib/google/drive';
 
 const OBJECTS_ID = process.env.GOOGLE_SHEETS_OBJECTS_ID ?? '';
 
-// Normalize comment — also handle typos from the data
 const SOLD_VARIANTS    = new Set(['продано через нас', 'продано']);
 const REMOVED_VARIANTS = new Set(['снято с продажи', 'снять с продажи', 'снато с продажи']);
+
+// #f4cccc = sold row highlight
+function isSoldColor(bg: { red?: number; green?: number; blue?: number } | null | undefined): boolean {
+  if (!bg) return false;
+  const r = bg.red   ?? 1;
+  const g = bg.green ?? 1;
+  const b = bg.blue  ?? 1;
+  return Math.abs(r - 0.9568) < 0.03 && Math.abs(g - 0.800) < 0.03 && Math.abs(b - 0.800) < 0.03;
+}
+
+async function getUnitCellColors(sheets: Awaited<ReturnType<typeof getGoogleSheetsClient>>, unitColIndex: number): Promise<Map<number, boolean>> {
+  const colLetter = String.fromCharCode(65 + unitColIndex);
+  const res2 = await sheets.spreadsheets.get({
+    spreadsheetId: OBJECTS_ID,
+    ranges: [`'Abu Dhabi'!${colLetter}:${colLetter}`],
+    fields: 'sheets.data.rowData.values.userEnteredFormat.backgroundColor',
+    includeGridData: true,
+  });
+
+  const rowData = res2.data.sheets?.[0]?.data?.[0]?.rowData ?? [];
+  const colorMap = new Map<number, boolean>();
+  rowData.forEach((rd: any, i: number) => {
+    const bg = rd?.values?.[0]?.userEnteredFormat?.backgroundColor;
+    colorMap.set(i, isSoldColor(bg));
+  });
+  return colorMap;
+}
 
 function normalizeComment(v: unknown): string {
   return String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -64,7 +90,8 @@ async function listSubfolders(
 
 export async function GET() {
   try {
-    const drive = await getGoogleDriveClient();
+    const drive  = await getGoogleDriveClient();
+    const sheets = await getGoogleSheetsClient();
 
     const [abuRows, cfgRows] = await Promise.all([
       getSheetData(OBJECTS_ID, 'Abu Dhabi') as Promise<unknown[][]>,
@@ -140,6 +167,9 @@ export async function GET() {
       unitFolderId: abuHeaders.indexOf('Unit Folder ID'),
     };
 
+    // Fetch cell fill colors for Unit column (sold = #f4cccc)
+    const soldColorMap = await getUnitCellColors(sheets, ai.unit);
+
     const results: AuditRow[] = [];
 
     for (let i = 1; i < abuRows.length; i++) {
@@ -151,10 +181,13 @@ export async function GET() {
       const folderId   = String(r[ai.unitFolderId] ?? '').trim();
       const prefix     = code.replace(/\D/g, '').slice(0, 4);
 
+      // soldColorMap is keyed by sheet row index (0-based, row 0 = header)
+      const isSoldByColor = soldColorMap.get(i) === true;
+
       const expected: ExpectedLocation =
-        SOLD_VARIANTS.has(comment)    ? 'sold' :
-        REMOVED_VARIANTS.has(comment) ? 'removed' :
-                                        'search';
+        SOLD_VARIANTS.has(comment) || isSoldByColor ? 'sold' :
+        REMOVED_VARIANTS.has(comment)               ? 'removed' :
+                                                      'search';
 
       const row: AuditRow = {
         rowNum:           i + 1,
