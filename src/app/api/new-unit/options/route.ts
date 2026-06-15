@@ -11,7 +11,14 @@ function uniqueCol(data: string[][], colIdx: number): string[] {
   return [...seen].sort((a, b) => a.localeCompare(b));
 }
 
+// In-memory cache — 5 minutes
+let cachedOptions: unknown = null;
+let cacheExpiry = 0;
+
 export async function GET() {
+  if (cachedOptions && Date.now() < cacheExpiry) {
+    return NextResponse.json(cachedOptions);
+  }
   const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID ?? '';
   if (!spreadsheetId) {
     return NextResponse.json({ error: 'GOOGLE_SHEETS_CONFIG_ID not configured' }, { status: 500 });
@@ -67,7 +74,7 @@ export async function GET() {
       return idx >= 0 ? uniqueCol(configData, idx) : [];
     };
 
-    return NextResponse.json({
+    const payload = {
       projects,
       objectKindByProject,
       buildingsByProject,
@@ -82,7 +89,12 @@ export async function GET() {
       statusOptions:        ['Ready to move', 'Off plan'],
       mortgageOptions:      ['available', 'not available'],
       podOptions:           ['Yes', 'No'],
-    });
+    };
+
+    cachedOptions = payload;
+    cacheExpiry   = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+    return NextResponse.json(payload);
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
