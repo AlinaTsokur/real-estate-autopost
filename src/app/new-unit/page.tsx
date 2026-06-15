@@ -385,11 +385,8 @@ export default function NewUnitPage() {
         paymentSheetUrl: data.paymentSheetUrl,
         paymentError: data.paymentError,
       });
-      setForm(prev => ({
-        ...EMPTY,
-        projectName: prev.projectName,
-      }));
-      setProjectSearch(form.projectName);
+      setForm(EMPTY);
+      setProjectSearch('');
     } catch (e: any) {
       setSaveResult({ ok: false, text: e.message });
     } finally {
