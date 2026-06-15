@@ -99,6 +99,8 @@ export default function ManualPostPage() {
       setParsedData(null);
       setPostPreview('');
       setOldPostsResult(null);
+      setProject('');
+      setProjectSearch('');
     } catch (e: any) {
       alert(e.message);
     } finally {
