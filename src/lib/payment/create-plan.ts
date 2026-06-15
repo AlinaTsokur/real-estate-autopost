@@ -366,31 +366,32 @@ export async function createFolderAndPaymentPlan(
 
   if (!parentFolderId) throw new Error(`Parent Folder ID not found for project: ${safe(record['Project Name'])}`);
 
-  // Check CONFIG_DRIVE for a cluster subfolder override (e.g. Saadiyat Lagoons by code prefix)
+  // Check CONFIG_DRIVE for a per-prefix Search folder override (e.g. Saadiyat Lagoons clusters)
   const objectsId = process.env.GOOGLE_SHEETS_OBJECTS_ID ?? '';
   if (objectsId) {
     try {
       const cfgDriveData = await getSheetData(objectsId, 'CONFIG_DRIVE');
       if (cfgDriveData.length > 1) {
-        const cdHeaders = (cfgDriveData[0] ?? []).map(h => String(h).trim().toLowerCase());
-        const cdPrefix  = cdHeaders.findIndex(h => h === 'code prefix');
-        const cdCluster = cdHeaders.findIndex(h => h === 'cluster folder id');
-        if (cdPrefix >= 0 && cdCluster >= 0) {
+        const cdHeaders  = (cfgDriveData[0] ?? []).map(h => String(h).trim().toLowerCase());
+        const cdPrefix   = cdHeaders.findIndex(h => h === 'code prefix');
+        const cdSearch   = cdHeaders.findIndex(h => h === 'search folder link');
+        if (cdPrefix >= 0 && cdSearch >= 0) {
           const rawCode    = safe(record['Code']).replace(/^#/, '');
           const codePrefix = rawCode.replace(/\D/g, '').slice(0, 4);
           for (let i = 1; i < cfgDriveData.length; i++) {
             const rowPrefix = String(cfgDriveData[i][cdPrefix] ?? '').replace(/\D/g, '').padStart(4, '0').slice(0, 4);
-            const raw       = String(cfgDriveData[i][cdCluster] ?? '').trim();
-            if (rowPrefix !== codePrefix || !raw) continue;
-            // accept both a bare ID and a full Drive URL
+            if (rowPrefix !== codePrefix) continue;
+            const raw = String(cfgDriveData[i][cdSearch] ?? '').trim();
+            if (!raw) break;
             const urlMatch = raw.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-            parentFolderId = urlMatch ? urlMatch[1] : raw;
+            const fid = urlMatch ? urlMatch[1] : raw;
+            if (fid && fid !== parentFolderId) parentFolderId = fid;
             break;
           }
         }
       }
     } catch {
-      // cluster lookup failure is non-fatal — fall back to project-level folder
+      // lookup failure is non-fatal — fall back to project-level folder
     }
   }
 
