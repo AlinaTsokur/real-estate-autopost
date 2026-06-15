@@ -388,8 +388,6 @@ export default function NewUnitPage() {
       setForm(prev => ({
         ...EMPTY,
         projectName: prev.projectName,
-        manager: prev.manager,
-        paymentPlan: prev.paymentPlan,
       }));
       setProjectSearch(form.projectName);
     } catch (e: any) {

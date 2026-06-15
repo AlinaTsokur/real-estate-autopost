@@ -95,6 +95,10 @@ export default function ManualPostPage() {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       alert('Sent to Review Group!');
+      setRawText('');
+      setParsedData(null);
+      setPostPreview('');
+      setOldPostsResult(null);
     } catch (e: any) {
       alert(e.message);
     } finally {
