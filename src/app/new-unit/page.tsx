@@ -354,9 +354,13 @@ export default function NewUnitPage() {
   };
 
   const validate = (): string => {
-    if (!form.projectName) return 'Выбери Project';
-    if (!form.unit && !form.code) return 'Заполни Unit или Code';
+    if (!form.projectName)  return 'Выбери Project';
+    if (!form.code)         return 'Заполни Код объекта';
+    if (!form.unit)         return 'Заполни Номер юнита';
+    if (!form.view)         return 'Заполни Вид';
+    if (!form.areaM2)       return 'Заполни Площадь (Area, m²)';
     if (!form.sellingPrice) return 'Заполни Selling Price';
+    if (!form.manager)      return 'Заполни Менеджера';
     return '';
   };
 
@@ -531,13 +535,13 @@ export default function NewUnitPage() {
 
           {/* Unit */}
           <div>
-            <label className={LABEL}>Номер юнита</label>
+            <label className={LABEL}>Номер юнита *</label>
             <input value={form.unit} onChange={up('unit')} placeholder="101" className={BASE_INPUT} />
           </div>
 
           {/* Code */}
           <div>
-            <label className={LABEL}>Код объекта</label>
+            <label className={LABEL}>Код объекта *</label>
             <input
               value={form.code}
               onChange={e => {
@@ -564,7 +568,7 @@ export default function NewUnitPage() {
 
           {/* View */}
           <div>
-            <label className={LABEL}>Вид</label>
+            <label className={LABEL}>Вид *</label>
             <input value={form.view} onChange={up('view')} placeholder="Sea view, Garden view..." className={BASE_INPUT} />
           </div>
 
@@ -634,7 +638,7 @@ export default function NewUnitPage() {
           </div>
 
           <div>
-            <label className={LABEL}>Area, m²</label>
+            <label className={LABEL}>Area, m² *</label>
             <input value={form.areaM2} onChange={up('areaM2')} placeholder="85.50" className={BASE_INPUT} />
           </div>
         </SectionCard>
@@ -737,7 +741,7 @@ export default function NewUnitPage() {
         {/* ── Section 6: Прочее ── */}
         <SectionCard title="Прочее" dot="bg-slate-400">
           <div className="col-span-2">
-            <label className={LABEL}>Менеджер</label>
+            <label className={LABEL}>Менеджер *</label>
             <input value={form.manager} onChange={up('manager')} placeholder="Nataly" className={BASE_INPUT} />
           </div>
         </SectionCard>
