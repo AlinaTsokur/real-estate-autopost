@@ -183,6 +183,7 @@ export async function GET() {
     const soldColorMap = await getUnitCellColors(sheets, ai.unit);
 
     const results: AuditRow[] = [];
+    const reportedFolderIds = new Set<string>(); // prevent duplicate entries for same physical folder
 
     for (let i = 1; i < abuRows.length; i++) {
       const r = abuRows[i] as unknown[];
@@ -258,6 +259,7 @@ export async function GET() {
             `https://drive.google.com/drive/folders/${id}`
           ).join(', ')}`;
         }
+        if (row.unitFolderId) reportedFolderIds.add(row.unitFolderId);
 
       // ── Rows WITHOUT code: search by unit name ───────────────────────────
       } else {
@@ -279,6 +281,9 @@ export async function GET() {
           results.push(row);
           continue;
         }
+
+        // Skip if this folder was already reported by a code-based row
+        if (row.unitFolderId && reportedFolderIds.has(row.unitFolderId)) continue;
 
         row.folderName       = indexed.folderName;
         row.actualParentId   = indexed.parentId;
