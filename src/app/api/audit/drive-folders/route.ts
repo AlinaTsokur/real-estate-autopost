@@ -4,8 +4,12 @@ import { getGoogleDriveClient } from '@/lib/google/drive';
 
 const OBJECTS_ID = process.env.GOOGLE_SHEETS_OBJECTS_ID ?? '';
 
-const SOLD_VARIANTS    = new Set(['продано через нас', 'продано']);
-const REMOVED_VARIANTS = new Set(['снято с продажи', 'снять с продажи', 'снато с продажи']);
+const SOLD_VARIANTS    = ['продано через нас', 'продано'];
+const REMOVED_VARIANTS = ['снято с продажи', 'снять с продажи', 'снато с продажи'];
+
+function matchesVariant(comment: string, variants: string[]): boolean {
+  return variants.some(v => comment === v || comment.startsWith(v + ' ') || comment.startsWith(v + ','));
+}
 
 // #f4cccc = sold row highlight
 function isSoldColor(bg: { red?: number; green?: number; blue?: number } | null | undefined): boolean {
@@ -186,10 +190,10 @@ export async function GET() {
 
       // Comment takes priority; color only used when comment gives no signal
       const expected: ExpectedLocation =
-        SOLD_VARIANTS.has(comment)    ? 'sold' :
-        REMOVED_VARIANTS.has(comment) ? 'removed' :
-        isSoldByColor                 ? 'sold' :
-                                        'search';
+        matchesVariant(comment, SOLD_VARIANTS)    ? 'sold' :
+        matchesVariant(comment, REMOVED_VARIANTS) ? 'removed' :
+        isSoldByColor                             ? 'sold' :
+                                                    'search';
 
       const row: AuditRow = {
         rowNum:           i + 1,
