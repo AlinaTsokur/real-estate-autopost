@@ -184,10 +184,12 @@ export async function GET() {
       // soldColorMap is keyed by sheet row index (0-based, row 0 = header)
       const isSoldByColor = soldColorMap.get(i) === true;
 
+      // Comment takes priority; color only used when comment gives no signal
       const expected: ExpectedLocation =
-        SOLD_VARIANTS.has(comment) || isSoldByColor ? 'sold' :
-        REMOVED_VARIANTS.has(comment)               ? 'removed' :
-                                                      'search';
+        SOLD_VARIANTS.has(comment)    ? 'sold' :
+        REMOVED_VARIANTS.has(comment) ? 'removed' :
+        isSoldByColor                 ? 'sold' :
+                                        'search';
 
       const row: AuditRow = {
         rowNum:           i + 1,
