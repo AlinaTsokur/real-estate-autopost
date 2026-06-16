@@ -183,7 +183,20 @@ export async function GET() {
     const soldColorMap = await getUnitCellColors(sheets, ai.unit);
 
     const results: AuditRow[] = [];
-    const reportedFolderIds = new Set<string>(); // prevent duplicate entries for same physical folder
+
+    // Pre-pass: collect folder IDs claimed by rows WITH a code so no-code rows don't duplicate them
+    const reportedFolderIds = new Set<string>();
+    for (let i = 1; i < abuRows.length; i++) {
+      const r = abuRows[i] as unknown[];
+      const code = String(r[ai.code] ?? '').replace(/\s/g, '').replace(/^#/, '');
+      if (!code) continue;
+      const storedId = String(r[ai.unitFolderId] ?? '').trim();
+      if (storedId) { reportedFolderIds.add(storedId); continue; }
+      const pattern = makeCodePattern(code);
+      for (const [id, info] of byId) {
+        if (pattern.test(info.folderName)) { reportedFolderIds.add(id); break; }
+      }
+    }
 
     for (let i = 1; i < abuRows.length; i++) {
       const r = abuRows[i] as unknown[];
