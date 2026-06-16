@@ -162,6 +162,14 @@ export async function GET() {
       );
     }
 
+    // ── Reverse map: parentId → category (for no-code unit lookup) ───────────
+    const parentCategory = new Map<string, { category: ExpectedLocation; pc: PrefixConfig }>();
+    for (const [, pc] of prefixMap) {
+      for (const id of pc.searchIds)  parentCategory.set(id, { category: 'search',  pc });
+      for (const id of pc.soldIds)    parentCategory.set(id, { category: 'sold',    pc });
+      for (const id of pc.removedIds) parentCategory.set(id, { category: 'removed', pc });
+    }
+
     // ── Parse Abu Dhabi ──────────────────────────────────────────────────────
     const abuHeaders = (abuRows[0] ?? []).map(h => String(h).trim());
     const ai = {
@@ -178,14 +186,14 @@ export async function GET() {
 
     for (let i = 1; i < abuRows.length; i++) {
       const r = abuRows[i] as unknown[];
-      const code = String(r[ai.code] ?? '').replace(/\s/g, '').replace(/^#/, '');
-      if (!code) continue; // skip header/empty rows
+      const unit     = String(r[ai.unit] ?? '').trim();
+      const code     = String(r[ai.code] ?? '').replace(/\s/g, '').replace(/^#/, '');
+      const hasCode  = code.length > 0;
+      if (!unit && !code) continue; // skip fully empty rows
 
-      const comment    = normalizeComment(r[ai.comment]);
-      const folderId   = String(r[ai.unitFolderId] ?? '').trim();
-      const prefix     = code.replace(/\D/g, '').slice(0, 4);
+      const comment  = normalizeComment(r[ai.comment]);
+      const folderId = String(r[ai.unitFolderId] ?? '').trim();
 
-      // soldColorMap is keyed by sheet row index (0-based, row 0 = header)
       const isSoldByColor = soldColorMap.get(i) === true;
 
       // Comment takes priority; color only used when comment gives no signal
@@ -197,8 +205,8 @@ export async function GET() {
 
       const row: AuditRow = {
         rowNum:           i + 1,
-        unit:             String(r[ai.unit] ?? '').trim(),
-        code:             '#' + code,
+        unit,
+        code:             hasCode ? '#' + code : '',
         comment,
         unitFolderId:     folderId,
         folderName:       '',
@@ -209,52 +217,90 @@ export async function GET() {
         detail:           '',
       };
 
-      const pc = prefixMap.get(prefix);
-      if (!pc) {
-        row.status = 'config_missing';
-        row.detail = `Prefix ${prefix} не найден в CONFIG_DRIVE`;
-        results.push(row);
-        continue;
-      }
+      // ── Rows WITH code: prefix-based lookup ──────────────────────────────
+      if (hasCode) {
+        const prefix = code.replace(/\D/g, '').slice(0, 4);
+        const pc = prefixMap.get(prefix);
+        if (!pc) {
+          row.status = 'config_missing';
+          row.detail = `Prefix ${prefix} не найден в CONFIG_DRIVE`;
+          results.push(row);
+          continue;
+        }
 
-      // Find the unit folder: by stored ID first, then by code pattern in names
-      let indexed = folderId ? byId.get(folderId) : undefined;
-
-      if (!indexed) {
-        // Search by code pattern in all scanned subfolders
-        const pattern = makeCodePattern(code);
-        for (const [id, info] of byId) {
-          if (pattern.test(info.folderName)) {
-            indexed = info;
-            row.unitFolderId = id;
-            break;
+        let indexed = folderId ? byId.get(folderId) : undefined;
+        if (!indexed) {
+          const pattern = makeCodePattern(code);
+          for (const [id, info] of byId) {
+            if (pattern.test(info.folderName)) { indexed = info; row.unitFolderId = id; break; }
           }
         }
-      }
 
-      if (!indexed) {
-        row.status = 'not_found';
-        row.detail = 'Папка не найдена в Drive';
-        results.push(row);
-        continue;
-      }
+        if (!indexed) {
+          row.status = 'not_found';
+          row.detail = 'Папка не найдена в Drive';
+          results.push(row);
+          continue;
+        }
 
-      row.folderName       = indexed.folderName;
-      row.actualParentId   = indexed.parentId;
-      row.actualParentName = indexed.parentName;
+        row.folderName       = indexed.folderName;
+        row.actualParentId   = indexed.parentId;
+        row.actualParentName = indexed.parentName;
 
-      const expectedIds =
-        expected === 'sold'    ? pc.soldIds :
-        expected === 'removed' ? pc.removedIds :
-                                  pc.searchIds;
+        const expectedIds =
+          expected === 'sold'    ? pc.soldIds :
+          expected === 'removed' ? pc.removedIds :
+                                   pc.searchIds;
 
-      if (expectedIds.has(indexed.parentId)) {
-        row.status = 'ok';
+        row.status = expectedIds.has(indexed.parentId) ? 'ok' : 'wrong';
+        if (row.status === 'wrong') {
+          row.detail = `Ожидается в: ${[...expectedIds].map(id =>
+            `https://drive.google.com/drive/folders/${id}`
+          ).join(', ')}`;
+        }
+
+      // ── Rows WITHOUT code: search by unit name ───────────────────────────
       } else {
-        row.status = 'wrong';
-        row.detail = `Ожидается в: ${[...expectedIds].map(id =>
-          `https://drive.google.com/drive/folders/${id}`
-        ).join(', ')}`;
+        if (!unit) { results.push(row); continue; }
+
+        let indexed = folderId ? byId.get(folderId) : undefined;
+        if (!indexed) {
+          const unitLower = unit.toLowerCase();
+          for (const [id, info] of byId) {
+            if (info.folderName.toLowerCase().includes(unitLower)) {
+              indexed = info; row.unitFolderId = id; break;
+            }
+          }
+        }
+
+        if (!indexed) {
+          row.status = 'not_found';
+          row.detail = 'Папка не найдена в Drive';
+          results.push(row);
+          continue;
+        }
+
+        row.folderName       = indexed.folderName;
+        row.actualParentId   = indexed.parentId;
+        row.actualParentName = indexed.parentName;
+
+        // Determine correctness via reverse map
+        const rev = parentCategory.get(indexed.parentId);
+        if (!rev) {
+          row.status = 'config_missing';
+          row.detail = 'Родительская папка не найдена в CONFIG_DRIVE';
+        } else if (rev.category === expected) {
+          row.status = 'ok';
+        } else {
+          row.status = 'wrong';
+          const expectedIds =
+            expected === 'sold'    ? rev.pc.soldIds :
+            expected === 'removed' ? rev.pc.removedIds :
+                                     rev.pc.searchIds;
+          row.detail = `Ожидается в: ${[...expectedIds].map(id =>
+            `https://drive.google.com/drive/folders/${id}`
+          ).join(', ')}`;
+        }
       }
 
       results.push(row);
