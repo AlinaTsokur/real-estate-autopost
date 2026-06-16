@@ -127,9 +127,9 @@ export default function DriveAuditPage() {
           </div>
 
           {/* Table */}
-          <div className="rounded-2xl bg-slate-900/60 border border-white/5 overflow-hidden">
+          <div className="rounded-2xl bg-slate-900/60 border border-white/5 overflow-auto max-h-[70vh]">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-slate-900">
                 <tr className="border-b border-white/5 text-left">
                   <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Строка</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Код</th>
