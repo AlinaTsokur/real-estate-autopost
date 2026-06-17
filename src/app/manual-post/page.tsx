@@ -20,6 +20,9 @@ export default function ManualPostPage() {
   const [searchingOldPrice, setSearchingOldPrice] = useState(false);
   const [oldPostsResult, setOldPostsResult] = useState<any>(null);
 
+  const [lastSent, setLastSent] = useState<{ code: string; unit: string } | null>(null);
+  const [approving, setApproving] = useState(false);
+
   // Fetch projects and floors from Google Sheets on page load
   useEffect(() => {
     fetch('/api/projects')
@@ -94,6 +97,7 @@ export default function ManualPostPage() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+      setLastSent({ code: parsedData.code || '', unit: parsedData.unit || '' });
       alert('Sent to Review Group!');
       setRawText('');
       setParsedData(null);
@@ -162,6 +166,25 @@ export default function ManualPostPage() {
 
   const isVilla = ['villa', 'townhouse', 'condo'].includes(String(parsedData?.objectType || '').toLowerCase());
 
+  const handleApprove = async () => {
+    if (!lastSent) return;
+    setApproving(true);
+    try {
+      const res = await fetch('/api/approve-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: lastSent.code, unit: lastSent.unit }),
+      });
+      const d = await res.json();
+      if (d.error) throw new Error(d.error);
+      setLastSent(null);
+    } catch (e: any) {
+      alert('Ошибка: ' + e.message);
+    } finally {
+      setApproving(false);
+    }
+  };
+
   const convertRuToEn = (str: string) => {
     const ru = 'йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,';
     const en = 'qwertyuiop[]asdfghjkl;\'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL:"ZXCVBNM<>?';
@@ -179,6 +202,34 @@ export default function ManualPostPage() {
         <h1 className="text-3xl font-bold text-white tracking-tight mb-2">Manual Post Builder</h1>
         <p className="text-slate-400">Parse a single row and prepare it for Telegram.</p>
       </div>
+
+      {lastSent && (
+        <div className="flex items-center gap-4 mb-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+          <div className="flex-1 text-sm text-emerald-300">
+            Пост отправлен —{' '}
+            <span className="font-mono font-semibold">{lastSent.code || lastSent.unit}</span>
+            . Отметить как Approved в таблице?
+          </div>
+          <button
+            onClick={handleApprove}
+            disabled={approving}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-5 rounded-xl transition-all disabled:opacity-50 disabled:pointer-events-none text-sm"
+          >
+            {approving ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Сохраняю...
+              </>
+            ) : '✓ Approved'}
+          </button>
+          <button
+            onClick={() => setLastSent(null)}
+            className="text-slate-500 hover:text-slate-300 text-xs transition-colors"
+          >
+            Пропустить
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* Left Column: Input Form & Preview */}
