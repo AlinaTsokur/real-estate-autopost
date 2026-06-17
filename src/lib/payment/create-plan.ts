@@ -251,10 +251,9 @@ async function fillTemplate(
   const fmlRows = fmlRes.data.values ?? [];
   const placeholders = buildPlaceholders(record);
 
-  const updates:    Array<{ range: string; values: unknown[][] }> = [];
-  // stringCells: cells where we must force text (no re-parsing by Sheets)
-  // stored as { rowIndex, colIndex, value } — written via batchUpdate stringValue
-  const stringCells: Array<{ row: number; col: number; value: string }> = [];
+  const updates: Array<{ range: string; values: unknown[][] }> = [];
+  // numCells: price display cells — write raw number + set format to 0 decimals so formulas work
+  const numCells: Array<{ row: number; col: number; value: number }> = [];
 
   // 1. Replace {{placeholders}} in all non-formula cells
   for (let r = 0; r < rows.length; r++) {
@@ -301,19 +300,19 @@ async function fillTemplate(
     }
   }
 
-  // 3. setValueUnderHeader: find label cell, write to cell below
+  // 3. setValueUnderHeader: find label cell, write raw number + 0-decimal format to cell below
   const underHeaderWrites = [
-    { label: 'Original Price, AED', value: fmtAedNumberOnly(record['Original Price, AED']) },
-    { label: 'Selling Price, AED',  value: buildSellingCell(record) },
+    { label: 'Original Price, AED', value: num(record['Original Price, AED']) },
+    { label: 'Selling Price, AED',  value: num(record['Selling Price, AED']) },
   ];
 
   for (const { label, value } of underHeaderWrites) {
-    if (!value) continue;
+    if (value === '') continue;
     let done = false;
     for (let r = 0; r < rows.length && !done; r++) {
       for (let c = 0; c < rows[r].length; c++) {
         if (String(rows[r][c] ?? '').trim() === label) {
-          stringCells.push({ row: r + 1, col: c, value });
+          numCells.push({ row: r + 1, col: c, value: value as number });
           done = true;
           break;
         }
@@ -321,9 +320,8 @@ async function fillTemplate(
     }
   }
 
-  if (!updates.length && !stringCells.length) return;
+  if (!updates.length && !numCells.length) return;
 
-  // Get sheetId for stringValue writes
   const sheetId = meta.data.sheets?.[0]?.properties?.sheetId ?? 0;
 
   await Promise.all([
@@ -331,15 +329,15 @@ async function fillTemplate(
       spreadsheetId,
       requestBody: { valueInputOption: 'USER_ENTERED', data: updates },
     }) : Promise.resolve(),
-    // Force text for price display cells — prevents Sheets re-parsing "1.250.000" as a number
-    stringCells.length ? sheets.spreadsheets.batchUpdate({
+    // Write price cells as number + set #,##0 format (0 decimals) so formulas work and no ,00 shows
+    numCells.length ? sheets.spreadsheets.batchUpdate({
       spreadsheetId,
       requestBody: {
-        requests: stringCells.map(({ row, col, value }) => ({
+        requests: numCells.map(({ row, col, value }) => ({
           updateCells: {
             range: { sheetId, startRowIndex: row, endRowIndex: row + 1, startColumnIndex: col, endColumnIndex: col + 1 },
-            rows: [{ values: [{ userEnteredValue: { stringValue: value } }] }],
-            fields: 'userEnteredValue',
+            rows: [{ values: [{ userEnteredValue: { numberValue: value }, userEnteredFormat: { numberFormat: { type: 'NUMBER', pattern: '#,##0' } } }] }],
+            fields: 'userEnteredValue,userEnteredFormat.numberFormat',
           },
         })),
       },
