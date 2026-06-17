@@ -251,10 +251,10 @@ async function fillTemplate(
   const fmlRows = fmlRes.data.values ?? [];
   const placeholders = buildPlaceholders(record);
 
-  // textUpdates → RAW (prevents Google Sheets re-parsing formatted strings like "1.250.000" as numbers)
-  // numUpdates  → USER_ENTERED (raw numbers that formulas in the sheet depend on)
-  const textUpdates: Array<{ range: string; values: unknown[][] }> = [];
-  const numUpdates:  Array<{ range: string; values: unknown[][] }> = [];
+  const updates:    Array<{ range: string; values: unknown[][] }> = [];
+  // stringCells: cells where we must force text (no re-parsing by Sheets)
+  // stored as { rowIndex, colIndex, value } — written via batchUpdate stringValue
+  const stringCells: Array<{ row: number; col: number; value: string }> = [];
 
   // 1. Replace {{placeholders}} in all non-formula cells
   for (let r = 0; r < rows.length; r++) {
@@ -268,7 +268,7 @@ async function fillTemplate(
         newVal = newVal.split(key).join(val);
       }
       if (newVal !== cellVal) {
-        textUpdates.push({ range: `${sheetName}!${colLetter(c)}${r + 1}`, values: [[newVal]] });
+        updates.push({ range: `${sheetName}!${colLetter(c)}${r + 1}`, values: [[newVal]] });
       }
     }
   }
@@ -297,7 +297,7 @@ async function fillTemplate(
   for (let c = 0; c < headers.length; c++) {
     const key = String(headers[c] ?? '').trim();
     if (key in serviceMap && serviceMap[key] !== '') {
-      numUpdates.push({ range: `${sheetName}!${colLetter(c)}2`, values: [[serviceMap[key]]] });
+      updates.push({ range: `${sheetName}!${colLetter(c)}2`, values: [[serviceMap[key]]] });
     }
   }
 
@@ -313,7 +313,7 @@ async function fillTemplate(
     for (let r = 0; r < rows.length && !done; r++) {
       for (let c = 0; c < rows[r].length; c++) {
         if (String(rows[r][c] ?? '').trim() === label) {
-          textUpdates.push({ range: `${sheetName}!${colLetter(c)}${r + 2}`, values: [[value]] });
+          stringCells.push({ row: r + 1, col: c, value });
           done = true;
           break;
         }
@@ -321,16 +321,28 @@ async function fillTemplate(
     }
   }
 
-  if (!textUpdates.length && !numUpdates.length) return;
+  if (!updates.length && !stringCells.length) return;
+
+  // Get sheetId for stringValue writes
+  const sheetId = meta.data.sheets?.[0]?.properties?.sheetId ?? 0;
 
   await Promise.all([
-    textUpdates.length ? sheets.spreadsheets.values.batchUpdate({
+    updates.length ? sheets.spreadsheets.values.batchUpdate({
       spreadsheetId,
-      requestBody: { valueInputOption: 'RAW', data: textUpdates },
+      requestBody: { valueInputOption: 'USER_ENTERED', data: updates },
     }) : Promise.resolve(),
-    numUpdates.length ? sheets.spreadsheets.values.batchUpdate({
+    // Force text for price display cells — prevents Sheets re-parsing "1.250.000" as a number
+    stringCells.length ? sheets.spreadsheets.batchUpdate({
       spreadsheetId,
-      requestBody: { valueInputOption: 'USER_ENTERED', data: numUpdates },
+      requestBody: {
+        requests: stringCells.map(({ row, col, value }) => ({
+          updateCells: {
+            range: { sheetId, startRowIndex: row, endRowIndex: row + 1, startColumnIndex: col, endColumnIndex: col + 1 },
+            rows: [{ values: [{ userEnteredValue: { stringValue: value } }] }],
+            fields: 'userEnteredValue',
+          },
+        })),
+      },
     }) : Promise.resolve(),
   ]);
 }
