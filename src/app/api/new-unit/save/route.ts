@@ -128,6 +128,37 @@ export async function POST(req: NextRequest) {
 
     const updatedRange = result.data.updates?.updatedRange ?? '';
 
+    // Fix integer columns that the sheet template formats with decimals
+    const rowNumEarly = parseRowNumber(updatedRange);
+    if (rowNumEarly !== null) {
+      const parkingColIdx = idx[normalizeText('Parking space')];
+      if (parkingColIdx !== undefined) {
+        const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties' });
+        const objectsSheet = meta.data.sheets?.find(s => s.properties?.title === 'OBJECTS');
+        const objectsSheetId = objectsSheet?.properties?.sheetId;
+        if (objectsSheetId !== undefined) {
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: {
+              requests: [{
+                updateCells: {
+                  range: {
+                    sheetId: objectsSheetId,
+                    startRowIndex: rowNumEarly - 1,
+                    endRowIndex: rowNumEarly,
+                    startColumnIndex: parkingColIdx,
+                    endColumnIndex: parkingColIdx + 1,
+                  },
+                  rows: [{ values: [{ userEnteredFormat: { numberFormat: { type: 'NUMBER', pattern: '#,##0' } } }] }],
+                  fields: 'userEnteredFormat.numberFormat',
+                },
+              }],
+            },
+          });
+        }
+      }
+    }
+
     // Build a record for the payment plan function (uses display names)
     const record: Record<string, unknown> = {
       'Project Name':        form.projectName ?? '',
