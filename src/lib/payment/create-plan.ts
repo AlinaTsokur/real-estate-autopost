@@ -251,7 +251,10 @@ async function fillTemplate(
   const fmlRows = fmlRes.data.values ?? [];
   const placeholders = buildPlaceholders(record);
 
-  const updates: Array<{ range: string; values: unknown[][] }> = [];
+  // textUpdates → RAW (prevents Google Sheets re-parsing formatted strings like "1.250.000" as numbers)
+  // numUpdates  → USER_ENTERED (raw numbers that formulas in the sheet depend on)
+  const textUpdates: Array<{ range: string; values: unknown[][] }> = [];
+  const numUpdates:  Array<{ range: string; values: unknown[][] }> = [];
 
   // 1. Replace {{placeholders}} in all non-formula cells
   for (let r = 0; r < rows.length; r++) {
@@ -265,7 +268,7 @@ async function fillTemplate(
         newVal = newVal.split(key).join(val);
       }
       if (newVal !== cellVal) {
-        updates.push({ range: `${sheetName}!${colLetter(c)}${r + 1}`, values: [[newVal]] });
+        textUpdates.push({ range: `${sheetName}!${colLetter(c)}${r + 1}`, values: [[newVal]] });
       }
     }
   }
@@ -294,7 +297,7 @@ async function fillTemplate(
   for (let c = 0; c < headers.length; c++) {
     const key = String(headers[c] ?? '').trim();
     if (key in serviceMap && serviceMap[key] !== '') {
-      updates.push({ range: `${sheetName}!${colLetter(c)}2`, values: [[serviceMap[key]]] });
+      numUpdates.push({ range: `${sheetName}!${colLetter(c)}2`, values: [[serviceMap[key]]] });
     }
   }
 
@@ -310,7 +313,7 @@ async function fillTemplate(
     for (let r = 0; r < rows.length && !done; r++) {
       for (let c = 0; c < rows[r].length; c++) {
         if (String(rows[r][c] ?? '').trim() === label) {
-          updates.push({ range: `${sheetName}!${colLetter(c)}${r + 2}`, values: [[value]] });
+          textUpdates.push({ range: `${sheetName}!${colLetter(c)}${r + 2}`, values: [[value]] });
           done = true;
           break;
         }
@@ -318,12 +321,18 @@ async function fillTemplate(
     }
   }
 
-  if (!updates.length) return;
+  if (!textUpdates.length && !numUpdates.length) return;
 
-  await sheets.spreadsheets.values.batchUpdate({
-    spreadsheetId,
-    requestBody: { valueInputOption: 'USER_ENTERED', data: updates },
-  });
+  await Promise.all([
+    textUpdates.length ? sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: { valueInputOption: 'RAW', data: textUpdates },
+    }) : Promise.resolve(),
+    numUpdates.length ? sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: { valueInputOption: 'USER_ENTERED', data: numUpdates },
+    }) : Promise.resolve(),
+  ]);
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
