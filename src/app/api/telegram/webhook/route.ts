@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { updatePublicationDate } from '@/lib/google/sheets';
+import { approveUnitRow } from '@/lib/google/sheets';
 import { getBot } from '@/lib/telegram/bot';
 
 export async function POST(request: Request) {
@@ -18,9 +18,9 @@ export async function POST(request: Request) {
         const code = data.replace('approve_', '');
         
         try {
-          await updatePublicationDate(code);
-          await bot.telegram.editMessageText(chatId, messageId, undefined, `✅ Approved and date updated for unit: ${code}`);
-          await bot.telegram.answerCbQuery(cb.id, `Success: Date updated for ${code}`);
+          const result = await approveUnitRow(code);
+          await bot.telegram.editMessageText(chatId, messageId, undefined, `✅ Approved: строка ${result.row} закрашена зелёным (#${code})`);
+          await bot.telegram.answerCbQuery(cb.id, `✅ Готово — строка ${result.row}`);
         } catch (e: any) {
           console.error(e);
           await bot.telegram.answerCbQuery(cb.id, `Error: ${e.message}`);

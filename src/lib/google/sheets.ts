@@ -270,6 +270,63 @@ export async function getOriginalPriceForObject(unitCode: string) {
   return '';
 }
 
+// #d9ead3 — approved green
+const APPROVED_COLOR = { red: 217 / 255, green: 234 / 255, blue: 211 / 255 };
+const APPROVED_SHEET_GID = 1747337860;
+
+export async function approveUnitRow(code: string, unit?: string): Promise<{ row: number; sheet: string }> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID ?? '';
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_OBJECTS_ID not configured');
+
+  const sheets = await getGoogleSheetsClient();
+
+  // Resolve sheet name from GID
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties' });
+  const sheetTitle = meta.data.sheets?.find(s => s.properties?.sheetId === APPROVED_SHEET_GID)?.properties?.title;
+  if (!sheetTitle) throw new Error(`Sheet GID ${APPROVED_SHEET_GID} not found`);
+
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: sheetTitle });
+  const rows = res.data.values ?? [];
+  if (rows.length < 2) throw new Error('Sheet is empty');
+
+  const headers = (rows[0] as unknown[]).map(h => String(h).trim().toLowerCase());
+  const unitCol = headers.indexOf('unit');
+  const codeCol = headers.findIndex(h => h === 'код' || h === 'code');
+
+  const norm = (v: unknown) =>
+    String(v ?? '').replace(/ /g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase();
+
+  const targetCode = norm(code);
+  const targetUnit = norm(unit ?? '');
+
+  let rowIndex = -1;
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i] as unknown[];
+    const rowCode = norm(r[codeCol]);
+    const rowUnit = norm(r[unitCol]);
+    if ((targetCode && rowCode === targetCode) || (targetUnit && rowUnit === targetUnit)) {
+      rowIndex = i;
+      break;
+    }
+  }
+  if (rowIndex === -1) throw new Error(`Unit not found: code=${code} unit=${unit}`);
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{
+        repeatCell: {
+          range: { sheetId: APPROVED_SHEET_GID, startRowIndex: rowIndex, endRowIndex: rowIndex + 1 },
+          cell: { userEnteredFormat: { backgroundColor: APPROVED_COLOR } },
+          fields: 'userEnteredFormat.backgroundColor',
+        },
+      }],
+    },
+  });
+
+  return { row: rowIndex + 1, sheet: sheetTitle };
+}
+
 export async function getC3Units(): Promise<string[]> {
   const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
   if (!spreadsheetId) return [];
