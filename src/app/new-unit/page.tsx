@@ -357,7 +357,7 @@ export default function NewUnitPage() {
     if (!form.projectName)  return 'Выбери Project';
     if (!form.code)         return 'Заполни Код объекта';
     if (!form.unit)         return 'Заполни Номер юнита';
-    if (!form.view)         return 'Заполни Вид';
+    if (!isVilla && !form.view) return 'Заполни Вид';
     if (!isVilla && !form.areaM2) return 'Заполни Площадь (Area, m²)';
     if (!form.sellingPrice) return 'Заполни Selling Price';
     if (!form.manager)      return 'Заполни Менеджера';
@@ -562,16 +562,20 @@ export default function NewUnitPage() {
           </div>
 
           {/* View */}
-          <div>
-            <label className={LABEL}>Вид *</label>
-            <input value={form.view} onChange={up('view')} placeholder="Sea view, Garden view..." className={BASE_INPUT} />
-          </div>
+          {!isVilla && (
+            <div>
+              <label className={LABEL}>Вид *</label>
+              <input value={form.view} onChange={up('view')} placeholder="Sea view, Garden view..." className={BASE_INPUT} />
+            </div>
+          )}
 
           {/* Floor */}
-          <div>
-            <label className={LABEL}>Этаж</label>
-            <SelOrInput value={form.floor} onChange={up('floor')} options={options?.floors} placeholder="High Floor..." />
-          </div>
+          {!isVilla && (
+            <div>
+              <label className={LABEL}>Этаж</label>
+              <SelOrInput value={form.floor} onChange={up('floor')} options={options?.floors} placeholder="High Floor..." />
+            </div>
+          )}
 
           {/* Furnished */}
           <div className="col-span-2">
