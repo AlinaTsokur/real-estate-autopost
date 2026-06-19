@@ -130,7 +130,7 @@ export default function BudgetPage() {
                 <button
                   key={p}
                   onClick={() => toggleCheck(p, projects)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-all select-none
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all select-none
                     ${done
                       ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
                       : 'bg-slate-950/50 border-white/8 text-slate-300 hover:border-white/20 hover:text-white'
