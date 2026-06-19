@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const convertRuToEn = (str: string) => {
   const ru = 'йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,';
@@ -13,31 +13,104 @@ const convertRuToEn = (str: string) => {
   return res;
 };
 
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatDateRu(iso: string) {
+  const [y, m, d] = iso.split('-');
+  const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  const days = ['вс','пн','вт','ср','чт','пт','сб'];
+  const date = new Date(`${iso}T12:00:00`);
+  return `${d} ${months[+m - 1]}, ${days[date.getDay()]}`;
+}
+
 export default function BudgetPage() {
+  // ── projects for main form ──────────────────────────────────
   const [projects, setProjects] = useState<string[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectSearch, setProjectSearch] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
   const [project, setProject] = useState('');
   const [rawText, setRawText] = useState('');
   const [parsedData, setParsedData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
+  // ── tracker state ───────────────────────────────────────────
+  const [rotation, setRotation] = useState<string[]>([]);          // ordered list of projects in rotation
+  const [checked, setChecked] = useState<Record<string, boolean>>({}); // today's checks
+  const [addSearch, setAddSearch] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
+  const addRef = useRef<HTMLDivElement>(null);
+
+  // load rotation & today's checks from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('budget_rotation');
+      if (saved) setRotation(JSON.parse(saved));
+      const todayChecks = localStorage.getItem(`budget_checks_${todayKey()}`);
+      if (todayChecks) setChecked(JSON.parse(todayChecks));
+    } catch {}
+  }, []);
+
+  const saveRotation = (r: string[]) => {
+    setRotation(r);
+    localStorage.setItem('budget_rotation', JSON.stringify(r));
+  };
+
+  const toggleCheck = (p: string) => {
+    const next = { ...checked, [p]: !checked[p] };
+    setChecked(next);
+    localStorage.setItem(`budget_checks_${todayKey()}`, JSON.stringify(next));
+  };
+
+  const removeFromRotation = (p: string) => saveRotation(rotation.filter(r => r !== p));
+
+  const addToRotation = (p: string) => {
+    if (rotation.includes(p)) return;
+    saveRotation([...rotation, p]);
+    setAddSearch('');
+    setAddOpen(false);
+  };
+
+  const moveUp = (i: number) => {
+    if (i === 0) return;
+    const r = [...rotation];
+    [r[i - 1], r[i]] = [r[i], r[i - 1]];
+    saveRotation(r);
+  };
+
+  const moveDown = (i: number) => {
+    if (i === rotation.length - 1) return;
+    const r = [...rotation];
+    [r[i], r[i + 1]] = [r[i + 1], r[i]];
+    saveRotation(r);
+  };
+
+  // close add-dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (addRef.current && !addRef.current.contains(e.target as Node)) setAddOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // ── projects API ────────────────────────────────────────────
   useEffect(() => {
     fetch('/api/projects')
       .then(res => res.json())
-      .then(data => {
-        if (data.projects && data.projects.length > 0) {
-          setProjects(data.projects);
-        }
-      })
+      .then(data => { if (data.projects?.length) setProjects(data.projects); })
       .catch(err => console.error('Failed to load projects:', err))
       .finally(() => setProjectsLoading(false));
   }, []);
 
-  const filteredProjects = projects.filter(p => 
+  const filteredProjects = projects.filter(p =>
     p.toLowerCase().includes(projectSearch.toLowerCase())
+  );
+
+  const addFilteredProjects = projects.filter(p =>
+    p.toLowerCase().includes(addSearch.toLowerCase()) && !rotation.includes(p)
   );
 
   const handleParse = async () => {
@@ -59,13 +132,140 @@ export default function BudgetPage() {
     }
   };
 
+  const doneCount = rotation.filter(p => checked[p]).length;
+  const totalCount = rotation.length;
+  const isSunday = new Date().getDay() === 0;
+
   return (
-    <div className="max-w-6xl mx-auto w-full">
-      <div className="mb-8">
+    <div className="max-w-6xl mx-auto w-full space-y-8">
+      <div className="mb-2">
         <h1 className="text-3xl font-bold text-white tracking-tight mb-2">Budget Builder</h1>
         <p className="text-slate-400">Paste your raw TSV table data to generate a budget plan.</p>
       </div>
 
+      {/* ── TRACKER ─────────────────────────────────────────────── */}
+      <div className="p-6 rounded-2xl bg-slate-900/60 border border-white/5 backdrop-blur-xl relative overflow-hidden">
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent" />
+
+        {/* header */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <span className="w-2 h-2 rounded-full bg-violet-400" />
+            <h2 className="text-base font-semibold text-white">Расписание рассылки</h2>
+            <span className="text-slate-500 text-sm">{formatDateRu(todayKey())}</span>
+            {isSunday && (
+              <span className="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full px-2 py-0.5">
+                Воскресенье — выходной
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {totalCount > 0 && (
+              <span className={`text-sm font-medium ${doneCount === totalCount ? 'text-emerald-400' : 'text-slate-400'}`}>
+                {doneCount}/{totalCount} готово
+              </span>
+            )}
+            {/* add project button */}
+            <div className="relative" ref={addRef}>
+              <button
+                onClick={() => setAddOpen(v => !v)}
+                className="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-white/10 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Добавить проект
+              </button>
+              {addOpen && (
+                <div className="absolute right-0 z-50 mt-2 w-64 bg-slate-900 border border-white/10 rounded-xl shadow-xl shadow-black/50 p-2">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={addSearch}
+                    onChange={e => setAddSearch(convertRuToEn(e.target.value))}
+                    placeholder="Поиск проекта..."
+                    className="w-full px-3 py-2 bg-slate-950/60 border border-white/10 rounded-lg text-sm text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-violet-500/50 mb-1"
+                  />
+                  <div className="max-h-48 overflow-y-auto space-y-0.5">
+                    {addFilteredProjects.length > 0 ? addFilteredProjects.map(p => (
+                      <div
+                        key={p}
+                        onClick={() => addToRotation(p)}
+                        className="px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white cursor-pointer transition-colors"
+                      >
+                        {p}
+                      </div>
+                    )) : (
+                      <div className="px-3 py-3 text-sm text-slate-500 text-center">
+                        {projects.length === 0 ? 'Загрузка...' : 'Нет проектов'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* project list */}
+        {rotation.length === 0 ? (
+          <div className="text-center py-8 text-slate-500 text-sm">
+            Добавь проекты в ротацию — нажми кнопку выше
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {rotation.map((p, i) => (
+              <div
+                key={p}
+                className={`group flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer select-none
+                  ${checked[p]
+                    ? 'bg-emerald-500/10 border-emerald-500/30'
+                    : 'bg-slate-950/40 border-white/5 hover:border-white/10'
+                  }`}
+                onClick={() => toggleCheck(p)}
+              >
+                {/* checkbox */}
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all
+                  ${checked[p] ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600 group-hover:border-slate-400'}`}
+                >
+                  {checked[p] && (
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+
+                <span className={`flex-1 text-sm font-medium truncate transition-all
+                  ${checked[p] ? 'text-emerald-400 line-through decoration-emerald-600' : 'text-slate-200'}`}
+                >
+                  {p}
+                </span>
+
+                {/* controls (visible on hover) */}
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => moveUp(i)} disabled={i === 0} className="p-1 text-slate-500 hover:text-white disabled:opacity-20 transition-colors rounded">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                    </svg>
+                  </button>
+                  <button onClick={() => moveDown(i)} disabled={i === rotation.length - 1} className="p-1 text-slate-500 hover:text-white disabled:opacity-20 transition-colors rounded">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  <button onClick={() => removeFromRotation(p)} className="p-1 text-slate-500 hover:text-rose-400 transition-colors rounded">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── MAIN FORM ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* Left Column: Form */}
         <div className="space-y-8">
@@ -98,7 +298,7 @@ export default function BudgetPage() {
                     <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
-                    
+
                     {isDropdownOpen && (
                       <div className="absolute z-50 w-full mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl shadow-black/50 max-h-60 overflow-y-auto overflow-x-hidden p-1 custom-scrollbar">
                         {filteredProjects.length > 0 ? (
@@ -168,11 +368,11 @@ export default function BudgetPage() {
                 Copy text
               </button>
             </div>
-            
+
             <div className="bg-[#f0fdf4] p-5 rounded-xl border border-emerald-100 text-sm font-sans whitespace-pre-wrap text-[#166534] overflow-auto max-h-[600px] custom-scrollbar shadow-inner">
               {parsedData.text}
             </div>
-            
+
             <div className="mt-4 text-xs text-slate-500 text-right">
               Selected {parsedData.selectedRows} units out of {parsedData.totalRows} parsed.
             </div>
