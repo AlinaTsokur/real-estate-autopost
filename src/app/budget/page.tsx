@@ -13,14 +13,6 @@ const convertRuToEn = (str: string) => {
   return res;
 };
 
-function todayKey() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 function formatDateRu() {
   const now = new Date();
   const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
@@ -30,13 +22,13 @@ function formatDateRu() {
 
 function loadChecked(): Record<string, boolean> {
   try {
-    const raw = localStorage.getItem(`budget_checks_${todayKey()}`);
+    const raw = localStorage.getItem(`budget_checks_${'budget_checks'}`);
     return raw ? JSON.parse(raw) : {};
   } catch { return {}; }
 }
 
 function saveChecked(c: Record<string, boolean>) {
-  localStorage.setItem(`budget_checks_${todayKey()}`, JSON.stringify(c));
+  localStorage.setItem(`budget_checks_${'budget_checks'}`, JSON.stringify(c));
 }
 
 export default function BudgetPage() {
