@@ -20,15 +20,34 @@ function formatDateRu() {
   return `${now.getDate()} ${months[now.getMonth()]}, ${days[now.getDay()]}`;
 }
 
-function loadChecked(): Record<string, boolean> {
+function loadLocal(): Record<string, boolean> {
   try {
-    const raw = localStorage.getItem(`budget_checks_${'budget_checks'}`);
+    const raw = localStorage.getItem('budget_checks');
     return raw ? JSON.parse(raw) : {};
   } catch { return {}; }
 }
 
-function saveChecked(c: Record<string, boolean>) {
-  localStorage.setItem(`budget_checks_${'budget_checks'}`, JSON.stringify(c));
+function saveLocal(c: Record<string, boolean>) {
+  try { localStorage.setItem('budget_checks', JSON.stringify(c)); } catch {}
+}
+
+async function fetchChecked(): Promise<Record<string, boolean>> {
+  try {
+    const res = await fetch('/api/tracker');
+    const data = await res.json();
+    return data.checked ?? {};
+  } catch { return {}; }
+}
+
+async function persistChecked(c: Record<string, boolean>) {
+  saveLocal(c);
+  try {
+    await fetch('/api/tracker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ checked: c }),
+    });
+  } catch {}
 }
 
 export default function BudgetPage() {
@@ -44,7 +63,8 @@ export default function BudgetPage() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    setChecked(loadChecked());
+    setChecked(loadLocal());
+    fetchChecked().then(c => { setChecked(c); saveLocal(c); });
     fetch('/api/projects')
       .then(r => r.json())
       .then(d => { if (d.projects?.length) setProjects(d.projects); })
@@ -54,14 +74,10 @@ export default function BudgetPage() {
 
   const toggleCheck = (p: string, allProjects: string[]) => {
     const next = { ...checked, [p]: !checked[p] };
-    // if all are now checked → reset
-    if (allProjects.every(proj => next[proj])) {
-      setChecked({});
-      saveChecked({});
-    } else {
-      setChecked(next);
-      saveChecked(next);
-    }
+    const reset = allProjects.every(proj => next[proj]);
+    const toSave = reset ? {} : next;
+    setChecked(toSave);
+    persistChecked(toSave);
   };
 
   const filteredProjects = projects.filter(p =>
