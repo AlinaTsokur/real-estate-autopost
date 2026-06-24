@@ -324,6 +324,33 @@ export async function approveUnitRow(code: string, unit?: string): Promise<{ row
     },
   });
 
+  // Write approval date to the correct column
+  const now = new Date();
+  const today = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
+
+  const dateAnnouncedCol = headers.findIndex(h => h === 'дата объявления');
+  const datePriceChangeCol = headers.findIndex(h => h === 'объявление изменения цены');
+
+  const row = rows[rowIndex] as unknown[];
+  const dateAnnouncedVal = dateAnnouncedCol !== -1 ? String(row[dateAnnouncedCol] ?? '').trim() : '';
+
+  let targetCol = -1;
+  if (dateAnnouncedCol !== -1 && !dateAnnouncedVal) {
+    targetCol = dateAnnouncedCol;
+  } else if (datePriceChangeCol !== -1) {
+    targetCol = datePriceChangeCol;
+  }
+
+  if (targetCol !== -1) {
+    const colLetter = getColLetter(targetCol);
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${sheetTitle}!${colLetter}${rowIndex + 1}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[today]] },
+    });
+  }
+
   return { row: rowIndex + 1, sheet: sheetTitle };
 }
 
