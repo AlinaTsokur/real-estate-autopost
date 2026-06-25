@@ -98,35 +98,49 @@ export async function uploadCatalogCover(
 
   const folderId = '11MjObMKaTuRTY2-ivhy7R0caut-b7yRK';
 
-  // Upload file (overwrite if same name exists)
-  const existing = await drive.files.list({
-    q: `'${folderId}' in parents and name='${fileName}' and trashed=false`,
-    fields: 'files(id)',
-    pageSize: 1,
-    supportsAllDrives: true,
-    includeItemsFromAllDrives: true,
-  });
+  // Check for existing file with same name
+  let existingFileId: string | null = null;
+  try {
+    const existing = await drive.files.list({
+      q: `'${folderId}' in parents and name='${fileName}' and trashed=false`,
+      fields: 'files(id)',
+      pageSize: 1,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+    });
+    existingFileId = existing.data.files?.[0]?.id ?? null;
+  } catch (e: any) {
+    throw new Error(`[list] ${e.message}`);
+  }
 
   let fileId: string;
   const { Readable } = await import('stream');
   const stream = Readable.from(fileBuffer);
 
-  if (existing.data.files?.length) {
-    const updated = await drive.files.update({
-      fileId: existing.data.files[0].id!,
-      media: { mimeType, body: stream },
-      fields: 'id',
-      supportsAllDrives: true,
-    });
-    fileId = updated.data.id!;
+  if (existingFileId) {
+    try {
+      const updated = await drive.files.update({
+        fileId: existingFileId,
+        media: { mimeType, body: stream },
+        fields: 'id',
+        supportsAllDrives: true,
+      });
+      fileId = updated.data.id!;
+    } catch (e: any) {
+      throw new Error(`[update] ${e.message}`);
+    }
   } else {
-    const uploaded = await drive.files.create({
-      requestBody: { name: fileName, parents: [folderId] },
-      media: { mimeType, body: stream },
-      fields: 'id',
-      supportsAllDrives: true,
-    });
-    fileId = uploaded.data.id!;
+    try {
+      const uploaded = await drive.files.create({
+        requestBody: { name: fileName, parents: [folderId] },
+        media: { mimeType, body: stream },
+        fields: 'id',
+        supportsAllDrives: true,
+      });
+      fileId = uploaded.data.id!;
+    } catch (e: any) {
+      throw new Error(`[create] ${e.message}`);
+    }
   }
 
   // Attempt to set public permissions (may be skipped if domain policy restricts it;
