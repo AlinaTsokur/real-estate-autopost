@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getProjectParseConfig, getConfig2, saveCatalogRows, CatalogRow } from '@/lib/google/sheets';
 import { parseTsvWithQuotedMultiline, isEmptyRow, isHeaderRow, selectLowestByExactType } from '@/lib/parsing/table-parser';
 import { parseRowByFormat } from '@/lib/parsing/row-parser';
-import { toNumber, extractLeadingNumberText } from '@/lib/posts/formatters';
+import { toNumber, extractLeadingNumberText, formatArea2, formatNumberLikeSheet, formatUnitLabel } from '@/lib/posts/formatters';
 import { getProjectPhotoFolderId, getDriveImageUrls } from '@/lib/google/drive';
 
 function makeCatalogId(project: string, type: string): string {
@@ -32,25 +32,42 @@ function buildTitle(type: string, project: string, island: string, emoji: string
 
 function buildDescription(item: {
   objectType: string; view: string; sellingPrice: string;
-  areaM2: string; grossAreaM2: string; handover: string;
+  areaM2: string; grossAreaM2: string; plotAreaM2: string;
+  unit: string; handover: string;
 }): string {
-  const isVillaOrTown = ['villa', 'townhouse'].includes(item.objectType.toLowerCase());
-  const price = formatMetaPrice(item.sellingPrice);
-  const parts: string[] = [];
+  const isVilla = item.objectType.toLowerCase() === 'villa';
+  const isTown = item.objectType.toLowerCase() === 'townhouse';
+  const priceNum = Number(toNumber(String(item.sellingPrice || '')));
+  const lines: string[] = [];
 
-  if (price) parts.push(`Selling Price: from ${price.replace(' AED', '').replace(/\B(?=(\d{3})+(?!\d))/g, '.')} AED`);
+  if (priceNum) lines.push(`Selling Price: from ${formatNumberLikeSheet(priceNum)} AED`);
 
-  if (isVillaOrTown) {
-    if (item.grossAreaM2) parts.push(`Gross area: ${item.grossAreaM2} sqm`);
+  lines.push('');
+
+  if (isVilla || isTown) {
+    const grossNum = Number(toNumber(item.grossAreaM2));
+    const plotNum = Number(toNumber(item.plotAreaM2));
+    if (grossNum) {
+      let areaLine = `📐 Gross area from ${formatArea2(grossNum)} sqm`;
+      if (isVilla && plotNum) areaLine += ` / Plot area from ${formatArea2(plotNum)} sqm`;
+      lines.push(areaLine);
+    }
+    if (isVilla && item.unit) lines.push(`🌳 ${formatUnitLabel(item.unit)}`);
   } else {
-    if (item.areaM2) parts.push(`Area: ${item.areaM2} sqm`);
-    if (item.view) parts.push(item.view);
+    const areaNum = Number(toNumber(item.areaM2));
+    if (areaNum) lines.push(`📐 From ${formatArea2(areaNum)} sqm`);
+    if (item.view) lines.push(`🌳 ${item.view}`);
   }
 
-  if (item.handover) parts.push(`Handover: ${item.handover}`);
-  parts.push('Tap "Message business" to learn more!');
+  if (item.handover) {
+    const isDate = /\b(january|february|march|april|may|june|july|august|september|october|november|december|Q[1-4])\b/i.test(item.handover);
+    lines.push(isDate ? `🗓️ Handover: from ${item.handover}` : `🗓️ ${item.handover}`);
+  }
 
-  return parts.join('\n').slice(0, 5000);
+  lines.push('');
+  lines.push('📩 Tap "Message business" to learn more!');
+
+  return lines.join('\n').slice(0, 5000);
 }
 
 export async function POST(request: Request) {
@@ -119,6 +136,8 @@ export async function POST(request: Request) {
           sellingPrice: String(item.sellingPrice || ''),
           areaM2: item.areaM2 || '',
           grossAreaM2: item.grossAreaM2 || '',
+          plotAreaM2: item.plotAreaM2 || '',
+          unit: item.unit || '',
           handover: item.handover || '',
         }),
         price: formatMetaPrice(String(item.sellingPrice || '')),
