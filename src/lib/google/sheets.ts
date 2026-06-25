@@ -485,6 +485,7 @@ export interface CatalogRow {
   area_size: string;
   num_beds: string;
   property_type: string;
+  construction_status: string;
 }
 
 function buildCatalogRowValues(r: CatalogRow, existingCover = ''): unknown[] {
@@ -496,7 +497,7 @@ function buildCatalogRowValues(r: CatalogRow, existingCover = ''): unknown[] {
     r.address_addr1, 'Abu Dhabi', 'AE',
     '24.4539', '54.3773',
     r.area_size, 'sqm',
-    r.num_beds, r.property_type, 'for_sale', 'off_plan',
+    r.num_beds, r.property_type, 'for_sale', r.construction_status,
   ];
 }
 

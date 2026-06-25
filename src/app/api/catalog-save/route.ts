@@ -151,6 +151,7 @@ export async function POST(request: Request) {
         area_size: String(toNumber(area)),
         num_beds: extractNumBeds(type),
         property_type: item.objectType.toLowerCase() === 'villa' ? 'house' : item.objectType.toLowerCase(),
+        construction_status: /ready/i.test(String(item.handover || '')) ? 'ready_to_move' : 'off_plan',
       };
     });
 
