@@ -336,13 +336,23 @@ export default function CatalogPage() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1">Title</label>
-                        <input
-                          value={row.name}
-                          onChange={e => setPreviewRows(rows => rows.map((r, i) => i === idx ? { ...r, name: e.target.value } : r))}
-                          className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50"
-                        />
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-400 mb-1">Title</label>
+                          <input
+                            value={row.name}
+                            onChange={e => setPreviewRows(rows => rows.map((r, i) => i === idx ? { ...r, name: e.target.value } : r))}
+                            className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-400 mb-1">Cover image</label>
+                          <CoverDropZone
+                            listingId={row.home_listing_id}
+                            existingUrl={coverUrls[row.home_listing_id]}
+                            onUploaded={url => setCoverUrls(p => ({ ...p, [row.home_listing_id]: url }))}
+                          />
+                        </div>
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Description</label>
