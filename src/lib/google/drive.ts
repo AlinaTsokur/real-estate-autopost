@@ -129,12 +129,15 @@ export async function uploadCatalogCover(
     fileId = uploaded.data.id!;
   }
 
-  // Make publicly accessible
-  await drive.permissions.create({
-    fileId,
-    requestBody: { role: 'reader', type: 'anyone' },
-    supportsAllDrives: true,
-  });
+  // Attempt to set public permissions (may be skipped if domain policy restricts it;
+  // files inherit access from the parent folder's sharing settings)
+  try {
+    await drive.permissions.create({
+      fileId,
+      requestBody: { role: 'reader', type: 'anyone' },
+      supportsAllDrives: true,
+    });
+  } catch {}
 
   return `https://drive.google.com/uc?export=view&id=${fileId}`;
 }
