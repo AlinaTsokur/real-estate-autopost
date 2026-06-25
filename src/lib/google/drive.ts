@@ -133,6 +133,7 @@ export async function uploadCatalogCover(
   await drive.permissions.create({
     fileId,
     requestBody: { role: 'reader', type: 'anyone' },
+    supportsAllDrives: true,
   });
 
   return `https://drive.google.com/uc?export=view&id=${fileId}`;
