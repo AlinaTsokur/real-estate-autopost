@@ -436,3 +436,123 @@ export async function getC3UnitData(unitStr: string): Promise<any> {
 
   return null;
 }
+
+// ── CATALOG ──────────────────────────────────────────────────────────────────
+
+const CATALOG_SHEET = 'CATALOG';
+
+export const CATALOG_COLUMNS = [
+  'home_listing_id', 'name', 'description', 'availability', 'price',
+  'image[0].url', 'image[1].url', 'image[2].url', 'image[3].url', 'image[4].url', 'image[5].url',
+  'url', 'address.addr1', 'address.city', 'address.country',
+  'latitude', 'longitude', 'area_size', 'area_unit',
+  'num_beds', 'property_type', 'listing_type', 'construction_status',
+];
+
+async function ensureCatalogSheet(sheets: Awaited<ReturnType<typeof getGoogleSheetsClient>>, spreadsheetId: string) {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties' });
+  const exists = meta.data.sheets?.some(s => s.properties?.title === CATALOG_SHEET);
+  if (!exists) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: { requests: [{ addSheet: { properties: { title: CATALOG_SHEET } } }] },
+    });
+  }
+  // Write headers if row 1 is empty
+  const check = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${CATALOG_SHEET}!A1` });
+  if (!check.data.values?.[0]?.[0]) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${CATALOG_SHEET}!A1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [CATALOG_COLUMNS] },
+    });
+  }
+}
+
+export interface CatalogRow {
+  home_listing_id: string;
+  name: string;
+  description: string;
+  price: string;
+  image0: string;
+  image1: string;
+  image2: string;
+  image3: string;
+  image4: string;
+  image5: string;
+  address_addr1: string;
+  area_size: string;
+  num_beds: string;
+  property_type: string;
+}
+
+export async function saveCatalogRows(rows: CatalogRow[]): Promise<void> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
+  const sheets = await getGoogleSheetsClient();
+  await ensureCatalogSheet(sheets, spreadsheetId);
+
+  // Read existing IDs to avoid duplicates
+  const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${CATALOG_SHEET}!A:A` });
+  const existingIds = new Set((existing.data.values || []).slice(1).map(r => String(r[0] || '').trim()));
+
+  const toAppend = rows.filter(r => !existingIds.has(r.home_listing_id));
+  if (toAppend.length === 0) return;
+
+  const values = toAppend.map(r => [
+    r.home_listing_id, r.name, r.description,
+    'available_soon', r.price,
+    r.image0, r.image1, r.image2, r.image3, r.image4, r.image5,
+    'https://real-estate-autopost.vercel.app',
+    r.address_addr1, 'Abu Dhabi', 'AE',
+    '24.4539', '54.3773',
+    r.area_size, 'sqm',
+    r.num_beds, r.property_type, 'for_sale', 'off_plan',
+  ]);
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: `${CATALOG_SHEET}!A1`,
+    valueInputOption: 'RAW',
+    requestBody: { values },
+  });
+}
+
+export async function getCatalogRows(): Promise<Record<string, string>[]> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
+  const sheets = await getGoogleSheetsClient();
+  await ensureCatalogSheet(sheets, spreadsheetId);
+
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: CATALOG_SHEET });
+  const data = res.data.values || [];
+  if (data.length < 2) return [];
+
+  const headers = data[0].map(h => String(h).trim());
+  return data.slice(1).map(row => {
+    const obj: Record<string, string> = {};
+    headers.forEach((h, i) => { obj[h] = String(row[i] ?? ''); });
+    return obj;
+  });
+}
+
+export async function updateCatalogCover(listingId: string, imageUrl: string): Promise<void> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
+  const sheets = await getGoogleSheetsClient();
+
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${CATALOG_SHEET}!A:A` });
+  const ids = (res.data.values || []).map(r => String(r[0] || '').trim());
+  const rowIndex = ids.indexOf(listingId);
+  if (rowIndex < 1) throw new Error(`Listing ${listingId} not found in CATALOG`);
+
+  const coverCol = CATALOG_COLUMNS.indexOf('image[0].url') + 1;
+  const colLetter = String.fromCharCode(64 + coverCol);
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${CATALOG_SHEET}!${colLetter}${rowIndex + 1}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [[imageUrl]] },
+  });
+}

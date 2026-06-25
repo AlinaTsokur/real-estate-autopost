@@ -44,6 +44,22 @@ export async function getProjectPhotoFolderId(projectName: string): Promise<stri
   throw new Error(`Project ${projectName} not found in PROJECT_MEDIA`);
 }
 
+export async function getDriveImageUrls(folderId: string, limit = 5): Promise<string[]> {
+  const drive = await getGoogleDriveClient();
+
+  const res = await drive.files.list({
+    q: `'${folderId}' in parents and (mimeType='image/jpeg' or mimeType='image/png' or mimeType='image/webp') and trashed=false`,
+    fields: 'files(id, name)',
+    orderBy: 'name',
+    pageSize: limit,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+
+  const files = res.data.files || [];
+  return files.filter(f => f.id).map(f => `https://drive.google.com/uc?export=view&id=${f.id}`);
+}
+
 export async function getDriveImages(folderId: string, limit = 5): Promise<Buffer[]> {
   const drive = await getGoogleDriveClient();
   
