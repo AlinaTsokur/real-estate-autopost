@@ -96,7 +96,24 @@ export async function uploadCatalogCover(
 ): Promise<string> {
   const drive = await getGoogleDriveClient();
 
-  const folderId = '11MjObMKaTuRTY2-ivhy7R0caut-b7yRK';
+  // Get or create CATALOG_COVERS folder in the OAuth account's Drive
+  const folderName = 'CATALOG_COVERS';
+  const folderSearch = await drive.files.list({
+    q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    fields: 'files(id)',
+    pageSize: 1,
+  });
+
+  let folderId: string;
+  if (folderSearch.data.files?.length) {
+    folderId = folderSearch.data.files[0].id!;
+  } else {
+    const created = await drive.files.create({
+      requestBody: { name: folderName, mimeType: 'application/vnd.google-apps.folder' },
+      fields: 'id',
+    });
+    folderId = created.data.id!;
+  }
 
   // Upload file (overwrite if same name exists)
   const existing = await drive.files.list({
