@@ -141,6 +141,7 @@ export async function POST(request: Request) {
 
       return {
         home_listing_id: makeCatalogId(projectName, type),
+        unit_code: String(item.code || '').trim(),
         name: buildTitle(type, projectName, cfg2.island, cfg2.emoji),
         description: buildDescription({
           objectType: item.objectType,

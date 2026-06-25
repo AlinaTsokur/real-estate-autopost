@@ -17,6 +17,7 @@ const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1VufwiqgAPjX1LhmWYuiBD
 
 type PreviewRow = {
   home_listing_id: string;
+  unit_code?: string;
   name: string;
   description: string;
   price: string;
@@ -26,7 +27,7 @@ type PreviewRow = {
   area_size: string;
   address_addr1: string;
   construction_status: string;
-  [key: string]: string;
+  [key: string]: string | undefined;
 };
 
 type CatalogItem = {
@@ -329,11 +330,16 @@ export default function CatalogPage() {
               <div className="space-y-4">
                 {previewRows.map((row, idx) => (
                   <div key={row.home_listing_id} className="p-5 rounded-2xl bg-slate-900/60 border border-white/5">
-                    <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center gap-2 mb-3 flex-wrap">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${typeColor(row.property_type)}`}>
-                        {row.property_type}
+                        {typeLabel(row.property_type)}
                       </span>
                       <span className="text-xs font-mono text-slate-500">{row.home_listing_id}</span>
+                      {row.unit_code && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border border-slate-600 text-slate-400 font-mono">
+                          {row.unit_code}
+                        </span>
+                      )}
                       <span className="text-xs text-emerald-400 ml-auto">{row.price}</span>
                     </div>
 
