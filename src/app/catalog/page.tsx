@@ -120,6 +120,8 @@ function CoverDropZone({ listingId, existingUrl, onUploaded }: {
   );
 }
 
+const typeLabel = (pt: string) => pt === 'house' ? 'villa' : (pt || '');
+
 const typeColor = (pt: string) => {
   const t = (pt || '').toLowerCase();
   if (t === 'apartment') return 'bg-blue-500/15 text-blue-300 border-blue-500/30';
@@ -396,7 +398,7 @@ export default function CatalogPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${typeColor(row.property_type)}`}>
-                            {row.property_type}
+                            {typeLabel(row.property_type)}
                           </span>
                           <span className="text-xs font-mono text-slate-500">{row.home_listing_id}</span>
                         </div>
@@ -450,7 +452,7 @@ export default function CatalogPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${typeColor(item['property_type'])}`}>
-                            {item['property_type']}
+                            {typeLabel(item['property_type'])}
                           </span>
                           <span className="text-xs text-slate-500">{item['address.addr1']}</span>
                         </div>
