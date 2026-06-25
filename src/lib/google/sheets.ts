@@ -487,36 +487,76 @@ export interface CatalogRow {
   property_type: string;
 }
 
+function buildCatalogRowValues(r: CatalogRow, existingCover = ''): unknown[] {
+  return [
+    r.home_listing_id, r.name, r.description,
+    'available_soon', r.price,
+    existingCover || r.image0, r.image1, r.image2, r.image3, r.image4, r.image5,
+    'https://real-estate-autopost.vercel.app',
+    r.address_addr1, 'Abu Dhabi', 'AE',
+    '24.4539', '54.3773',
+    r.area_size, 'sqm',
+    r.num_beds, r.property_type, 'for_sale', 'off_plan',
+  ];
+}
+
 export async function saveCatalogRows(rows: CatalogRow[]): Promise<void> {
   const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
   if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
   const sheets = await getGoogleSheetsClient();
   await ensureCatalogSheet(sheets, spreadsheetId);
 
-  // Read existing IDs to avoid duplicates
-  const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${CATALOG_SHEET}!A:A` });
-  const existingIds = new Set((existing.data.values || []).slice(1).map(r => String(r[0] || '').trim()));
+  // Read existing sheet to find rows to update vs append
+  const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range: CATALOG_SHEET });
+  const data = existing.data.values || [];
+  const coverColIndex = CATALOG_COLUMNS.indexOf('image[0].url');
 
-  const toAppend = rows.filter(r => !existingIds.has(r.home_listing_id));
-  if (toAppend.length === 0) return;
+  // Build map: id → row index (1-based, sheet row number = index + 1 because header is row 1)
+  const idToSheetRow = new Map<string, { rowNum: number; cover: string }>();
+  for (let i = 1; i < data.length; i++) {
+    const id = String(data[i][0] || '').trim();
+    if (id) {
+      idToSheetRow.set(id, {
+        rowNum: i + 1,
+        cover: coverColIndex !== -1 ? String(data[i][coverColIndex] ?? '') : '',
+      });
+    }
+  }
 
-  const values = toAppend.map(r => [
-    r.home_listing_id, r.name, r.description,
-    'available_soon', r.price,
-    r.image0, r.image1, r.image2, r.image3, r.image4, r.image5,
-    'https://real-estate-autopost.vercel.app',
-    r.address_addr1, 'Abu Dhabi', 'AE',
-    '24.4539', '54.3773',
-    r.area_size, 'sqm',
-    r.num_beds, r.property_type, 'for_sale', 'off_plan',
-  ]);
+  const toAppend: CatalogRow[] = [];
+  const updateRequests: any[] = [];
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: `${CATALOG_SHEET}!A1`,
-    valueInputOption: 'RAW',
-    requestBody: { values },
-  });
+  for (const r of rows) {
+    const existing = idToSheetRow.get(r.home_listing_id);
+    if (existing) {
+      // Update row but preserve existing cover image
+      const values = buildCatalogRowValues(r, existing.cover);
+      updateRequests.push({
+        range: `${CATALOG_SHEET}!A${existing.rowNum}`,
+        values: [values],
+      });
+    } else {
+      toAppend.push(r);
+    }
+  }
+
+  // Batch update existing rows
+  if (updateRequests.length > 0) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: { valueInputOption: 'RAW', data: updateRequests },
+    });
+  }
+
+  // Append new rows
+  if (toAppend.length > 0) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${CATALOG_SHEET}!A1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: toAppend.map(r => buildCatalogRowValues(r)) },
+    });
+  }
 }
 
 export async function getCatalogRows(): Promise<Record<string, string>[]> {

@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getProjectParseConfig, getConfig2, saveCatalogRows, CatalogRow } from '@/lib/google/sheets';
-import { parseTsvWithQuotedMultiline, isEmptyRow, isHeaderRow } from '@/lib/parsing/table-parser';
+import { parseTsvWithQuotedMultiline, isEmptyRow, isHeaderRow, selectLowestByExactType } from '@/lib/parsing/table-parser';
 import { parseRowByFormat } from '@/lib/parsing/row-parser';
-import { toNumber, formatHandoverDate } from '@/lib/posts/formatters';
+import { toNumber, extractLeadingNumberText } from '@/lib/posts/formatters';
 import { getProjectPhotoFolderId, getDriveImageUrls } from '@/lib/google/drive';
+
+function makeCatalogId(project: string, type: string): string {
+  const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '-');
+  return `${slug(project)}_${slug(type)}`.slice(0, 80);
+}
 
 function extractNumBeds(type: string): string {
   const s = String(type || '').trim().toLowerCase();
@@ -67,48 +72,56 @@ export async function POST(request: Request) {
       photoUrls = await getDriveImageUrls(folderId, 5);
     } catch {}
 
+    // Parse all rows
     const rows = parseTsvWithQuotedMultiline(rawText);
-    const catalogRows: CatalogRow[] = [];
-    const seen = new Set<string>();
+    const parsedRows: any[] = [];
 
     for (const parts of rows) {
       if (isEmptyRow(parts)) continue;
       if (isHeaderRow(parts)) continue;
 
       const parsed = parseRowByFormat(parts, config, projectName);
-
       const type = String(parsed.type || '').trim();
       const sellingPrice = String(parsed.sellingPrice || '').trim();
       if (!type || !sellingPrice) continue;
-      if (!Number(toNumber(sellingPrice))) continue;
 
-      // Detect townhouse from type string
+      const priceNum = Number(toNumber(sellingPrice));
+      if (!priceNum) continue;
+
       if (type.toLowerCase().includes('townhouse')) parsed.objectType = 'Townhouse';
 
-      const id = String(parsed.code || parsed.unit || '').trim();
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
+      parsed.sellingPriceNumber = priceNum;
+      parsed.areaNumber = Number(toNumber(extractLeadingNumberText(parsed.areaM2 || ''))) || 0;
+      parsed.grossAreaNumber = Number(toNumber(extractLeadingNumberText(parsed.grossAreaM2 || ''))) || 0;
+      parsedRows.push(parsed);
+    }
 
-      const isVillaOrTown = ['villa', 'townhouse'].includes(parsed.objectType.toLowerCase());
+    if (!parsedRows.length) {
+      return NextResponse.json({ error: 'No valid rows found' }, { status: 400 });
+    }
+
+    // Select cheapest per type (same logic as Budget Builder)
+    const selected = selectLowestByExactType(parsedRows);
+
+    const catalogRows: CatalogRow[] = selected.map(item => {
+      const type = String(item.type || '').trim();
+      const isVillaOrTown = ['villa', 'townhouse'].includes(item.objectType.toLowerCase());
       const area = isVillaOrTown
-        ? String(parsed.grossAreaM2 || parsed.areaM2 || '').trim()
-        : String(parsed.areaM2 || '').trim();
+        ? String(item.grossAreaM2 || item.areaM2 || '').trim()
+        : String(item.areaM2 || '').trim();
 
-      const title = buildTitle(type, projectName, cfg2.island, cfg2.emoji);
-      const description = buildDescription({
-        objectType: parsed.objectType,
-        view: parsed.view || '',
-        sellingPrice,
-        areaM2: parsed.areaM2 || '',
-        grossAreaM2: parsed.grossAreaM2 || '',
-        handover: parsed.handover || '',
-      });
-
-      catalogRows.push({
-        home_listing_id: id,
-        name: title,
-        description,
-        price: formatMetaPrice(sellingPrice),
+      return {
+        home_listing_id: makeCatalogId(projectName, type),
+        name: buildTitle(type, projectName, cfg2.island, cfg2.emoji),
+        description: buildDescription({
+          objectType: item.objectType,
+          view: item.view || '',
+          sellingPrice: String(item.sellingPrice || ''),
+          areaM2: item.areaM2 || '',
+          grossAreaM2: item.grossAreaM2 || '',
+          handover: item.handover || '',
+        }),
+        price: formatMetaPrice(String(item.sellingPrice || '')),
         image0: '',
         image1: photoUrls[0] || '',
         image2: photoUrls[1] || '',
@@ -118,13 +131,9 @@ export async function POST(request: Request) {
         address_addr1: projectName,
         area_size: String(toNumber(area)),
         num_beds: extractNumBeds(type),
-        property_type: parsed.objectType.toLowerCase() === 'villa' ? 'house' : parsed.objectType.toLowerCase(),
-      });
-    }
-
-    if (!catalogRows.length) {
-      return NextResponse.json({ error: 'No valid rows found' }, { status: 400 });
-    }
+        property_type: item.objectType.toLowerCase() === 'villa' ? 'house' : item.objectType.toLowerCase(),
+      };
+    });
 
     await saveCatalogRows(catalogRows);
 
