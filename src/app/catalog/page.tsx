@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 const convertRuToEn = (str: string) => {
   const ru = 'йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,';
@@ -28,10 +28,86 @@ type CatalogItem = {
   'address.addr1': string;
 };
 
+function CoverDropZone({ listingId, existingUrl, onUploaded }: {
+  listingId: string;
+  existingUrl?: string;
+  onUploaded: (url: string) => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState(existingUrl || '');
+  const [error, setError] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const upload = async (file: File) => {
+    setUploading(true);
+    setError('');
+    const form = new FormData();
+    form.append('file', file);
+    form.append('listingId', listingId);
+    try {
+      const res = await fetch('/api/catalog-cover-upload', { method: 'POST', body: form });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setPreview(data.url);
+      onUploaded(data.url);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) upload(file);
+  };
+
+  return (
+    <div
+      onDragOver={e => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
+      onClick={() => inputRef.current?.click()}
+      className={`relative mt-3 rounded-xl border-2 border-dashed cursor-pointer transition-all overflow-hidden
+        ${dragging ? 'border-indigo-400 bg-indigo-500/10' : preview ? 'border-white/10 bg-slate-950/30' : 'border-white/10 hover:border-indigo-500/40 bg-slate-950/30 hover:bg-indigo-500/5'}`}
+      style={{ height: preview ? 80 : 52 }}
+    >
+      <input ref={inputRef} type="file" accept="image/*" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); }} />
+
+      {uploading ? (
+        <div className="absolute inset-0 flex items-center justify-center gap-2 text-xs text-slate-400">
+          <div className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+          Uploading...
+        </div>
+      ) : preview ? (
+        <div className="absolute inset-0 flex items-center gap-3 px-3">
+          <img src={preview} alt="cover" className="h-14 w-14 object-cover rounded-lg border border-white/10 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-emerald-400 font-medium">Cover uploaded ✓</p>
+            <p className="text-[10px] text-slate-500">Drag new image to replace</p>
+          </div>
+        </div>
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center gap-2 text-xs text-slate-500">
+          <span className="text-base">🖼</span>
+          Drag cover image here or click to upload
+        </div>
+      )}
+
+      {error && (
+        <div className="absolute bottom-0 inset-x-0 px-2 py-1 bg-rose-500/20 text-rose-400 text-[10px] text-center">{error}</div>
+      )}
+    </div>
+  );
+}
+
 export default function CatalogPage() {
   const [tab, setTab] = useState<'add' | 'manage'>('add');
 
-  // Add tab state
   const [projects, setProjects] = useState<string[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectSearch, setProjectSearch] = useState('');
@@ -40,17 +116,12 @@ export default function CatalogPage() {
   const [rawText, setRawText] = useState('');
   const [saving, setSaving] = useState(false);
   const [savedRows, setSavedRows] = useState<any[]>([]);
-  const [coverInputs, setCoverInputs] = useState<Record<string, string>>({});
-  const [coverSaving, setCoverSaving] = useState<Record<string, boolean>>({});
-  const [coverSaved, setCoverSaved] = useState<Record<string, boolean>>({});
+  const [coverUrls, setCoverUrls] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
 
-  // Manage tab state
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [manageCovers, setManageCovers] = useState<Record<string, string>>({});
-  const [manageSaving, setManageSaving] = useState<Record<string, boolean>>({});
-  const [manageSaved, setManageSaved] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetch('/api/projects')
@@ -65,7 +136,11 @@ export default function CatalogPage() {
     try {
       const res = await fetch('/api/catalog-items');
       const data = await res.json();
-      setItems(data.rows || []);
+      const rows = data.rows || [];
+      setItems(rows);
+      const covers: Record<string, string> = {};
+      rows.forEach((r: CatalogItem) => { if (r['image[0].url']) covers[r['home_listing_id']] = r['image[0].url']; });
+      setManageCovers(covers);
     } catch {} finally {
       setItemsLoading(false);
     }
@@ -89,6 +164,10 @@ export default function CatalogPage() {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setSavedRows(data.rows || []);
+      // Pre-fill existing covers
+      const covers: Record<string, string> = {};
+      (data.rows || []).forEach((r: any) => { if (r.image0) covers[r.home_listing_id] = r.image0; });
+      setCoverUrls(covers);
       setRawText('');
     } catch (e: any) {
       setError(e.message);
@@ -97,28 +176,6 @@ export default function CatalogPage() {
     }
   };
 
-  const saveCover = async (id: string, url: string, source: 'add' | 'manage') => {
-    if (!url.trim()) return;
-    const setSavingFn = source === 'add' ? setCoverSaving : setManageSaving;
-    const setSavedFn = source === 'add' ? setCoverSaved : setManageSaved;
-    setSavingFn(p => ({ ...p, [id]: true }));
-    try {
-      await fetch('/api/catalog-items', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, imageUrl: url }),
-      });
-      setSavedFn(p => ({ ...p, [id]: true }));
-      setTimeout(() => setSavedFn(p => ({ ...p, [id]: false })), 2000);
-    } catch {} finally {
-      setSavingFn(p => ({ ...p, [id]: false }));
-    }
-  };
-
-  const filteredProjects = projects.filter(p =>
-    p.toLowerCase().includes(projectSearch.toLowerCase())
-  );
-
   const typeColor = (pt: string) => {
     const t = (pt || '').toLowerCase();
     if (t === 'apartment') return 'bg-blue-500/15 text-blue-300 border-blue-500/30';
@@ -126,6 +183,10 @@ export default function CatalogPage() {
     if (t === 'townhouse') return 'bg-violet-500/15 text-violet-300 border-violet-500/30';
     return 'bg-slate-500/15 text-slate-300 border-slate-500/30';
   };
+
+  const filteredProjects = projects.filter(p =>
+    p.toLowerCase().includes(projectSearch.toLowerCase())
+  );
 
   return (
     <div className="max-w-6xl mx-auto w-full space-y-6">
@@ -154,7 +215,6 @@ export default function CatalogPage() {
           <div className="p-6 rounded-2xl bg-slate-900/60 border border-white/5 backdrop-blur-xl relative overflow-hidden">
             <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
             <div className="space-y-6">
-              {/* Project selector */}
               <div className="relative">
                 <label className="block text-sm font-medium text-slate-300 mb-2">Project Name</label>
                 {projectsLoading ? (
@@ -185,7 +245,6 @@ export default function CatalogPage() {
                 )}
               </div>
 
-              {/* Table paste */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">Paste Full Table (TSV)</label>
                 <textarea rows={8} value={rawText} onChange={e => setRawText(e.target.value)}
@@ -204,43 +263,34 @@ export default function CatalogPage() {
             </div>
           </div>
 
-          {/* Preview */}
           {savedRows.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-sm font-semibold text-white">{savedRows.length} units saved to CATALOG</span>
-                <span className="text-xs text-slate-500">Add cover image URLs below</span>
+                <span className="text-sm font-semibold text-white">{savedRows.length} types saved</span>
+                <span className="text-xs text-slate-500">Add cover images below</span>
               </div>
               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                 {savedRows.map((row: any) => (
                   <div key={row.home_listing_id} className="p-4 rounded-xl bg-slate-900/60 border border-white/5">
-                    <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-mono text-slate-500">{row.home_listing_id}</span>
                           <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${typeColor(row.property_type)}`}>
                             {row.property_type}
                           </span>
+                          <span className="text-xs font-mono text-slate-500">{row.home_listing_id}</span>
                         </div>
                         <p className="text-sm font-medium text-white leading-tight">{row.name}</p>
                         <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{row.description}</p>
                       </div>
                       <span className="text-sm font-semibold text-emerald-400 whitespace-nowrap">{row.price}</span>
                     </div>
-                    <div className="flex gap-2 mt-3">
-                      <input type="text" placeholder="Cover image URL (image[0].url)"
-                        value={coverInputs[row.home_listing_id] || ''}
-                        onChange={e => setCoverInputs(p => ({ ...p, [row.home_listing_id]: e.target.value }))}
-                        className="flex-1 px-3 py-1.5 bg-slate-950/50 border border-white/10 rounded-lg text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500/50"
-                      />
-                      <button
-                        onClick={() => saveCover(row.home_listing_id, coverInputs[row.home_listing_id] || '', 'add')}
-                        disabled={coverSaving[row.home_listing_id] || !coverInputs[row.home_listing_id]}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${coverSaved[row.home_listing_id] ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-indigo-600/80 hover:bg-indigo-500 text-white disabled:opacity-40'}`}>
-                        {coverSaved[row.home_listing_id] ? '✓' : coverSaving[row.home_listing_id] ? '...' : 'Save'}
-                      </button>
-                    </div>
+                    <CoverDropZone
+                      listingId={row.home_listing_id}
+                      existingUrl={coverUrls[row.home_listing_id]}
+                      onUploaded={url => setCoverUrls(p => ({ ...p, [row.home_listing_id]: url }))}
+                    />
                   </div>
                 ))}
               </div>
@@ -259,7 +309,7 @@ export default function CatalogPage() {
               Loading catalog...
             </div>
           ) : items.length === 0 ? (
-            <p className="text-slate-500 text-sm py-8 text-center">No items in catalog yet. Add units first.</p>
+            <p className="text-slate-500 text-sm py-8 text-center">No items in catalog yet.</p>
           ) : (
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-4">
@@ -270,16 +320,16 @@ export default function CatalogPage() {
                 {items.map(item => (
                   <div key={item['home_listing_id']} className="p-4 rounded-xl bg-slate-950/40 border border-white/5">
                     <div className="flex items-start gap-3">
-                      {item['image[0].url'] ? (
-                        <img src={item['image[0].url']} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-white/10" />
+                      {(manageCovers[item['home_listing_id']] || item['image[0].url']) ? (
+                        <img src={manageCovers[item['home_listing_id']] || item['image[0].url']} alt=""
+                          className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border border-white/10" />
                       ) : (
-                        <div className="w-12 h-12 rounded-lg bg-slate-800 border border-white/5 flex items-center justify-center flex-shrink-0">
+                        <div className="w-14 h-14 rounded-lg bg-slate-800 border border-white/5 flex items-center justify-center flex-shrink-0">
                           <span className="text-slate-600 text-xs">no img</span>
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-xs font-mono text-slate-500">{item['home_listing_id']}</span>
                           <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${typeColor(item['property_type'])}`}>
                             {item['property_type']}
                           </span>
@@ -289,19 +339,11 @@ export default function CatalogPage() {
                         <p className="text-xs text-emerald-400 mt-0.5">{item['price']}</p>
                       </div>
                     </div>
-                    <div className="flex gap-2 mt-3">
-                      <input type="text" placeholder="Cover image URL"
-                        defaultValue={item['image[0].url']}
-                        onChange={e => setManageCovers(p => ({ ...p, [item['home_listing_id']]: e.target.value }))}
-                        className="flex-1 px-3 py-1.5 bg-slate-950/50 border border-white/10 rounded-lg text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500/50"
-                      />
-                      <button
-                        onClick={() => saveCover(item['home_listing_id'], manageCovers[item['home_listing_id']] ?? item['image[0].url'], 'manage')}
-                        disabled={manageSaving[item['home_listing_id']]}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${manageSaved[item['home_listing_id']] ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-indigo-600/80 hover:bg-indigo-500 text-white disabled:opacity-40'}`}>
-                        {manageSaved[item['home_listing_id']] ? '✓' : manageSaving[item['home_listing_id']] ? '...' : 'Save'}
-                      </button>
-                    </div>
+                    <CoverDropZone
+                      listingId={item['home_listing_id']}
+                      existingUrl={manageCovers[item['home_listing_id']] || item['image[0].url']}
+                      onUploaded={url => setManageCovers(p => ({ ...p, [item['home_listing_id']]: url }))}
+                    />
                   </div>
                 ))}
               </div>

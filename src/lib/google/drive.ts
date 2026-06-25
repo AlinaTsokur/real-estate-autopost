@@ -89,6 +89,68 @@ export async function getDriveImages(folderId: string, limit = 5): Promise<Buffe
   return buffers;
 }
 
+export async function uploadCatalogCover(
+  fileBuffer: Buffer,
+  mimeType: string,
+  fileName: string,
+): Promise<string> {
+  const drive = await getGoogleDriveClient();
+
+  // Get or create CATALOG_COVERS folder
+  const folderName = 'CATALOG_COVERS';
+  const folderSearch = await drive.files.list({
+    q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    fields: 'files(id)',
+    pageSize: 1,
+  });
+
+  let folderId: string;
+  if (folderSearch.data.files?.length) {
+    folderId = folderSearch.data.files[0].id!;
+  } else {
+    const created = await drive.files.create({
+      requestBody: { name: folderName, mimeType: 'application/vnd.google-apps.folder' },
+      fields: 'id',
+    });
+    folderId = created.data.id!;
+  }
+
+  // Upload file (overwrite if same name exists)
+  const existing = await drive.files.list({
+    q: `'${folderId}' in parents and name='${fileName}' and trashed=false`,
+    fields: 'files(id)',
+    pageSize: 1,
+  });
+
+  let fileId: string;
+  const { Readable } = await import('stream');
+  const stream = Readable.from(fileBuffer);
+
+  if (existing.data.files?.length) {
+    const updated = await drive.files.update({
+      fileId: existing.data.files[0].id!,
+      media: { mimeType, body: stream },
+      fields: 'id',
+    });
+    fileId = updated.data.id!;
+  } else {
+    const uploaded = await drive.files.create({
+      requestBody: { name: fileName, parents: [folderId] },
+      media: { mimeType, body: stream },
+      fields: 'id',
+    });
+    fileId = uploaded.data.id!;
+  }
+
+  // Make publicly accessible
+  await drive.permissions.create({
+    fileId,
+    requestBody: { role: 'reader', type: 'anyone' },
+  });
+
+  return `https://drive.google.com/uc?export=view&id=${fileId}`;
+}
+
 // TODO: cache photo IDs
 
 export async function findC3SlideByUnit(unit: string): Promise<string> {
