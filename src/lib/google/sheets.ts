@@ -512,28 +512,32 @@ export async function saveCatalogRows(rows: CatalogRow[]): Promise<void> {
   const data = existing.data.values || [];
   const coverColIndex = CATALOG_COLUMNS.indexOf('image[0].url');
 
-  // Build map: id → row index (1-based, sheet row number = index + 1 because header is row 1)
+  const nameColIndex = CATALOG_COLUMNS.indexOf('name');
+
+  // Build maps: id → row info, name → row info (for dedup by name when ID changes)
   const idToSheetRow = new Map<string, { rowNum: number; cover: string }>();
+  const nameToSheetRow = new Map<string, { rowNum: number; cover: string }>();
   for (let i = 1; i < data.length; i++) {
     const id = String(data[i][0] || '').trim();
-    if (id) {
-      idToSheetRow.set(id, {
-        rowNum: i + 1,
-        cover: coverColIndex !== -1 ? String(data[i][coverColIndex] ?? '') : '',
-      });
-    }
+    const name = nameColIndex !== -1 ? String(data[i][nameColIndex] || '').trim() : '';
+    const entry = {
+      rowNum: i + 1,
+      cover: coverColIndex !== -1 ? String(data[i][coverColIndex] ?? '') : '',
+    };
+    if (id) idToSheetRow.set(id, entry);
+    if (name) nameToSheetRow.set(name, entry);
   }
 
   const toAppend: CatalogRow[] = [];
   const updateRequests: any[] = [];
 
   for (const r of rows) {
-    const existing = idToSheetRow.get(r.home_listing_id);
-    if (existing) {
-      // Update row but preserve existing cover image
-      const values = buildCatalogRowValues(r, existing.cover);
+    const match = idToSheetRow.get(r.home_listing_id) ?? nameToSheetRow.get(r.name);
+    if (match) {
+      // Update row (preserving cover); also overwrites old-format IDs with new slug
+      const values = buildCatalogRowValues(r, match.cover);
       updateRequests.push({
-        range: `${CATALOG_SHEET}!A${existing.rowNum}`,
+        range: `${CATALOG_SHEET}!A${match.rowNum}`,
         values: [values],
       });
     } else {
