@@ -590,7 +590,7 @@ export async function updateCatalogCover(listingId: string, imageUrl: string): P
   const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${CATALOG_SHEET}!A:A` });
   const ids = (res.data.values || []).map(r => String(r[0] || '').trim());
   const rowIndex = ids.indexOf(listingId);
-  if (rowIndex < 1) throw new Error(`Listing ${listingId} not found in CATALOG`);
+  if (rowIndex < 1) return; // not saved yet (preview mode); cover will be included on save
 
   const coverCol = CATALOG_COLUMNS.indexOf('image[0].url') + 1;
   const colLetter = String.fromCharCode(64 + coverCol);

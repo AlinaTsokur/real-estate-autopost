@@ -357,8 +357,11 @@ export default function CatalogPage() {
                           <label className="block text-xs font-medium text-slate-400 mb-1">Cover image</label>
                           <CoverDropZone
                             listingId={row.home_listing_id}
-                            existingUrl={coverUrls[row.home_listing_id]}
-                            onUploaded={url => setCoverUrls(p => ({ ...p, [row.home_listing_id]: url }))}
+                            existingUrl={coverUrls[row.home_listing_id] || row.image0}
+                            onUploaded={url => {
+                              setCoverUrls(p => ({ ...p, [row.home_listing_id]: url }));
+                              setPreviewRows(rows => rows.map((r, i) => i === idx ? { ...r, image0: url } : r));
+                            }}
                           />
                         </div>
                       </div>
