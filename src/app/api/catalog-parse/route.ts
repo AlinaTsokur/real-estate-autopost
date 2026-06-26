@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getProjectParseConfig, getConfig2, getConfig2Handover } from '@/lib/google/sheets';
+import { getProjectParseConfig, getConfig2, getConfig2Handover, getCatalogRows } from '@/lib/google/sheets';
 import { parseTsvWithQuotedMultiline, isEmptyRow, isHeaderRow, selectLowestByExactType } from '@/lib/parsing/table-parser';
 import { parseRowByFormat } from '@/lib/parsing/row-parser';
 import { toNumber, extractLeadingNumberText, formatArea2, formatNumberLikeSheet, formatUnitLabel, formatHandoverDate } from '@/lib/posts/formatters';
@@ -77,10 +77,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing rawText or projectName' }, { status: 400 });
     }
 
-    const [config, cfg2] = await Promise.all([
+    const [config, cfg2, existingCatalog] = await Promise.all([
       getProjectParseConfig(projectName),
       getConfig2(projectName),
+      getCatalogRows().catch(() => [] as Record<string, string>[]),
     ]);
+
+    // Build map: home_listing_id → existing cover URL
+    const existingCovers = new Map<string, string>();
+    for (const row of existingCatalog) {
+      const id = String(row['home_listing_id'] || '').trim();
+      const cover = String(row['image[0].url'] || '').trim();
+      if (id && cover) existingCovers.set(id, cover);
+    }
 
     // Get project photos (up to 5)
     let photoUrls: string[] = [];
@@ -139,8 +148,9 @@ export async function POST(request: Request) {
         ? String(item.grossAreaM2 || item.areaM2 || '').trim()
         : String(item.areaM2 || '').trim();
 
+      const listingId = makeCatalogId(projectName, type);
       return {
-        home_listing_id: makeCatalogId(projectName, type),
+        home_listing_id: listingId,
         unit_code: String(item.code || '').trim(),
         name: buildTitle(type, projectName, cfg2.island, cfg2.emoji),
         description: buildDescription({
@@ -154,7 +164,7 @@ export async function POST(request: Request) {
           handover: item.handover || '',
         }),
         price: formatMetaPrice(String(item.sellingPrice || '')),
-        image0: '',
+        image0: existingCovers.get(listingId) || '',
         image1: photoUrls[0] || '',
         image2: photoUrls[1] || '',
         image3: photoUrls[2] || '',
