@@ -464,7 +464,7 @@ async function ensureCatalogSheet(sheets: Awaited<ReturnType<typeof getGoogleShe
     });
   }
 
-  const check = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${CATALOG_SHEET}!A1` });
+  const check = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${CATALOG_SHEET}!1:1` });
   const existingHeaders: string[] = (check.data.values?.[0] || []).map(h => String(h).trim());
 
   if (!existingHeaders[0]) {
