@@ -449,6 +449,11 @@ export const CATALOG_COLUMNS = [
   'num_beds', 'property_type', 'listing_type', 'construction_status',
 ];
 
+// Default fill values for columns added via migration
+const CATALOG_COLUMN_DEFAULTS: Record<string, string> = {
+  'address.region': 'Abu Dhabi',
+};
+
 async function ensureCatalogSheet(sheets: Awaited<ReturnType<typeof getGoogleSheetsClient>>, spreadsheetId: string) {
   const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties' });
   const exists = meta.data.sheets?.some(s => s.properties?.title === CATALOG_SHEET);
@@ -458,16 +463,46 @@ async function ensureCatalogSheet(sheets: Awaited<ReturnType<typeof getGoogleShe
       requestBody: { requests: [{ addSheet: { properties: { title: CATALOG_SHEET } } }] },
     });
   }
-  // Write headers if row 1 is empty
+
   const check = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${CATALOG_SHEET}!A1` });
-  if (!check.data.values?.[0]?.[0]) {
+  const existingHeaders: string[] = (check.data.values?.[0] || []).map(h => String(h).trim());
+
+  if (!existingHeaders[0]) {
+    // Fresh sheet — write headers
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${CATALOG_SHEET}!A1`,
       valueInputOption: 'RAW',
       requestBody: { values: [CATALOG_COLUMNS] },
     });
+    return;
   }
+
+  // Migrate: find columns in CATALOG_COLUMNS that are missing from the sheet
+  const missingCols = CATALOG_COLUMNS.filter(c => !existingHeaders.includes(c));
+  if (missingCols.length === 0) return;
+
+  // Read all existing data to rewrite rows with new columns inserted at correct positions
+  const dataRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: CATALOG_SHEET });
+  const allRows = dataRes.data.values || [];
+  if (allRows.length === 0) return;
+
+  // Build new rows: remap old columns by name, insert new ones with defaults
+  const newRows = allRows.map((row, rowIdx) => {
+    return CATALOG_COLUMNS.map(col => {
+      const oldIdx = existingHeaders.indexOf(col);
+      if (oldIdx !== -1) return row[oldIdx] ?? '';
+      // New column: header row gets the column name, data rows get the default
+      return rowIdx === 0 ? col : (CATALOG_COLUMN_DEFAULTS[col] ?? '');
+    });
+  });
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${CATALOG_SHEET}!A1`,
+    valueInputOption: 'RAW',
+    requestBody: { values: newRows },
+  });
 }
 
 export interface CatalogRow {
