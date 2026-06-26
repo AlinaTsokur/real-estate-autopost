@@ -171,7 +171,7 @@ export async function POST(request: Request) {
         image4: photoUrls[3] || '',
         image5: photoUrls[4] || '',
         address_addr1: projectName,
-        area_size: String(toNumber(area)),
+        area_size: String(Math.round(Number(toNumber(area)) || 0)),
         num_beds: extractNumBeds(type),
         property_type: item.objectType.toLowerCase() === 'villa' ? 'house' : item.objectType.toLowerCase(),
         construction_status: /ready/i.test(String(item.handover || '')) ? 'ready_to_move' : 'off_plan',

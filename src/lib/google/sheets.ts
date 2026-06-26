@@ -446,7 +446,7 @@ export const CATALOG_COLUMNS = [
   'image[0].url', 'image[1].url', 'image[2].url', 'image[3].url', 'image[4].url', 'image[5].url',
   'url', 'address.addr1', 'address.city', 'address.region', 'address.country',
   'latitude', 'longitude', 'area_size', 'area_unit',
-  'num_beds', 'property_type', 'listing_type', 'construction_status',
+  'num_beds', 'property_type', 'construction_status',
 ];
 
 // Default fill values for columns added via migration
@@ -531,8 +531,8 @@ function buildCatalogRowValues(r: CatalogRow, existingCover = ''): unknown[] {
     'https://primebridge.estate',
     r.address_addr1, 'Abu Dhabi', 'Abu Dhabi', 'AE',
     '24.4539', '54.3773',
-    r.area_size, 'sqm',
-    r.num_beds, r.property_type, 'for_sale', r.construction_status,
+    r.area_size, 'sq_m',
+    r.num_beds, r.property_type, r.construction_status,
   ];
 }
 
