@@ -444,7 +444,7 @@ const CATALOG_SHEET = 'CATALOG';
 export const CATALOG_COLUMNS = [
   'home_listing_id', 'name', 'description', 'availability', 'price',
   'image[0].url', 'image[1].url', 'image[2].url', 'image[3].url', 'image[4].url', 'image[5].url',
-  'address.addr1', 'address.city', 'address.region', 'address.country',
+  'url', 'address.addr1', 'address.city', 'address.region', 'address.country',
   'latitude', 'longitude', 'area_size', 'area_unit',
   'num_beds', 'property_type', 'listing_type', 'construction_status',
 ];
@@ -528,6 +528,7 @@ function buildCatalogRowValues(r: CatalogRow, existingCover = ''): unknown[] {
     r.home_listing_id, r.name, r.description,
     'for_sale', r.price,
     existingCover || r.image0, r.image1, r.image2, r.image3, r.image4, r.image5,
+    'https://primebridge.estate',
     r.address_addr1, 'Abu Dhabi', 'Abu Dhabi', 'AE',
     '24.4539', '54.3773',
     r.area_size, 'sqm',
