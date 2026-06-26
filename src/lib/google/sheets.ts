@@ -449,10 +449,18 @@ export const CATALOG_COLUMNS = [
   'num_beds', 'property_type', 'construction_status',
 ];
 
-// Default fill values for columns added via migration
+// Default fill values for new columns added via migration
 const CATALOG_COLUMN_DEFAULTS: Record<string, string> = {
   'address.region': 'Abu Dhabi',
+  'url': 'https://primebridge.estate',
 };
+
+function fixCatalogValue(col: string, val: string): string {
+  if (col === 'area_unit' && val === 'sqm') return 'sq_m';
+  if (col === 'area_size' && val) return String(Math.round(Number(val) || 0));
+  if (col === 'url' && !val) return 'https://primebridge.estate';
+  return val;
+}
 
 async function ensureCatalogSheet(sheets: Awaited<ReturnType<typeof getGoogleSheetsClient>>, spreadsheetId: string) {
   const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties' });
@@ -468,7 +476,6 @@ async function ensureCatalogSheet(sheets: Awaited<ReturnType<typeof getGoogleShe
   const existingHeaders: string[] = (check.data.values?.[0] || []).map(h => String(h).trim());
 
   if (!existingHeaders[0]) {
-    // Fresh sheet — write headers
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${CATALOG_SHEET}!A1`,
@@ -478,22 +485,27 @@ async function ensureCatalogSheet(sheets: Awaited<ReturnType<typeof getGoogleShe
     return;
   }
 
-  // Migrate: find columns in CATALOG_COLUMNS that are missing from the sheet
-  const missingCols = CATALOG_COLUMNS.filter(c => !existingHeaders.includes(c));
-  if (missingCols.length === 0) return;
-
-  // Read all existing data to rewrite rows with new columns inserted at correct positions
+  // Read all data to check for structural or value issues
   const dataRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: CATALOG_SHEET });
   const allRows = dataRes.data.values || [];
   if (allRows.length === 0) return;
 
-  // Build new rows: remap old columns by name, insert new ones with defaults
+  const missingCols = CATALOG_COLUMNS.filter(c => !existingHeaders.includes(c));
+
+  // Check if any data row has values that need fixing
+  const needsValueFix = allRows.slice(1).some(row =>
+    existingHeaders.some((col, i) => fixCatalogValue(col, String(row[i] ?? '')) !== String(row[i] ?? ''))
+  );
+
+  if (missingCols.length === 0 && !needsValueFix) return;
+
+  // Rewrite all rows: remap columns + fix values
   const newRows = allRows.map((row, rowIdx) => {
     return CATALOG_COLUMNS.map(col => {
       const oldIdx = existingHeaders.indexOf(col);
-      if (oldIdx !== -1) return row[oldIdx] ?? '';
-      // New column: header row gets the column name, data rows get the default
-      return rowIdx === 0 ? col : (CATALOG_COLUMN_DEFAULTS[col] ?? '');
+      if (rowIdx === 0) return col; // header row
+      if (oldIdx !== -1) return fixCatalogValue(col, String(row[oldIdx] ?? ''));
+      return CATALOG_COLUMN_DEFAULTS[col] ?? '';
     });
   });
 
