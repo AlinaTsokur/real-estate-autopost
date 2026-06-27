@@ -440,8 +440,20 @@ export async function getC3UnitData(unitStr: string): Promise<any> {
 // ── WA QUEUE ─────────────────────────────────────────────────────────────────
 
 const WA_QUEUE_SHEET = 'WA_QUEUE';
-// Columns: id | created_at | label | wa_text | drive_file_id | marked | status | cfg_scheduled_at | cfg_wa_chatid
-// Row with id=CONFIG stores schedule settings in the last two columns.
+// Columns: A id | B created_at | C label | D wa_text | E drive_file_id | F scheduled_at | G status | H (unused) | I cfg_wa_chatid
+// Row with id=CONFIG stores the WhatsApp chat id in column I.
+// scheduled_at format: "YYYY-MM-DD HH:MM" interpreted as Dubai wall-clock time.
+
+async function getSheetIdByTitle(
+  sheets: Awaited<ReturnType<typeof getGoogleSheetsClient>>,
+  spreadsheetId: string,
+  title: string,
+): Promise<number> {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties' });
+  const sheet = meta.data.sheets?.find(s => s.properties?.title === title);
+  if (sheet?.properties?.sheetId == null) throw new Error(`Sheet "${title}" not found`);
+  return sheet.properties.sheetId;
+}
 
 async function ensureWaQueueSheet(sheets: Awaited<ReturnType<typeof getGoogleSheetsClient>>, spreadsheetId: string) {
   const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties' });
@@ -452,7 +464,7 @@ async function ensureWaQueueSheet(sheets: Awaited<ReturnType<typeof getGoogleShe
       spreadsheetId,
       requestBody: { requests: [{ addSheet: { properties: { title: WA_QUEUE_SHEET } } }] },
     });
-    const headers = ['id', 'created_at', 'label', 'wa_text', 'drive_file_id', 'marked', 'status', 'cfg_scheduled_at', 'cfg_wa_chatid'];
+    const headers = ['id', 'created_at', 'label', 'wa_text', 'drive_file_id', 'scheduled_at', 'status', '', 'cfg_wa_chatid'];
     const configRow = ['CONFIG', '', '', '', '', '', '', '', '37257957905@c.us'];
     await sheets.spreadsheets.values.update({
       spreadsheetId,
@@ -470,12 +482,11 @@ export interface WaQueueItem {
   label: string;
   wa_text: string;
   drive_file_id: string;
-  marked: boolean;
+  scheduled_at: string;
   status: string;
 }
 
 export interface WaQueueConfig {
-  scheduled_at: string;
   wa_chatid: string;
   configRowIndex: number;
 }
@@ -490,7 +501,7 @@ export async function getWaQueue(): Promise<{ config: WaQueueConfig; items: WaQu
   const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: WA_QUEUE_SHEET });
   const rows = res.data.values || [];
 
-  let config: WaQueueConfig = { scheduled_at: '', wa_chatid: '', configRowIndex: -1 };
+  let config: WaQueueConfig = { wa_chatid: '', configRowIndex: -1 };
   const items: WaQueueItem[] = [];
 
   for (let i = 1; i < rows.length; i++) {
@@ -499,7 +510,6 @@ export async function getWaQueue(): Promise<{ config: WaQueueConfig; items: WaQu
 
     if (id === 'CONFIG') {
       config = {
-        scheduled_at: String(row[7] ?? '').trim(),
         wa_chatid: String(row[8] ?? '').trim(),
         configRowIndex: i + 1, // 1-indexed sheet row
       };
@@ -508,6 +518,10 @@ export async function getWaQueue(): Promise<{ config: WaQueueConfig; items: WaQu
 
     if (!id) continue;
 
+    const sched = String(row[5] ?? '').trim();
+    // Old test rows stored 'true'/'false' here; ignore those as a schedule.
+    const scheduled_at = /^\d{4}-\d{2}-\d{2}/.test(sched) ? sched : '';
+
     items.push({
       rowIndex: i + 1,
       id,
@@ -515,7 +529,7 @@ export async function getWaQueue(): Promise<{ config: WaQueueConfig; items: WaQu
       label: String(row[2] ?? '').trim(),
       wa_text: String(row[3] ?? '').trim(),
       drive_file_id: String(row[4] ?? '').trim(),
-      marked: String(row[5] ?? '').toLowerCase() === 'true',
+      scheduled_at,
       status: String(row[6] ?? '').trim() || 'WAITING',
     });
   }
@@ -537,7 +551,7 @@ export async function addWaQueueItem(label: string, waText: string, driveFileId:
     spreadsheetId,
     range: `${WA_QUEUE_SHEET}!A1`,
     valueInputOption: 'RAW',
-    requestBody: { values: [[id, createdAt, label, waText, driveFileId, 'false', 'WAITING', '', '']] },
+    requestBody: { values: [[id, createdAt, label, waText, driveFileId, '', 'WAITING', '', '']] },
   });
 
   return id;
@@ -555,7 +569,7 @@ export async function updateWaQueueItemStatus(rowIndex: number, status: string) 
   });
 }
 
-export async function updateWaQueueItemMarked(rowIndex: number, marked: boolean) {
+export async function updateWaQueueItemSchedule(rowIndex: number, scheduledAt: string) {
   const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
   if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
   const sheets = await getGoogleSheetsClient();
@@ -563,19 +577,37 @@ export async function updateWaQueueItemMarked(rowIndex: number, marked: boolean)
     spreadsheetId,
     range: `${WA_QUEUE_SHEET}!F${rowIndex}`,
     valueInputOption: 'RAW',
-    requestBody: { values: [[marked ? 'true' : 'false']] },
+    requestBody: { values: [[scheduledAt]] },
   });
 }
 
-export async function updateWaQueueConfig(configRowIndex: number, scheduledAt: string, waChatId: string) {
+export async function deleteWaQueueRow(rowIndex: number) {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
+  const sheets = await getGoogleSheetsClient();
+  const sheetId = await getSheetIdByTitle(sheets, spreadsheetId, WA_QUEUE_SHEET);
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{
+        deleteDimension: {
+          range: { sheetId, dimension: 'ROWS', startIndex: rowIndex - 1, endIndex: rowIndex },
+        },
+      }],
+    },
+  });
+}
+
+export async function updateWaQueueConfig(configRowIndex: number, waChatId: string) {
   const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
   if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
   const sheets = await getGoogleSheetsClient();
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${WA_QUEUE_SHEET}!H${configRowIndex}:I${configRowIndex}`,
+    range: `${WA_QUEUE_SHEET}!I${configRowIndex}`,
     valueInputOption: 'RAW',
-    requestBody: { values: [[scheduledAt, waChatId]] },
+    requestBody: { values: [[waChatId]] },
   });
 }
 

@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import {
   getWaQueue,
-  updateWaQueueItemMarked,
+  updateWaQueueItemSchedule,
   updateWaQueueConfig,
+  deleteWaQueueRow,
 } from '@/lib/google/sheets';
+import { dispatchWaItem } from '@/lib/whatsapp/dispatch';
 
 export async function GET() {
   try {
@@ -18,20 +20,43 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    if (body.action === 'toggle') {
-      const { rowIndex, marked } = body as { action: string; rowIndex: number; marked: boolean };
-      await updateWaQueueItemMarked(rowIndex, marked);
+    // Set/clear a per-post scheduled time
+    if (body.action === 'schedule') {
+      const { rowIndex, scheduledAt } = body as { rowIndex: number; scheduledAt: string };
+      await updateWaQueueItemSchedule(rowIndex, scheduledAt || '');
       return NextResponse.json({ ok: true });
     }
 
+    // Manually send one post right now, then remove it from the queue
+    if (body.action === 'send-one') {
+      const { rowIndex } = body as { rowIndex: number };
+      const { config, items } = await getWaQueue();
+      if (!config.wa_chatid) return NextResponse.json({ error: 'Chat ID не настроен' }, { status: 400 });
+
+      const item = items.find(i => i.rowIndex === rowIndex);
+      if (!item) return NextResponse.json({ error: 'Пост не найден' }, { status: 404 });
+
+      try {
+        await dispatchWaItem(item, config.wa_chatid);
+      } catch (e: any) {
+        const detail = e?.response?.data ? JSON.stringify(e.response.data) : e.message;
+        return NextResponse.json({ error: detail }, { status: 500 });
+      }
+      await deleteWaQueueRow(rowIndex);
+      return NextResponse.json({ ok: true });
+    }
+
+    // Delete a post from the queue without sending
+    if (body.action === 'delete') {
+      const { rowIndex } = body as { rowIndex: number };
+      await deleteWaQueueRow(rowIndex);
+      return NextResponse.json({ ok: true });
+    }
+
+    // Save the WhatsApp chat id
     if (body.action === 'config') {
-      const { configRowIndex, scheduledAt, waChatId } = body as {
-        action: string;
-        configRowIndex: number;
-        scheduledAt: string;
-        waChatId: string;
-      };
-      await updateWaQueueConfig(configRowIndex, scheduledAt, waChatId);
+      const { configRowIndex, waChatId } = body as { configRowIndex: number; waChatId: string };
+      await updateWaQueueConfig(configRowIndex, waChatId);
       return NextResponse.json({ ok: true });
     }
 
