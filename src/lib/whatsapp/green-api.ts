@@ -7,6 +7,11 @@ function url(method: string) {
   return `${BASE}/waInstance${process.env.GREENAPI_ID_INSTANCE}/${method}/${process.env.GREENAPI_API_TOKEN}`;
 }
 
+export async function getInstanceState(): Promise<string> {
+  const res = await axios.get(url('getStateInstance'));
+  return res.data?.stateInstance || 'unknown';
+}
+
 export async function sendWhatsAppText(chatId: string, message: string) {
   const res = await axios.post(url('sendMessage'), { chatId, message });
   return res.data;

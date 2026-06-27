@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getWaQueue, deleteWaQueueRow } from '@/lib/google/sheets';
 import { dispatchWaItem, isDue } from '@/lib/whatsapp/dispatch';
+import { getInstanceState } from '@/lib/whatsapp/green-api';
 
 // Called by an external pinger (cron-job.org) every few minutes.
 // Auth via Authorization header OR ?secret= query param.
@@ -16,6 +17,12 @@ export async function GET(req: Request) {
   const { config, items } = await getWaQueue();
   if (!config.wa_chatid) {
     return NextResponse.json({ ok: true, skipped: 'wa_chatid not configured' });
+  }
+
+  // Don't auto-send while WhatsApp is restricted (yellow card) — it only worsens the ban.
+  const state = await getInstanceState().catch(() => 'unknown');
+  if (state !== 'authorized') {
+    return NextResponse.json({ ok: true, skipped: `state=${state}` });
   }
 
   // Highest rowIndex first so deletions don't shift the rows we still need.

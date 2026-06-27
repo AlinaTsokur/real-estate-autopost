@@ -26,13 +26,39 @@ export default function ScheduledPage() {
   const [chatId, setChatId] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [state, setState] = useState<string>('');
+  const [refreshingState, setRefreshingState] = useState(false);
 
   const load = async () => {
     const data = await fetch('/api/wa-schedule').then(r => r.json());
     setConfig(data.config);
     setItems(data.items || []);
+    setState(data.state || 'unknown');
     setChatId(data.config?.wa_chatid || '37257957905@c.us');
   };
+
+  const refreshState = async () => {
+    setRefreshingState(true);
+    try {
+      const data = await fetch('/api/wa-schedule').then(r => r.json());
+      setState(data.state || 'unknown');
+    } finally {
+      setRefreshingState(false);
+    }
+  };
+
+  const isReady = state === 'authorized';
+
+  const stateInfo: Record<string, { dot: string; label: string; cls: string }> = {
+    authorized: { dot: '🟢', label: 'Авторизован — можно отправлять', cls: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' },
+    yellowCard: { dot: '🟡', label: 'Жёлтая карточка — WhatsApp ограничил номер, отправка заблокирована', cls: 'bg-amber-500/10 border-amber-500/30 text-amber-300' },
+    blocked: { dot: '🔴', label: 'Заблокирован — номер забанен', cls: 'bg-rose-500/10 border-rose-500/30 text-rose-300' },
+    notAuthorized: { dot: '🔴', label: 'Не авторизован — переподключи WhatsApp в Green API', cls: 'bg-rose-500/10 border-rose-500/30 text-rose-300' },
+    sleepMode: { dot: '🟡', label: 'Спящий режим — телефон офлайн', cls: 'bg-amber-500/10 border-amber-500/30 text-amber-300' },
+    starting: { dot: '⚪', label: 'Запускается...', cls: 'bg-slate-500/10 border-slate-500/30 text-slate-300' },
+    unknown: { dot: '⚪', label: 'Статус неизвестен', cls: 'bg-slate-500/10 border-slate-500/30 text-slate-400' },
+  };
+  const si = stateInfo[state] || stateInfo.unknown;
 
   useEffect(() => {
     load().finally(() => setLoading(false));
@@ -136,6 +162,25 @@ export default function ScheduledPage() {
         </p>
       </div>
 
+      {/* WhatsApp status */}
+      <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border ${si.cls}`}>
+        <span className="text-lg leading-none">{si.dot}</span>
+        <span className="text-sm font-medium flex-1">{si.label}</span>
+        <button
+          onClick={refreshState}
+          disabled={refreshingState}
+          className="text-xs px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-all disabled:opacity-50"
+        >
+          {refreshingState ? '...' : '↻ Обновить'}
+        </button>
+      </div>
+
+      {!isReady && (
+        <div className="px-4 py-3 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-amber-200/90 text-xs leading-relaxed">
+          ⚠️ Пока WhatsApp не в статусе 🟢 «Авторизован», отправка заблокирована (и ручная, и автоматическая) — чтобы не усугублять блокировку. Переждите ограничение и не шлите тесты.
+        </div>
+      )}
+
       {/* Chat ID */}
       <div className="p-5 rounded-2xl bg-slate-900/60 border border-white/5 space-y-3">
         <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">⚙️ WhatsApp Chat ID</h2>
@@ -211,8 +256,9 @@ export default function ScheduledPage() {
                   <div className="flex items-center gap-2 ml-auto">
                     <button
                       onClick={() => sendOne(item)}
-                      disabled={busyId === item.id}
-                      className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-all disabled:opacity-50"
+                      disabled={busyId === item.id || !isReady}
+                      title={!isReady ? 'Отправка заблокирована: WhatsApp не авторизован' : ''}
+                      className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {busyId === item.id
                         ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />...</>

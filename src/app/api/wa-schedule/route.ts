@@ -6,11 +6,13 @@ import {
   deleteWaQueueRow,
 } from '@/lib/google/sheets';
 import { dispatchWaItem } from '@/lib/whatsapp/dispatch';
+import { getInstanceState } from '@/lib/whatsapp/green-api';
 
 export async function GET() {
   try {
     const data = await getWaQueue();
-    return NextResponse.json(data);
+    const state = await getInstanceState().catch(() => 'unknown');
+    return NextResponse.json({ ...data, state });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
@@ -35,6 +37,11 @@ export async function POST(req: Request) {
 
       const item = items.find(i => i.rowIndex === rowIndex);
       if (!item) return NextResponse.json({ error: 'Пост не найден' }, { status: 404 });
+
+      const state = await getInstanceState().catch(() => 'unknown');
+      if (state !== 'authorized') {
+        return NextResponse.json({ error: `WhatsApp не готов (статус: ${state}). Отправка заблокирована.` }, { status: 409 });
+      }
 
       try {
         await dispatchWaItem(item, config.wa_chatid);
