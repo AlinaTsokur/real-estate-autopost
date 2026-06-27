@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getBot, sendMediaGroupWithCaption, sendTextMessage, sendPlainTextMessage, sendPhoto } from '@/lib/telegram/bot';
-import { getDriveImages, getProjectPhotoFolderId } from '@/lib/google/drive';
-import { getConfig2 } from '@/lib/google/sheets';
+import { getDriveImages, getProjectPhotoFolderId, uploadToWaQueue } from '@/lib/google/drive';
+import { getConfig2, addWaQueueItem } from '@/lib/google/sheets';
 import { buildTelegramHtmlPost, buildWhatsAppMarkdown, PostData } from '@/lib/posts/templates';
 import { validatePostData } from '@/lib/posts/validators';
 
@@ -24,9 +24,18 @@ export async function POST(request: Request) {
       if (data.oldPostUrl) {
         await sendPlainTextMessage(chatId, data.oldPostUrl);
       }
-      
+
       await sendTextMessage(chatId, telegramHtml, data.code);
       await sendPlainTextMessage(chatId, whatsappText);
+
+      // Save text-only post to WA queue (no image for price change)
+      try {
+        const label = `PRICE_CHANGE – ${data.code || data.unit || '?'} in ${data.project}`;
+        await addWaQueueItem(label, whatsappText, '');
+      } catch (e) {
+        console.error('WA queue save error (price change):', e);
+      }
+
       return NextResponse.json({ ok: true, whatsappText });
     }
 
@@ -59,9 +68,19 @@ export async function POST(request: Request) {
     console.log(`Sending telegram media group with ${media.length} items`);
 
     await sendMediaGroupWithCaption(chatId, media, telegramHtml, data.code || data.unit || 'Unknown');
-    
+
     // Send the WhatsApp plain text version as a separate message with the slide photo
     await sendPhoto(chatId, slideBuffer, whatsappText);
+
+    // Save post to WA queue (upload slide to Drive for later WhatsApp delivery)
+    try {
+      const label = `${data.postType} – ${data.code || data.unit || '?'} in ${data.project}`;
+      const filename = `wa_${Date.now()}.jpg`;
+      const driveFileId = await uploadToWaQueue(slideBuffer, filename);
+      await addWaQueueItem(label, whatsappText, driveFileId);
+    } catch (e) {
+      console.error('WA queue save error:', e);
+    }
 
     return NextResponse.json({ ok: true, whatsappText });
   } catch (error: any) {

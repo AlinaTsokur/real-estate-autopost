@@ -156,6 +156,75 @@ export async function uploadCatalogCover(
   return `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`;
 }
 
+// ── WA QUEUE ─────────────────────────────────────────────────────────────────
+
+let _waQueueFolderId: string | null = null;
+
+async function findOrCreateWaQueueFolder(): Promise<string> {
+  if (_waQueueFolderId) return _waQueueFolderId;
+
+  const drive = await getGoogleDriveClient();
+
+  const res = await drive.files.list({
+    q: `name='WA_Queue' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    fields: 'files(id)',
+    pageSize: 1,
+  });
+
+  if (res.data.files?.[0]?.id) {
+    _waQueueFolderId = res.data.files[0].id;
+    return _waQueueFolderId;
+  }
+
+  const folder = await drive.files.create({
+    requestBody: { name: 'WA_Queue', mimeType: 'application/vnd.google-apps.folder' },
+    fields: 'id',
+  });
+
+  _waQueueFolderId = folder.data.id!;
+
+  try {
+    await drive.permissions.create({
+      fileId: _waQueueFolderId,
+      requestBody: { role: 'reader', type: 'anyone' },
+    });
+  } catch {}
+
+  return _waQueueFolderId;
+}
+
+export async function uploadToWaQueue(buffer: Buffer, filename: string): Promise<string> {
+  const drive = await getGoogleDriveClient();
+  const folderId = await findOrCreateWaQueueFolder();
+  const { Readable } = await import('stream');
+
+  const file = await drive.files.create({
+    requestBody: { name: filename, parents: [folderId] },
+    media: { mimeType: 'image/jpeg', body: Readable.from(buffer) },
+    fields: 'id',
+  });
+
+  const fileId = file.data.id!;
+
+  try {
+    await drive.permissions.create({
+      fileId,
+      requestBody: { role: 'reader', type: 'anyone' },
+    });
+  } catch {}
+
+  return fileId;
+}
+
+export async function downloadFromDrive(fileId: string): Promise<Buffer> {
+  const drive = await getGoogleDriveClient();
+  const res = await drive.files.get(
+    { fileId, alt: 'media' },
+    { responseType: 'arraybuffer' }
+  );
+  return Buffer.from(res.data as ArrayBuffer);
+}
+
 // TODO: cache photo IDs
 
 export async function findC3SlideByUnit(unit: string): Promise<string> {

@@ -68,6 +68,13 @@ export default function RootLayout({
                 <span className="text-base">🏢</span>
                 <span>C3 Autopost</span>
               </Link>
+              <Link
+                href="/scheduled"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-green-300 hover:text-green-200 hover:bg-green-600/10 transition-all duration-200"
+              >
+                <span className="text-base">💬</span>
+                <span>WA Schedule</span>
+              </Link>
             </nav>
           </aside>
 

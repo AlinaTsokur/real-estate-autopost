@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/permit-expiry",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/wa-send",
+      "schedule": "0 * * * *"
     }
   ]
 }

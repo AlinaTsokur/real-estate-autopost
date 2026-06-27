@@ -437,6 +437,148 @@ export async function getC3UnitData(unitStr: string): Promise<any> {
   return null;
 }
 
+// ── WA QUEUE ─────────────────────────────────────────────────────────────────
+
+const WA_QUEUE_SHEET = 'WA_QUEUE';
+// Columns: id | created_at | label | wa_text | drive_file_id | marked | status | cfg_scheduled_at | cfg_wa_chatid
+// Row with id=CONFIG stores schedule settings in the last two columns.
+
+async function ensureWaQueueSheet(sheets: Awaited<ReturnType<typeof getGoogleSheetsClient>>, spreadsheetId: string) {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties' });
+  const exists = meta.data.sheets?.some(s => s.properties?.title === WA_QUEUE_SHEET);
+
+  if (!exists) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: { requests: [{ addSheet: { properties: { title: WA_QUEUE_SHEET } } }] },
+    });
+    const headers = ['id', 'created_at', 'label', 'wa_text', 'drive_file_id', 'marked', 'status', 'cfg_scheduled_at', 'cfg_wa_chatid'];
+    const configRow = ['CONFIG', '', '', '', '', '', '', '', '37257957905@c.us'];
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${WA_QUEUE_SHEET}!A1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [headers, configRow] },
+    });
+  }
+}
+
+export interface WaQueueItem {
+  rowIndex: number;
+  id: string;
+  created_at: string;
+  label: string;
+  wa_text: string;
+  drive_file_id: string;
+  marked: boolean;
+  status: string;
+}
+
+export interface WaQueueConfig {
+  scheduled_at: string;
+  wa_chatid: string;
+  configRowIndex: number;
+}
+
+export async function getWaQueue(): Promise<{ config: WaQueueConfig; items: WaQueueItem[] }> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
+
+  const sheets = await getGoogleSheetsClient();
+  await ensureWaQueueSheet(sheets, spreadsheetId);
+
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: WA_QUEUE_SHEET });
+  const rows = res.data.values || [];
+
+  let config: WaQueueConfig = { scheduled_at: '', wa_chatid: '', configRowIndex: -1 };
+  const items: WaQueueItem[] = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const id = String(row[0] ?? '').trim();
+
+    if (id === 'CONFIG') {
+      config = {
+        scheduled_at: String(row[7] ?? '').trim(),
+        wa_chatid: String(row[8] ?? '').trim(),
+        configRowIndex: i + 1, // 1-indexed sheet row
+      };
+      continue;
+    }
+
+    if (!id) continue;
+
+    items.push({
+      rowIndex: i + 1,
+      id,
+      created_at: String(row[1] ?? '').trim(),
+      label: String(row[2] ?? '').trim(),
+      wa_text: String(row[3] ?? '').trim(),
+      drive_file_id: String(row[4] ?? '').trim(),
+      marked: String(row[5] ?? '').toLowerCase() === 'true',
+      status: String(row[6] ?? '').trim() || 'WAITING',
+    });
+  }
+
+  return { config, items };
+}
+
+export async function addWaQueueItem(label: string, waText: string, driveFileId: string): Promise<string> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
+
+  const sheets = await getGoogleSheetsClient();
+  await ensureWaQueueSheet(sheets, spreadsheetId);
+
+  const id = Date.now().toString();
+  const createdAt = new Date().toISOString();
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: `${WA_QUEUE_SHEET}!A1`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [[id, createdAt, label, waText, driveFileId, 'false', 'WAITING', '', '']] },
+  });
+
+  return id;
+}
+
+export async function updateWaQueueItemStatus(rowIndex: number, status: string) {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
+  const sheets = await getGoogleSheetsClient();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${WA_QUEUE_SHEET}!G${rowIndex}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [[status]] },
+  });
+}
+
+export async function updateWaQueueItemMarked(rowIndex: number, marked: boolean) {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
+  const sheets = await getGoogleSheetsClient();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${WA_QUEUE_SHEET}!F${rowIndex}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [[marked ? 'true' : 'false']] },
+  });
+}
+
+export async function updateWaQueueConfig(configRowIndex: number, scheduledAt: string, waChatId: string) {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
+  const sheets = await getGoogleSheetsClient();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${WA_QUEUE_SHEET}!H${configRowIndex}:I${configRowIndex}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [[scheduledAt, waChatId]] },
+  });
+}
+
 // ── CATALOG ──────────────────────────────────────────────────────────────────
 
 const CATALOG_SHEET = 'CATALOG';
