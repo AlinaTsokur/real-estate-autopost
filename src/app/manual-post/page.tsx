@@ -23,6 +23,9 @@ export default function ManualPostPage() {
   const [lastSent, setLastSent] = useState<{ code: string; unit: string } | null>(null);
   const [approving, setApproving] = useState(false);
 
+  const [waPhone, setWaPhone] = useState('');
+  const [sendingWa, setSendingWa] = useState(false);
+
   // Fetch projects and floors from Google Sheets on page load
   useEffect(() => {
     fetch('/api/projects')
@@ -182,6 +185,44 @@ export default function ManualPostPage() {
       alert('Ошибка: ' + e.message);
     } finally {
       setApproving(false);
+    }
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!parsedData) return;
+    const phone = waPhone.replace(/\D/g, '');
+    if (!phone) return alert('Введите номер телефона');
+    const chatId = `${phone}@c.us`;
+
+    setSendingWa(true);
+    try {
+      const payload = { ...parsedData, postType, project };
+      // First build the WA text via preview endpoint
+      const previewRes = await fetch('/api/build-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: payload }),
+      });
+      const previewData = await previewRes.json();
+      const waText = previewData.whatsappText;
+      if (!waText) throw new Error('Не удалось сформировать текст');
+
+      const res = await fetch('/api/send-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId,
+          text: waText,
+          imageBase64: parsedData.slideDataUrl || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      alert(`Отправлено в WhatsApp → ${phone}`);
+    } catch (e: any) {
+      alert('Ошибка WhatsApp: ' + e.message);
+    } finally {
+      setSendingWa(false);
     }
   };
 
@@ -567,6 +608,30 @@ export default function ManualPostPage() {
             >
               {sending ? 'Sending to Review Group...' : 'Send to Telegram'}
             </button>
+
+            {/* WhatsApp direct send */}
+            <div className="mt-4 pt-4 border-t border-white/5">
+              <label className="block text-xs text-slate-400 mb-2">WhatsApp — номер для теста</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={waPhone}
+                  onChange={(e) => setWaPhone(e.target.value)}
+                  placeholder="+971501234567"
+                  className="flex-1 px-3 py-2 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-white outline-none focus:ring-2 focus:ring-green-500/50 placeholder-slate-500"
+                />
+                <button
+                  onClick={handleSendWhatsApp}
+                  disabled={sendingWa || !waPhone}
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-medium py-2 px-4 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none text-sm whitespace-nowrap"
+                >
+                  {sendingWa ? (
+                    <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Отправляю...</>
+                  ) : '💬 WhatsApp'}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1.5">Номер в любом формате: +971... или 971... — отправит картинку + текст</p>
+            </div>
           </div>
         )}
       </div>
