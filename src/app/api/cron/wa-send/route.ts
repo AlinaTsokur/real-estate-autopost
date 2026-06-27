@@ -1,59 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getWaQueue, updateWaQueueItemStatus, updateWaQueueConfig } from '@/lib/google/sheets';
+import { getWaQueue, updateWaQueueItemStatus } from '@/lib/google/sheets';
 import { downloadFromDrive } from '@/lib/google/drive';
 import { sendWhatsAppImage, sendWhatsAppText } from '@/lib/whatsapp/green-api';
 
-// Dubai = UTC+4, no DST
-function getDubaiNow(): Date {
-  return new Date(Date.now() + 4 * 60 * 60 * 1000);
-}
-
-// Parse "2026-06-28 10:30" (Dubai time) → UTC Date
-function parseScheduledAt(s: string): Date | null {
-  const m = s.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})$/);
-  if (!m) return null;
-  return new Date(`${m[1]}T${m[2]}:00+04:00`);
-}
-
-export async function GET(req: Request) {
-  const auth = req.headers.get('authorization');
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { config, items } = await getWaQueue();
-
-  if (!config.scheduled_at || !config.wa_chatid) {
-    return NextResponse.json({ ok: true, skipped: 'no schedule' });
-  }
-
-  const scheduledDt = parseScheduledAt(config.scheduled_at);
-  if (!scheduledDt) {
-    return NextResponse.json({ ok: true, skipped: 'invalid scheduled_at format' });
-  }
-
-  if (new Date() < scheduledDt) {
-    const dubaiNow = getDubaiNow();
-    return NextResponse.json({
-      ok: true,
-      skipped: 'not yet',
-      dubaiNow: `${String(dubaiNow.getUTCHours()).padStart(2,'0')}:${String(dubaiNow.getUTCMinutes()).padStart(2,'0')}`,
-      scheduledAt: config.scheduled_at,
-    });
-  }
-
+async function sendMarkedItems(chatId: string) {
+  const { items } = await getWaQueue();
   const toSend = items.filter(i => i.marked && i.status === 'WAITING');
-  if (toSend.length === 0) {
-    // Clear schedule to prevent re-checking
-    await updateWaQueueConfig(config.configRowIndex, '', config.wa_chatid);
-    return NextResponse.json({ ok: true, skipped: 'nothing marked' });
-  }
 
-  // Mark all as SENT immediately to prevent double-send on retry
+  if (toSend.length === 0) return { sent: 0, results: [] };
+
+  // Mark as SENT immediately to prevent double-send
   await Promise.all(toSend.map(i => updateWaQueueItemStatus(i.rowIndex, 'SENT')));
-
-  // Clear scheduled_at so cron doesn't re-trigger next hour
-  await updateWaQueueConfig(config.configRowIndex, '', config.wa_chatid);
 
   const results: { label: string; ok?: boolean; error?: string }[] = [];
 
@@ -61,17 +18,32 @@ export async function GET(req: Request) {
     try {
       if (item.drive_file_id) {
         const buf = await downloadFromDrive(item.drive_file_id);
-        await sendWhatsAppImage(config.wa_chatid, buf, item.wa_text);
+        await sendWhatsAppImage(chatId, buf, item.wa_text);
       } else {
-        await sendWhatsAppText(config.wa_chatid, item.wa_text);
+        await sendWhatsAppText(chatId, item.wa_text);
       }
       results.push({ label: item.label, ok: true });
     } catch (e: any) {
       results.push({ label: item.label, error: e.message });
-      // Revert status so user can retry
       await updateWaQueueItemStatus(item.rowIndex, 'WAITING');
     }
   }
 
-  return NextResponse.json({ ok: true, sent: results.filter(r => r.ok).length, results });
+  return { sent: results.filter(r => r.ok).length, results };
+}
+
+// Vercel cron — fires daily at 06:00 UTC = 10:00 Dubai
+export async function GET(req: Request) {
+  const auth = req.headers.get('authorization');
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { config } = await getWaQueue();
+  if (!config.wa_chatid) {
+    return NextResponse.json({ ok: true, skipped: 'wa_chatid not configured' });
+  }
+
+  const result = await sendMarkedItems(config.wa_chatid);
+  return NextResponse.json({ ok: true, ...result });
 }

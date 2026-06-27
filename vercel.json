@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/wa-send",
-      "schedule": "0 * * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
