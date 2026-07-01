@@ -2,6 +2,18 @@
 
 import { useState, useEffect } from 'react';
 
+const WA_GROUPS = [
+  { id: '120363213058937905@g.us', name: 'Abu Dhabi & Dubai properties', defaultOn: true },
+  { id: '120363131158226499@g.us', name: 'Fliplux properties listing', defaultOn: true },
+  { id: '120363243671933793@g.us', name: 'Blue One Properties', defaultOn: true },
+  { id: '120363262055909265@g.us', name: 'AD Real Estate Availability', defaultOn: true },
+  { id: '120363419032330817@g.us', name: '🆎 ALE + Rent', defaultOn: true },
+  { id: '120363315978879330@g.us', name: '🏝️ Yas Island', defaultOn: false },
+  { id: '120363180834286557@g.us', name: 'VIP Properties Abu Dhabi', defaultOn: true },
+  { id: '120363023065348490@g.us', name: 'AD&D Realtors', defaultOn: true },
+  { id: '120363179418473887@g.us', name: 'AUH Rent/Invest', defaultOn: true },
+];
+
 const convertRuToEn = (str: string) => {
   const ru = 'йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,';
   const en = 'qwertyuiop[]asdfghjkl;\'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL:"ZXCVBNM<>?';
@@ -61,6 +73,12 @@ export default function BudgetPage() {
   const [loading, setLoading] = useState(false);
 
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [enabledGroups, setEnabledGroups] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(WA_GROUPS.map(g => [g.id, g.defaultOn]))
+  );
+  const [broadcasting, setBroadcasting] = useState(false);
+  const [broadcastResults, setBroadcastResults] = useState<{ id: string; ok?: boolean; error?: string }[] | null>(null);
+  const [broadcastError, setBroadcastError] = useState<string | null>(null);
 
   useEffect(() => {
     setChecked(loadLocal());
@@ -100,6 +118,33 @@ export default function BudgetPage() {
       alert(e.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleGroup = (id: string) => {
+    setEnabledGroups(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const sendBroadcast = async () => {
+    if (!parsedData?.text) return;
+    const groupIds = WA_GROUPS.filter(g => enabledGroups[g.id]).map(g => g.id);
+    if (!groupIds.length) return;
+    setBroadcasting(true);
+    setBroadcastResults(null);
+    setBroadcastError(null);
+    try {
+      const res = await fetch('/api/wa-broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: parsedData.text, groupIds }),
+      });
+      const d = await res.json();
+      if (d.error) throw new Error(d.error);
+      setBroadcastResults(d.results);
+    } catch (e: any) {
+      setBroadcastError(e.message);
+    } finally {
+      setBroadcasting(false);
     }
   };
 
@@ -263,6 +308,66 @@ export default function BudgetPage() {
             </div>
             <div className="mt-4 text-xs text-slate-500 text-right">
               Selected {parsedData.selectedRows} units out of {parsedData.totalRows} parsed.
+            </div>
+
+            {/* ── WA BROADCAST ── */}
+            <div className="mt-5 pt-5 border-t border-white/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-white">📤 Отправить в группы</span>
+                <span className="text-xs text-slate-500">{WA_GROUPS.filter(g => enabledGroups[g.id]).length} из {WA_GROUPS.length}</span>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {WA_GROUPS.map(g => {
+                  const on = !!enabledGroups[g.id];
+                  const result = broadcastResults?.find(r => r.id === g.id);
+                  return (
+                    <button
+                      key={g.id}
+                      onClick={() => toggleGroup(g.id)}
+                      disabled={broadcasting}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all select-none
+                        ${result?.ok ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400' :
+                          result?.error ? 'bg-rose-500/15 border-rose-500/40 text-rose-400' :
+                          on ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-300' :
+                          'bg-slate-950/50 border-white/8 text-slate-500 hover:text-slate-300'}`}
+                    >
+                      {result?.ok ? '✓' : result?.error ? '✗' : on ? '✓' : '○'}
+                      {g.name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {broadcastError && (
+                <div className="px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+                  {broadcastError}
+                </div>
+              )}
+
+              {broadcastResults && !broadcastError && (
+                <div className="text-xs text-emerald-400">
+                  ✓ Отправлено в {broadcastResults.filter(r => r.ok).length} групп
+                  {broadcastResults.filter(r => r.error).length > 0 && (
+                    <span className="text-rose-400 ml-2">
+                      · {broadcastResults.filter(r => r.error).length} ошибок
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={sendBroadcast}
+                disabled={broadcasting || WA_GROUPS.filter(g => enabledGroups[g.id]).length === 0}
+                className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-xl transition-all flex items-center justify-center gap-2"
+              >
+                {broadcasting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Отправляю... (5 сек между группами)
+                  </>
+                ) : '📲 Разослать по группам'}
+              </button>
             </div>
           </div>
         )}
