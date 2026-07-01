@@ -26,7 +26,6 @@ export default function ScheduledPage() {
   const [chatId, setChatId] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmSendId, setConfirmSendId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [state, setState] = useState<string>('');
@@ -101,7 +100,6 @@ export default function ScheduledPage() {
   };
 
   const deleteOne = async (item: WaItem) => {
-    setConfirmDeleteId(null);
     setBusyId(item.id);
     try {
       const res = await fetch('/api/wa-schedule', {
@@ -275,12 +273,6 @@ export default function ScheduledPage() {
                         <button onClick={() => sendOne(item)} className="text-xs px-2.5 py-1 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-all">Да</button>
                         <button onClick={() => setConfirmSendId(null)} className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all">Нет</button>
                       </div>
-                    ) : confirmDeleteId === item.id ? (
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-rose-300">Удалить?</span>
-                        <button onClick={() => deleteOne(item)} className="text-xs px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition-all">Да</button>
-                        <button onClick={() => setConfirmDeleteId(null)} className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all">Нет</button>
-                      </div>
                     ) : (
                       <>
                         <button
@@ -292,8 +284,9 @@ export default function ScheduledPage() {
                           📤 Отправить
                         </button>
                         <button
-                          onClick={() => setConfirmDeleteId(item.id)}
-                          className="flex items-center gap-1.5 bg-rose-600/80 hover:bg-rose-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-all"
+                          onClick={() => deleteOne(item)}
+                          disabled={busyId !== null}
+                          className="flex items-center gap-1.5 bg-rose-600/80 hover:bg-rose-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-all disabled:opacity-50"
                         >
                           🗑 Удалить
                         </button>
