@@ -26,6 +26,9 @@ export default function ScheduledPage() {
   const [chatId, setChatId] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmSendId, setConfirmSendId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [state, setState] = useState<string>('');
   const [refreshingState, setRefreshingState] = useState(false);
 
@@ -79,7 +82,7 @@ export default function ScheduledPage() {
   };
 
   const sendOne = async (item: WaItem) => {
-    if (!confirm(`Отправить пост «${item.label}» в WhatsApp прямо сейчас?`)) return;
+    setConfirmSendId(null);
     setBusyId(item.id);
     try {
       const res = await fetch('/api/wa-schedule', {
@@ -91,14 +94,14 @@ export default function ScheduledPage() {
       if (d.error) throw new Error(d.error);
       await load();
     } catch (e: any) {
-      alert('Ошибка отправки: ' + e.message);
+      setErrorMsg('Ошибка отправки: ' + e.message);
     } finally {
       setBusyId(null);
     }
   };
 
   const deleteOne = async (item: WaItem) => {
-    if (!confirm(`Удалить пост «${item.label}» из очереди?`)) return;
+    setConfirmDeleteId(null);
     setBusyId(item.id);
     try {
       const res = await fetch('/api/wa-schedule', {
@@ -110,7 +113,7 @@ export default function ScheduledPage() {
       if (d.error) throw new Error(d.error);
       await load();
     } catch (e: any) {
-      alert('Ошибка удаления: ' + e.message);
+      setErrorMsg('Ошибка удаления: ' + e.message);
     } finally {
       setBusyId(null);
     }
@@ -178,6 +181,13 @@ export default function ScheduledPage() {
       {!isReady && (
         <div className="px-4 py-3 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-amber-200/90 text-xs leading-relaxed">
           ⚠️ Пока WhatsApp не в статусе 🟢 «Авторизован», отправка заблокирована (и ручная, и автоматическая) — чтобы не усугублять блокировку. Переждите ограничение и не шлите тесты.
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="px-4 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-start gap-3">
+          <span className="flex-1">{errorMsg}</span>
+          <button onClick={() => setErrorMsg(null)} className="text-rose-400 hover:text-white text-lg leading-none">×</button>
         </div>
       )}
 
@@ -253,24 +263,42 @@ export default function ScheduledPage() {
                     />
                   </div>
 
-                  <div className="flex items-center gap-2 ml-auto">
-                    <button
-                      onClick={() => sendOne(item)}
-                      disabled={busyId === item.id || !isReady}
-                      title={!isReady ? 'Отправка заблокирована: WhatsApp не авторизован' : ''}
-                      className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {busyId === item.id
-                        ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />...</>
-                        : '📤 Отправить'}
-                    </button>
-                    <button
-                      onClick={() => deleteOne(item)}
-                      disabled={busyId === item.id}
-                      className="flex items-center gap-1.5 bg-rose-600/80 hover:bg-rose-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-all disabled:opacity-50"
-                    >
-                      🗑 Удалить
-                    </button>
+                  <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
+                    {busyId === item.id ? (
+                      <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+                        <div className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                        Обработка...
+                      </div>
+                    ) : confirmSendId === item.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-amber-300">Отправить сейчас?</span>
+                        <button onClick={() => sendOne(item)} className="text-xs px-2.5 py-1 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-all">Да</button>
+                        <button onClick={() => setConfirmSendId(null)} className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all">Нет</button>
+                      </div>
+                    ) : confirmDeleteId === item.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-rose-300">Удалить?</span>
+                        <button onClick={() => deleteOne(item)} className="text-xs px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition-all">Да</button>
+                        <button onClick={() => setConfirmDeleteId(null)} className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all">Нет</button>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setConfirmSendId(item.id)}
+                          disabled={!isReady}
+                          title={!isReady ? 'Отправка заблокирована: WhatsApp не авторизован' : ''}
+                          className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          📤 Отправить
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(item.id)}
+                          className="flex items-center gap-1.5 bg-rose-600/80 hover:bg-rose-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-all"
+                        >
+                          🗑 Удалить
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
