@@ -16,11 +16,20 @@ export async function POST(request: Request) {
 
       if (data.startsWith('approve_')) {
         const code = data.replace('approve_', '');
-        
+
         try {
           const result = await approveUnitRow(code);
           await bot.telegram.editMessageText(chatId, messageId, undefined, `✅ Approved: строка ${result.row} закрашена зелёным (#${code})`);
           await bot.telegram.answerCbQuery(cb.id, `✅ Готово — строка ${result.row}`);
+
+          const heart = [{ type: 'emoji', emoji: '❤' }];
+          // React on the review message itself
+          await (bot.telegram as any).callApi('setMessageReaction', { chat_id: chatId, message_id: messageId, reaction: heart });
+          // React on the original post (the message the review replied to)
+          const originalMsgId = cb.message.reply_to_message?.message_id;
+          if (originalMsgId) {
+            await (bot.telegram as any).callApi('setMessageReaction', { chat_id: chatId, message_id: originalMsgId, reaction: heart });
+          }
         } catch (e: any) {
           console.error(e);
           await bot.telegram.answerCbQuery(cb.id, `Error: ${e.message}`);
