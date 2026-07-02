@@ -9,10 +9,10 @@ style.textContent = `
   position: fixed;
   z-index: 99999;
   width: 300px;
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(17,17,17,.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.08);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -27,7 +27,7 @@ style.textContent = `
   align-items: center;
   justify-content: space-between;
   padding: 7px 12px;
-  background: rgba(30, 41, 59, 0.7);
+  background: rgba(0,0,0,.25);
   cursor: grab;
   border-bottom: 1px solid rgba(255,255,255,0.06);
 }
@@ -43,8 +43,8 @@ style.textContent = `
 #ul-search-row { display: flex; gap: 7px; margin-bottom: 10px; }
 #ul-input {
   flex: 1;
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,.25);
+  border: 1px solid rgba(255,255,255,.10);
   border-radius: 7px;
   padding: 6px 10px;
   color: #f1f5f9;
