@@ -1,19 +1,13 @@
 import { NextResponse } from 'next/server';
-import { sendWhatsAppText } from '@/lib/whatsapp/green-api';
-import { getInstanceState } from '@/lib/whatsapp/green-api';
+import { sendWhatsAppText, getInstanceState } from '@/lib/whatsapp/green-api';
 
-const DELAY_MS = 5000;
-
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
+// Sends to ONE group. Frontend handles the 36s delay between calls.
 export async function POST(req: Request) {
   try {
-    const { text, groupIds } = await req.json() as { text: string; groupIds: string[] };
+    const { text, groupId } = await req.json() as { text: string; groupId: string };
 
-    if (!text || !groupIds?.length) {
-      return NextResponse.json({ error: 'text and groupIds required' }, { status: 400 });
+    if (!text || !groupId) {
+      return NextResponse.json({ error: 'text and groupId required' }, { status: 400 });
     }
 
     const state = await getInstanceState().catch(() => 'unknown');
@@ -21,21 +15,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `WhatsApp не готов (статус: ${state})` }, { status: 409 });
     }
 
-    const results: { id: string; ok?: boolean; error?: string }[] = [];
-
-    for (let i = 0; i < groupIds.length; i++) {
-      if (i > 0) await sleep(DELAY_MS);
-      try {
-        await sendWhatsAppText(groupIds[i], text);
-        results.push({ id: groupIds[i], ok: true });
-      } catch (e: any) {
-        const detail = e?.response?.data ? JSON.stringify(e.response.data) : e.message;
-        results.push({ id: groupIds[i], error: detail });
-      }
-    }
-
-    return NextResponse.json({ ok: true, results });
+    await sendWhatsAppText(groupId, text);
+    return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    const detail = e?.response?.data ? JSON.stringify(e.response.data) : e.message;
+    return NextResponse.json({ error: detail }, { status: 500 });
   }
 }

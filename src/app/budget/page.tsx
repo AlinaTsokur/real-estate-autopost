@@ -125,27 +125,48 @@ export default function BudgetPage() {
     setEnabledGroups(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const [broadcastProgress, setBroadcastProgress] = useState<string | null>(null);
+
   const sendBroadcast = async () => {
     if (!parsedData?.text) return;
-    const groupIds = WA_GROUPS.filter(g => enabledGroups[g.id]).map(g => g.id);
-    if (!groupIds.length) return;
+    const groups = WA_GROUPS.filter(g => enabledGroups[g.id]);
+    if (!groups.length) return;
     setBroadcasting(true);
     setBroadcastResults(null);
     setBroadcastError(null);
-    try {
-      const res = await fetch('/api/wa-broadcast', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: parsedData.text, groupIds }),
-      });
-      const d = await res.json();
-      if (d.error) throw new Error(d.error);
-      setBroadcastResults(d.results);
-    } catch (e: any) {
-      setBroadcastError(e.message);
-    } finally {
-      setBroadcasting(false);
+    setBroadcastProgress(null);
+
+    const results: { id: string; ok?: boolean; error?: string }[] = [];
+
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i];
+      setBroadcastProgress(`${i + 1} / ${groups.length} — ${g.name}`);
+
+      try {
+        const res = await fetch('/api/wa-broadcast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: parsedData.text, groupId: g.id }),
+        });
+        const d = await res.json();
+        if (d.error) throw new Error(d.error);
+        results.push({ id: g.id, ok: true });
+      } catch (e: any) {
+        results.push({ id: g.id, error: e.message });
+      }
+
+      setBroadcastResults([...results]);
+
+      if (i < groups.length - 1) {
+        for (let s = 36; s > 0; s--) {
+          setBroadcastProgress(`Следующая через ${s} сек — ${groups[i + 1].name}`);
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
     }
+
+    setBroadcastProgress(null);
+    setBroadcasting(false);
   };
 
   const isSunday = new Date().getDay() === 0;
@@ -364,7 +385,7 @@ export default function BudgetPage() {
                 {broadcasting ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Отправляю... (5 сек между группами)
+                    {broadcastProgress || 'Отправляю...'}
                   </>
                 ) : '📲 Разослать по группам'}
               </button>
