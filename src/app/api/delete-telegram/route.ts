@@ -14,7 +14,10 @@ export async function POST(request: Request) {
     );
 
     const failed = results.filter(r => r.status === 'rejected').length;
-    return NextResponse.json({ ok: true, deleted: messageIds.length - failed, failed });
+    const errors = results
+      .map((r, i) => r.status === 'rejected' ? { id: messageIds[i], error: (r as any).reason?.message } : null)
+      .filter(Boolean);
+    return NextResponse.json({ ok: true, deleted: messageIds.length - failed, failed, errors });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
