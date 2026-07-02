@@ -284,10 +284,5 @@ export async function parsePastedRow(pastedText: string, projectName: string) {
     parsed.handover = formatHandoverDate(parsed.handover);
   }
 
-  // Detect townhouse from type string (e.g. "3 Bedroom + Maid Townhouse")
-  if (String(parsed.type || '').toLowerCase().includes('townhouse')) {
-    parsed.objectType = 'Townhouse';
-  }
-
   return parsed;
 }
