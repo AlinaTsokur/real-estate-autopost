@@ -8,11 +8,13 @@ style.textContent = `
 #ul-widget {
   position: fixed;
   z-index: 99999;
-  width: 320px;
-  background: #0f172a;
-  border: 1px solid #334155;
+  width: 300px;
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 13px;
   color: #e2e8f0;
@@ -24,27 +26,27 @@ style.textContent = `
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 14px;
-  background: #1e293b;
+  padding: 7px 12px;
+  background: rgba(30, 41, 59, 0.6);
   cursor: grab;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 #ul-header:active { cursor: grabbing; }
-#ul-title { font-size: 11px; font-weight: 600; color: #64748b; letter-spacing: 0.06em; text-transform: uppercase; }
+#ul-title { font-size: 10px; font-weight: 600; color: #64748b; letter-spacing: 0.06em; text-transform: uppercase; }
 #ul-toggle {
   background: none; border: none; color: #64748b; cursor: pointer;
-  font-size: 16px; line-height: 1; padding: 0 2px;
+  font-size: 15px; line-height: 1; padding: 0 2px;
 }
 #ul-toggle:hover { color: #94a3b8; }
-#ul-body { padding: 14px; }
+#ul-body { padding: 10px 12px 12px; }
 #ul-widget.collapsed #ul-body { display: none; }
-#ul-search-row { display: flex; gap: 8px; margin-bottom: 12px; }
+#ul-search-row { display: flex; gap: 7px; margin-bottom: 10px; }
 #ul-input {
   flex: 1;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: 7px;
-  padding: 7px 11px;
+  padding: 6px 10px;
   color: #f1f5f9;
   font-size: 13px;
   outline: none;
@@ -53,58 +55,43 @@ style.textContent = `
 #ul-input:focus { border-color: #6366f1; }
 #ul-btn {
   background: #6366f1; color: white; border: none;
-  border-radius: 7px; padding: 7px 14px; font-size: 12px; cursor: pointer;
+  border-radius: 7px; padding: 6px 12px; font-size: 12px; cursor: pointer;
   white-space: nowrap; flex-shrink: 0;
 }
 #ul-btn:hover { background: #4f46e5; }
 #ul-btn:disabled { background: #334155; cursor: default; }
-#ul-status { margin-bottom: 12px; }
+#ul-status { margin-bottom: 8px; }
 .ul-badge {
   display: inline-block; font-size: 11px; font-weight: 600;
-  padding: 3px 10px; border-radius: 20px;
+  padding: 2px 9px; border-radius: 20px;
 }
-.ul-ok  { background: #14532d; color: #4ade80; }
-.ul-no  { background: #4c1d1d; color: #f87171; }
-.ul-field {
-  margin-bottom: 11px;
-  padding-bottom: 11px;
-  border-bottom: 1px solid #1e293b;
-}
-.ul-field:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-.ul-label {
-  font-size: 10px; color: #475569;
-  text-transform: uppercase; letter-spacing: 0.08em;
-  margin-bottom: 4px;
-}
+.ul-ok  { background: rgba(20, 83, 45, 0.8); color: #4ade80; }
+.ul-no  { background: rgba(76, 29, 29, 0.8); color: #f87171; }
+.ul-field { margin-bottom: 7px; }
+.ul-label { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.07em; }
 .ul-val {
-  color: #f1f5f9;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  line-height: 1.5;
-  font-size: 13px;
+  color: #f1f5f9; word-break: break-word;
+  overflow-wrap: break-word; line-height: 1.45; font-size: 13px;
 }
 .ul-val a {
   color: #818cf8; text-decoration: none;
-  font-size: 11px; line-height: 1.5;
-  display: block; word-break: break-all;
+  font-size: 11px; word-break: break-all; display: block;
 }
 .ul-val a:hover { text-decoration: underline; }
-.ul-comment {
-  background: #1e293b; border: 1px solid #2d3f55;
-  border-radius: 6px; padding: 8px 10px;
-  color: #cbd5e1; font-size: 12px; line-height: 1.55;
+.ul-comment-text {
+  color: #94a3b8; font-size: 12px; line-height: 1.5;
   white-space: pre-wrap; word-break: break-word;
-  max-height: 90px; overflow-y: auto;
+  font-style: italic;
 }
 #ul-copy {
-  width: 100%; margin-top: 12px;
-  background: #1e293b; color: #94a3b8;
-  border: 1px solid #334155; border-radius: 7px;
-  padding: 8px; font-size: 12px; cursor: pointer;
+  width: 100%; margin-top: 10px;
+  background: rgba(99, 102, 241, 0.15); color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 7px;
+  padding: 7px; font-size: 12px; cursor: pointer;
 }
-#ul-copy:hover { background: #273548; color: #e2e8f0; }
-#ul-copy.ok { color: #4ade80; border-color: #14532d; }
-#ul-msg { font-size: 12px; color: #94a3b8; margin-top: 6px; }
+#ul-copy:hover { background: rgba(99, 102, 241, 0.25); color: #a5b4fc; }
+#ul-copy.ok { color: #4ade80; border-color: rgba(74, 222, 128, 0.3); background: rgba(20,83,45,0.2); }
+#ul-msg { font-size: 12px; color: #94a3b8; margin-top: 5px; }
 `;
 document.head.appendChild(style);
 
@@ -125,7 +112,7 @@ widget.innerHTML = `
       <div class="ul-field"><div class="ul-label">Unit</div><div class="ul-val" id="ul-unit"></div></div>
       <div class="ul-field"><div class="ul-label">Код</div><div class="ul-val" id="ul-code"></div></div>
       <div class="ul-field" id="ul-link-row"><div class="ul-label">Ссылка</div><div class="ul-val" id="ul-link"></div></div>
-      <div class="ul-field" id="ul-comment-row"><div class="ul-label">Комментарии</div><div class="ul-comment" id="ul-comment"></div></div>
+      <div class="ul-field" id="ul-comment-row"><div class="ul-label">Комментарии</div><div class="ul-comment-text" id="ul-comment"></div></div>
       <button id="ul-copy">📋 Копировать для WhatsApp</button>
     </div>
     <div id="ul-msg"></div>
@@ -242,9 +229,10 @@ async function lookup() {
         copyBtn.textContent = '✅ Скопировано!';
         copyBtn.className = 'ok';
         setTimeout(() => {
-          copyBtn.textContent = '📋 Копировать для WhatsApp';
-          copyBtn.className = '';
-        }, 2000);
+          widget.classList.add('collapsed');
+          document.getElementById('ul-toggle').textContent = '+';
+          savePos();
+        }, 800);
       });
     };
 
