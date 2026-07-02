@@ -1,14 +1,22 @@
 {
   "manifest_version": 3,
   "name": "Unit Lookup",
-  "version": "1.0",
-  "description": "Быстрый поиск юнитов из таблицы",
+  "version": "2.0",
+  "description": "Плавающая панель поиска юнитов на WhatsApp Web",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://web.whatsapp.com/*",
+    "https://real-estate-autopost.vercel.app/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "Unit Lookup"
-  },
-  "permissions": [],
-  "host_permissions": [
-    "https://real-estate-autopost.vercel.app/*"
-  ]
+  }
 }
