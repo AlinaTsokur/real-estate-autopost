@@ -440,7 +440,7 @@ export async function getC3UnitData(unitStr: string): Promise<any> {
 // ── WA QUEUE ─────────────────────────────────────────────────────────────────
 
 const WA_QUEUE_SHEET = 'WA_QUEUE';
-// Columns: A id | B created_at | C label | D wa_text | E drive_file_id | F scheduled_at | G status | H (unused) | I cfg_wa_chatid
+// Columns: A id | B created_at | C label | D wa_text | E drive_file_id | F scheduled_at | G status | H item_chatid | I cfg_wa_chatid
 // Row with id=CONFIG stores the WhatsApp chat id in column I.
 // scheduled_at format: "YYYY-MM-DD HH:MM" interpreted as Dubai wall-clock time.
 
@@ -484,6 +484,7 @@ export interface WaQueueItem {
   drive_file_id: string;
   scheduled_at: string;
   status: string;
+  item_chatid: string;
 }
 
 export interface WaQueueConfig {
@@ -531,13 +532,20 @@ export async function getWaQueue(): Promise<{ config: WaQueueConfig; items: WaQu
       drive_file_id: String(row[4] ?? '').trim(),
       scheduled_at,
       status: String(row[6] ?? '').trim() || 'WAITING',
+      item_chatid: String(row[7] ?? '').trim(),
     });
   }
 
   return { config, items };
 }
 
-export async function addWaQueueItem(label: string, waText: string, driveFileId: string): Promise<string> {
+export async function addWaQueueItem(
+  label: string,
+  waText: string,
+  driveFileId: string,
+  scheduledAt = '',
+  itemChatId = '',
+): Promise<string> {
   const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
   if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
 
@@ -551,7 +559,7 @@ export async function addWaQueueItem(label: string, waText: string, driveFileId:
     spreadsheetId,
     range: `${WA_QUEUE_SHEET}!A1`,
     valueInputOption: 'RAW',
-    requestBody: { values: [[id, createdAt, label, waText, driveFileId, '', 'WAITING', '', '']] },
+    requestBody: { values: [[id, createdAt, label, waText, driveFileId, scheduledAt, 'WAITING', itemChatId, '']] },
   });
 
   return id;

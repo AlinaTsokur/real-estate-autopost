@@ -34,7 +34,8 @@ export async function GET(req: Request) {
 
   for (const item of due) {
     try {
-      await dispatchWaItem(item, config.wa_chatid);
+      const chatId = item.item_chatid || config.wa_chatid;
+      await dispatchWaItem(item, chatId);
       await deleteWaQueueRow(item.rowIndex);
       results.push({ label: item.label, ok: true });
     } catch (e: any) {
