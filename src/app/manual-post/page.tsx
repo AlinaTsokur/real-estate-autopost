@@ -22,6 +22,8 @@ export default function ManualPostPage() {
 
   const [lastSent, setLastSent] = useState<{ code: string; unit: string } | null>(null);
   const [approving, setApproving] = useState(false);
+  const [sentPost, setSentPost] = useState<{ messageIds: number[]; chatId: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
 
   // Fetch projects and floors from Google Sheets on page load
@@ -99,7 +101,9 @@ export default function ManualPostPage() {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setLastSent({ code: parsedData.code || '', unit: parsedData.unit || '' });
-      alert('Sent to Review Group!');
+      if (data.messageIds?.length) {
+        setSentPost({ messageIds: data.messageIds, chatId: data.chatId });
+      }
       setRawText('');
       setParsedData(null);
       setPostPreview('');
@@ -223,8 +227,36 @@ export default function ManualPostPage() {
               </>
             ) : '✓ Approved'}
           </button>
+          {sentPost && (
+            <button
+              onClick={async () => {
+                setDeleting(true);
+                try {
+                  const res = await fetch('/api/delete-telegram', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(sentPost),
+                  });
+                  const d = await res.json();
+                  if (d.error) throw new Error(d.error);
+                  setSentPost(null);
+                  setLastSent(null);
+                } catch (e: any) {
+                  alert('Ошибка удаления: ' + e.message);
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+              disabled={deleting}
+              className="flex items-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 font-medium py-2 px-4 rounded-xl transition-all disabled:opacity-50 disabled:pointer-events-none text-sm"
+            >
+              {deleting ? (
+                <div className="w-3.5 h-3.5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
+              ) : '🗑️ Удалить из TG'}
+            </button>
+          )}
           <button
-            onClick={() => setLastSent(null)}
+            onClick={() => { setLastSent(null); setSentPost(null); }}
             className="text-slate-500 hover:text-slate-300 text-xs transition-colors"
           >
             Пропустить

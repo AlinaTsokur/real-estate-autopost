@@ -20,15 +20,16 @@ export async function POST(request: Request) {
     if (!chatId) throw new Error('TELEGRAM_REVIEW_CHAT_ID not configured');
 
     if (data.postType === 'PRICE_CHANGE') {
-      // Reduced posts send old link first, then new post text
+      const allIds: number[] = [];
       if (data.oldPostUrl) {
-        await sendPlainTextMessage(chatId, data.oldPostUrl);
+        const r = await sendPlainTextMessage(chatId, data.oldPostUrl);
+        allIds.push(...r.ids);
       }
+      const r1 = await sendTextMessage(chatId, telegramHtml, data.code);
+      allIds.push(...r1.ids);
+      const r2 = await sendPlainTextMessage(chatId, whatsappText);
+      allIds.push(...r2.ids);
 
-      await sendTextMessage(chatId, telegramHtml, data.code);
-      await sendPlainTextMessage(chatId, whatsappText);
-
-      // Save text-only post to WA queue (no image for price change)
       try {
         const label = `PRICE_CHANGE – ${data.code || data.unit || '?'} in ${data.project}`;
         await addWaQueueItem(label, whatsappText, '');
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
         console.error('WA queue save error (price change):', e);
       }
 
-      return NextResponse.json({ ok: true, whatsappText });
+      return NextResponse.json({ ok: true, whatsappText, messageIds: allIds, chatId });
     }
 
     // Normal post: fetch photos and send
@@ -67,12 +68,12 @@ export async function POST(request: Request) {
 
     console.log(`Sending telegram media group with ${media.length} items`);
 
-    await sendMediaGroupWithCaption(chatId, media, telegramHtml, data.code || data.unit || 'Unknown');
+    const r1 = await sendMediaGroupWithCaption(chatId, media, telegramHtml, data.code || data.unit || 'Unknown');
+    const allIds: number[] = [...r1.ids];
 
-    // Send the WhatsApp plain text version as a separate message with the slide photo
-    await sendPhoto(chatId, slideBuffer, whatsappText);
+    const r2 = await sendPhoto(chatId, slideBuffer, whatsappText);
+    allIds.push(...r2.ids);
 
-    // Save post to WA queue (upload slide to Drive for later WhatsApp delivery)
     try {
       const label = `${data.postType} – ${data.code || data.unit || '?'} in ${data.project}`;
       const filename = `wa_${Date.now()}.jpg`;
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
       console.error('WA queue save error:', e);
     }
 
-    return NextResponse.json({ ok: true, whatsappText });
+    return NextResponse.json({ ok: true, whatsappText, messageIds: allIds, chatId });
   } catch (error: any) {
     console.error('Send Telegram error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

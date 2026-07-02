@@ -48,12 +48,11 @@ export async function sendMediaGroupWithCaption(
     headers: formData.getHeaders()
   });
   const message = res.data.result;
-  
-  // After sending media group, we can send a reply with inline buttons to approve/skip
-  // We attach it to the first message of the group
-  const firstMsgId = message[0].message_id;
 
-  await bot.telegram.sendMessage(chatId, `Review post for ${unitCode}:`, {
+  const firstMsgId = message[0].message_id;
+  const ids: number[] = message.map((m: any) => m.message_id);
+
+  const reviewMsg = await bot.telegram.sendMessage(chatId, `Review post for ${unitCode}:`, {
     reply_parameters: { message_id: firstMsgId },
     reply_markup: {
       inline_keyboard: [
@@ -64,16 +63,18 @@ export async function sendMediaGroupWithCaption(
       ]
     }
   });
+  ids.push(reviewMsg.message_id);
 
-  return message;
+  return { message, ids };
 }
 
 export async function sendTextMessage(chatId: string, textHtml: string, unitCode?: string) {
   const bot = getBot();
   const msg = await bot.telegram.sendMessage(chatId, textHtml, { parse_mode: 'HTML' });
-  
+  const ids: number[] = [msg.message_id];
+
   if (unitCode) {
-    await bot.telegram.sendMessage(chatId, `Review post for ${unitCode}:`, {
+    const reviewMsg = await bot.telegram.sendMessage(chatId, `Review post for ${unitCode}:`, {
       reply_parameters: { message_id: msg.message_id },
       reply_markup: {
         inline_keyboard: [
@@ -84,16 +85,19 @@ export async function sendTextMessage(chatId: string, textHtml: string, unitCode
         ]
       }
     });
+    ids.push(reviewMsg.message_id);
   }
-  return msg;
+  return { msg, ids };
 }
 
 export async function sendPlainTextMessage(chatId: string, text: string) {
   const bot = getBot();
-  return bot.telegram.sendMessage(chatId, text);
+  const msg = await bot.telegram.sendMessage(chatId, text);
+  return { msg, ids: [msg.message_id] };
 }
 
 export async function sendPhoto(chatId: string, source: Buffer, caption: string) {
   const bot = getBot();
-  return bot.telegram.sendPhoto(chatId, { source }, { caption });
+  const msg = await bot.telegram.sendPhoto(chatId, { source }, { caption });
+  return { msg, ids: [msg.message_id] };
 }
