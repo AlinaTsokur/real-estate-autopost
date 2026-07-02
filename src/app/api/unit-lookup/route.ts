@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
 
     const res = await sheets.spreadsheets.get({
       spreadsheetId,
-      ranges: ['Abu Dhabi!A:Z'],
+      ranges: ['Abu Dhabi!A:AZ'],
       includeGridData: true,
     });
 
@@ -58,10 +58,11 @@ export async function GET(req: NextRequest) {
     const headers     = headerCells.map(h => getCellText(h));
     const headersNorm = headers.map(h => normalizeText(h));
 
-    const codeCol    = headersNorm.findIndex(h => h === normalizeText('Код') || h === normalizeText('Code'));
-    const unitCol    = headersNorm.findIndex(h => h === normalizeText('Unit'));
-    const commentCol = headersNorm.findIndex(h => h === normalizeText('Комментарии') || h === normalizeText('Comments'));
-    const linkCol    = headers.findIndex(h => LINK_COL_NAMES.some(n => normalizeText(h) === normalizeText(n)));
+    const codeCol       = headersNorm.findIndex(h => h === normalizeText('Код') || h === normalizeText('Code'));
+    const unitCol       = headersNorm.findIndex(h => h === normalizeText('Unit'));
+    const commentCol    = headersNorm.findIndex(h => h === normalizeText('Комментарии') || h === normalizeText('Comments'));
+    const linkCol       = headers.findIndex(h => LINK_COL_NAMES.some(n => normalizeText(h) === normalizeText(n)));
+    const folderLinkCol = headersNorm.findIndex(h => h === normalizeText('Unit Folder Link'));
 
     if (debug) {
       return json({ headers, codeCol, unitCol, commentCol, linkCol });
@@ -82,12 +83,13 @@ export async function GET(req: NextRequest) {
       const bg        = checkCell?.effectiveFormat?.backgroundColor ?? checkCell?.userEnteredFormat?.backgroundColor;
 
       return json({
-        found:    true,
-        code:     getCellText(cells[codeCol]),
-        unit:     unitCol    !== -1 ? getCellText(cells[unitCol])    : '',
-        link:     linkCol    !== -1 ? getCellText(cells[linkCol])    : '',
-        comments: commentCol !== -1 ? getCellText(cells[commentCol]) : '',
-        available: !isUnavailableColor(bg),
+        found:      true,
+        code:       getCellText(cells[codeCol]),
+        unit:       unitCol       !== -1 ? getCellText(cells[unitCol])       : '',
+        link:       linkCol       !== -1 ? getCellText(cells[linkCol])       : '',
+        comments:   commentCol    !== -1 ? getCellText(cells[commentCol])    : '',
+        folderLink: folderLinkCol !== -1 ? getCellText(cells[folderLinkCol]) : '',
+        available:  !isUnavailableColor(bg),
       });
     }
 

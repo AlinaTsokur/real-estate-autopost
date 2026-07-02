@@ -113,6 +113,7 @@ widget.innerHTML = `
       <div class="ul-field"><div class="ul-label">Код</div><div class="ul-val" id="ul-code"></div></div>
       <div class="ul-field" id="ul-link-row"><div class="ul-label">Ссылка</div><div class="ul-val" id="ul-link"></div></div>
       <div class="ul-field" id="ul-comment-row"><div class="ul-label">Комментарии</div><div class="ul-comment-text" id="ul-comment"></div></div>
+      <div class="ul-field" id="ul-folder-row"><div class="ul-label">Unit Folder</div><div class="ul-val" id="ul-folder"></div></div>
       <button id="ul-copy">📋 Копировать для WhatsApp</button>
     </div>
     <div id="ul-msg"></div>
@@ -213,6 +214,15 @@ async function lookup() {
       commentRow.style.display = '';
     } else {
       commentRow.style.display = 'none';
+    }
+
+    const folderRow = document.getElementById('ul-folder-row');
+    const folderEl  = document.getElementById('ul-folder');
+    if (data.folderLink) {
+      folderEl.innerHTML = `<a href="${data.folderLink}" target="_blank">📁 Открыть папку</a>`;
+      folderRow.style.display = '';
+    } else {
+      folderRow.style.display = 'none';
     }
 
     result.style.display = 'block';
