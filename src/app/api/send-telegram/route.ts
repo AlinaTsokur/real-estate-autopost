@@ -13,8 +13,8 @@ export async function POST(request: Request) {
     validatePostData(data);
 
     const cfg = await getConfig2(data.project);
-    const telegramHtml = await buildTelegramHtmlPost(data);
-    const whatsappText = await buildWhatsAppMarkdown(data);
+    const telegramHtml = body.telegramHtmlOverride || await buildTelegramHtmlPost(data);
+    const whatsappText = body.whatsappTextOverride || await buildWhatsAppMarkdown(data);
 
     const chatId = process.env.TELEGRAM_REVIEW_CHAT_ID;
     if (!chatId) throw new Error('TELEGRAM_REVIEW_CHAT_ID not configured');

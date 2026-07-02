@@ -24,6 +24,8 @@ export default function ManualPostPage() {
   const [approving, setApproving] = useState(false);
   const [sentPost, setSentPost] = useState<{ messageIds: number[]; chatId: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [editableTgHtml, setEditableTgHtml] = useState('');
+  const [editableWaText, setEditableWaText] = useState('');
 
 
   // Fetch projects and floors from Google Sheets on page load
@@ -60,7 +62,8 @@ export default function ManualPostPage() {
           body: JSON.stringify({ data: payload })
         });
         const data = await res.json();
-        if (data.preview) setPostPreview(data.preview);
+        if (data.preview) { setPostPreview(data.preview); setEditableTgHtml(data.preview); }
+        if (data.whatsappText) setEditableWaText(data.whatsappText);
       } catch (e) {
         console.error("Preview error", e);
       }
@@ -96,7 +99,7 @@ export default function ManualPostPage() {
       const res = await fetch('/api/send-telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: payload })
+        body: JSON.stringify({ data: payload, telegramHtmlOverride: editableTgHtml || undefined, whatsappTextOverride: editableWaText || undefined })
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -364,16 +367,33 @@ export default function ManualPostPage() {
           </div>
 
           {postPreview && (
-            <div className="p-6 rounded-2xl bg-slate-900/40 border border-white/5 backdrop-blur-md">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <div className="p-6 rounded-2xl bg-slate-900/40 border border-white/5 backdrop-blur-md space-y-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Live Telegram Preview
+                Preview &amp; Edit
               </h3>
-              <div className="prose prose-invert max-w-none">
-                {/* Render the HTML directly so bold/italic tags display correctly */}
-                <div 
-                  className="whitespace-pre-wrap font-sans text-[15px] text-slate-200 bg-slate-950/50 p-6 rounded-xl border border-white/5 leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: postPreview.replace(/\n/g, '<br/>') }}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1.5">Telegram (HTML)</label>
+                <div
+                  className="whitespace-pre-wrap font-sans text-[14px] text-slate-200 bg-slate-950/50 p-4 rounded-xl border border-white/5 leading-relaxed mb-2"
+                  dangerouslySetInnerHTML={{ __html: editableTgHtml.replace(/\n/g, '<br/>') }}
+                />
+                <textarea
+                  rows={8}
+                  value={editableTgHtml}
+                  onChange={e => setEditableTgHtml(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-slate-300 font-mono outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y"
+                  spellCheck={false}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1.5">WhatsApp</label>
+                <textarea
+                  rows={8}
+                  value={editableWaText}
+                  onChange={e => setEditableWaText(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-slate-300 font-mono outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y"
+                  spellCheck={false}
                 />
               </div>
             </div>
@@ -548,7 +568,7 @@ export default function ManualPostPage() {
                   
                   {parsedData.slideDataUrl ? (
                     <div className="relative w-full rounded-xl overflow-hidden border border-white/10 mb-3 group">
-                      <img src={parsedData.slideDataUrl} alt="Slide preview" className="w-full h-auto block max-h-52 object-contain" />
+                      <img src={parsedData.slideDataUrl} alt="Slide preview" className="w-full h-auto block max-h-72 object-contain" />
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <button 
                           onClick={() => updateField('slideDataUrl', '')}
