@@ -229,9 +229,10 @@ async function lookup() {
         copyBtn.textContent = '✅ Скопировано!';
         copyBtn.className = 'ok';
         setTimeout(() => {
-          widget.classList.add('collapsed');
-          document.getElementById('ul-toggle').textContent = '+';
-          savePos();
+          result.style.display = 'none';
+          msg.textContent = '';
+          inp.value = '';
+          inp.focus();
         }, 800);
       });
     };
