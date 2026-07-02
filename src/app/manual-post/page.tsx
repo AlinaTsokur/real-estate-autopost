@@ -515,8 +515,8 @@ export default function ManualPostPage() {
                   <label className="block text-sm font-medium text-slate-300 mb-2">Slide Image</label>
                   
                   {parsedData.slideDataUrl ? (
-                    <div className="relative w-full h-48 rounded-xl overflow-hidden border border-white/10 mb-3 group">
-                      <img src={parsedData.slideDataUrl} alt="Slide preview" className="w-full h-full object-cover" />
+                    <div className="relative w-full rounded-xl overflow-hidden border border-white/10 mb-3 group">
+                      <img src={parsedData.slideDataUrl} alt="Slide preview" className="w-full h-auto block max-h-52 object-contain" />
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <button 
                           onClick={() => updateField('slideDataUrl', '')}
