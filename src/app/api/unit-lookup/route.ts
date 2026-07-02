@@ -4,6 +4,15 @@ import { normalizeText } from '@/lib/posts/formatters';
 
 export const dynamic = 'force-dynamic';
 
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+};
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS });
+}
+
 const LINK_COL_NAMES = ['Ссылка', 'Link', 'URL', 'Ссылка на объект', 'Listing URL', 'Listing Link', 'Property Link', 'Bayut Link', 'PF Link', 'Ссылка на листинг'];
 
 function isUnavailableColor(c: { red?: number | null; green?: number | null; blue?: number | null } | undefined | null): boolean {
@@ -20,10 +29,12 @@ function norm(v: unknown): string {
 export async function GET(req: NextRequest) {
   const code  = req.nextUrl.searchParams.get('code')?.trim() ?? '';
   const debug = req.nextUrl.searchParams.get('debug') === '1';
-  if (!code) return NextResponse.json({ found: false, error: 'code required' });
+  const json  = (data: object, status = 200) => NextResponse.json(data, { status, headers: CORS });
+
+  if (!code) return json({ found: false, error: 'code required' });
 
   const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
-  if (!spreadsheetId) return NextResponse.json({ found: false, error: 'GOOGLE_SHEETS_OBJECTS_ID not configured' });
+  if (!spreadsheetId) return json({ found: false, error: 'GOOGLE_SHEETS_OBJECTS_ID not configured' });
 
   try {
     const sheets = await getGoogleSheetsClient();
@@ -37,7 +48,7 @@ export async function GET(req: NextRequest) {
     const gridData = res.data.sheets?.[0]?.data?.[0];
     const rowData  = gridData?.rowData;
     if (!rowData || rowData.length < 2) {
-      return NextResponse.json({ found: false, error: 'sheet empty or not found' });
+      return json({ found: false, error: 'sheet empty or not found' });
     }
 
     const getCellText = (cell: any): string =>
@@ -53,11 +64,11 @@ export async function GET(req: NextRequest) {
     const linkCol    = headers.findIndex(h => LINK_COL_NAMES.some(n => normalizeText(h) === normalizeText(n)));
 
     if (debug) {
-      return NextResponse.json({ headers, codeCol, unitCol, commentCol, linkCol });
+      return json({ headers, codeCol, unitCol, commentCol, linkCol });
     }
 
     if (codeCol === -1) {
-      return NextResponse.json({ found: false, error: `Код column not found. Headers: ${headers.slice(0, 10).join(', ')}` });
+      return json({ found: false, error: `Код column not found. Headers: ${headers.slice(0, 10).join(', ')}` });
     }
 
     const target = norm(code);
@@ -70,7 +81,7 @@ export async function GET(req: NextRequest) {
       const checkCell = cells[unitCol !== -1 ? unitCol : codeCol];
       const bg        = checkCell?.effectiveFormat?.backgroundColor ?? checkCell?.userEnteredFormat?.backgroundColor;
 
-      return NextResponse.json({
+      return json({
         found:    true,
         code:     getCellText(cells[codeCol]),
         unit:     unitCol    !== -1 ? getCellText(cells[unitCol])    : '',
@@ -80,8 +91,8 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ found: false });
+    return json({ found: false });
   } catch (e: any) {
-    return NextResponse.json({ found: false, error: e.message }, { status: 500 });
+    return json({ found: false, error: e.message }, 500);
   }
 }
