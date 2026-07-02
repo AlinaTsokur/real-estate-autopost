@@ -1,35 +1,40 @@
 import { NextResponse } from 'next/server';
 import { addWaQueueItem } from '@/lib/google/sheets';
 
-const DELAY_SECONDS = 36;
+const INTERVAL_MINUTES = 2;
 
-function dubaiNow(): Date {
-  // Dubai is UTC+4, no DST
-  return new Date(Date.now() + 4 * 60 * 60 * 1000);
-}
-
-function toScheduledAt(d: Date): string {
-  // "YYYY-MM-DD HH:MM" in Dubai wall-clock time
-  return d.toISOString().slice(0, 16).replace('T', ' ');
+// "YYYY-MM-DDTHH:MM" (datetime-local, Dubai wall-clock) → "YYYY-MM-DD HH:MM"
+function toScheduledAt(base: string, offsetMinutes: number): string {
+  const [datePart, timePart] = base.split('T');
+  const [h, m] = timePart.split(':').map(Number);
+  const totalMinutes = h * 60 + m + offsetMinutes;
+  const hh = String(Math.floor(totalMinutes / 60) % 24).padStart(2, '0');
+  const mm = String(totalMinutes % 60).padStart(2, '0');
+  // If overflow past midnight, advance date by days
+  const extraDays = Math.floor((h * 60 + m + offsetMinutes) / (24 * 60));
+  if (extraDays > 0) {
+    const d = new Date(`${datePart}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + extraDays);
+    return `${d.toISOString().slice(0, 10)} ${hh}:${mm}`;
+  }
+  return `${datePart} ${hh}:${mm}`;
 }
 
 export async function POST(req: Request) {
   try {
-    const { text, label, groups } = await req.json() as {
+    const { text, label, groups, startAt } = await req.json() as {
       text: string;
       label: string;
       groups: { id: string; name: string }[];
+      startAt: string;
     };
 
-    if (!text || !groups?.length) {
-      return NextResponse.json({ error: 'text and groups required' }, { status: 400 });
+    if (!text || !groups?.length || !startAt) {
+      return NextResponse.json({ error: 'text, groups and startAt required' }, { status: 400 });
     }
 
-    const base = dubaiNow();
-
     for (let i = 0; i < groups.length; i++) {
-      const sendAt = new Date(base.getTime() + i * DELAY_SECONDS * 1000);
-      const scheduledAt = toScheduledAt(sendAt);
+      const scheduledAt = toScheduledAt(startAt, i * INTERVAL_MINUTES);
       await addWaQueueItem(
         `${label} → ${groups[i].name}`,
         text,

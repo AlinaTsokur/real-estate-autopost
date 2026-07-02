@@ -77,8 +77,9 @@ export default function BudgetPage() {
     () => Object.fromEntries(WA_GROUPS.map(g => [g.id, g.defaultOn]))
   );
   const [broadcasting, setBroadcasting] = useState(false);
-  const [broadcastResults, setBroadcastResults] = useState<{ id: string; ok?: boolean; error?: string }[] | null>(null);
+  const [broadcastQueued, setBroadcastQueued] = useState(false);
   const [broadcastError, setBroadcastError] = useState<string | null>(null);
+  const [broadcastTime, setBroadcastTime] = useState('');
 
   useEffect(() => {
     setChecked(loadLocal());
@@ -126,21 +127,21 @@ export default function BudgetPage() {
   };
 
   const sendBroadcast = async () => {
-    if (!parsedData?.text) return;
+    if (!parsedData?.text || !broadcastTime) return;
     const groups = WA_GROUPS.filter(g => enabledGroups[g.id]);
     if (!groups.length) return;
     setBroadcasting(true);
-    setBroadcastResults(null);
+    setBroadcastQueued(false);
     setBroadcastError(null);
     try {
       const res = await fetch('/api/wa-broadcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: parsedData.text, label: project, groups }),
+        body: JSON.stringify({ text: parsedData.text, label: project, groups, startAt: broadcastTime }),
       });
       const d = await res.json();
       if (d.error) throw new Error(d.error);
-      setBroadcastResults(groups.map(g => ({ id: g.id, ok: true })));
+      setBroadcastQueued(true);
     } catch (e: any) {
       setBroadcastError(e.message);
     } finally {
@@ -313,30 +314,37 @@ export default function BudgetPage() {
             {/* ── WA BROADCAST ── */}
             <div className="mt-5 pt-5 border-t border-white/5 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-white">📤 Отправить в группы</span>
+                <span className="text-sm font-semibold text-white">📤 Рассылка по группам</span>
                 <span className="text-xs text-slate-500">{WA_GROUPS.filter(g => enabledGroups[g.id]).length} из {WA_GROUPS.length}</span>
               </div>
 
               <div className="flex flex-wrap gap-2">
                 {WA_GROUPS.map(g => {
                   const on = !!enabledGroups[g.id];
-                  const result = broadcastResults?.find(r => r.id === g.id);
                   return (
                     <button
                       key={g.id}
                       onClick={() => toggleGroup(g.id)}
-                      disabled={broadcasting}
+                      disabled={broadcasting || broadcastQueued}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all select-none
-                        ${result?.ok ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400' :
-                          result?.error ? 'bg-rose-500/15 border-rose-500/40 text-rose-400' :
-                          on ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-300' :
-                          'bg-slate-950/50 border-white/8 text-slate-500 hover:text-slate-300'}`}
+                        ${on
+                          ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-300'
+                          : 'bg-slate-950/50 border-white/8 text-slate-500 hover:text-slate-300'}`}
                     >
-                      {result?.ok ? '✓' : result?.error ? '✗' : on ? '✓' : '○'}
-                      {g.name}
+                      {on ? '✓' : '○'} {g.name}
                     </button>
                   );
                 })}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 shrink-0">⏰ Время старта (Дубай):</span>
+                <input
+                  type="datetime-local"
+                  value={broadcastTime}
+                  onChange={e => { setBroadcastTime(e.target.value); setBroadcastQueued(false); }}
+                  className="px-2 py-1.5 bg-slate-950/50 border border-white/10 rounded-lg text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500/50 [color-scheme:dark]"
+                />
               </div>
 
               {broadcastError && (
@@ -345,15 +353,15 @@ export default function BudgetPage() {
                 </div>
               )}
 
-              {broadcastResults && !broadcastError && (
-                <div className="text-xs text-emerald-400">
-                  ✓ Добавлено в очередь: {broadcastResults.length} групп — крон разошлёт с интервалом 36 сек. Страницу можно закрыть.
+              {broadcastQueued && (
+                <div className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs">
+                  ✓ Добавлено в очередь. Группы получат сообщения начиная с {broadcastTime.replace('T', ' ')} с интервалом 2 мин. Смотри на странице <a href="/scheduled" className="underline">WA Schedule</a>.
                 </div>
               )}
 
               <button
                 onClick={sendBroadcast}
-                disabled={broadcasting || WA_GROUPS.filter(g => enabledGroups[g.id]).length === 0}
+                disabled={broadcasting || broadcastQueued || !broadcastTime || WA_GROUPS.filter(g => enabledGroups[g.id]).length === 0}
                 className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-xl transition-all flex items-center justify-center gap-2"
               >
                 {broadcasting ? (
@@ -361,7 +369,7 @@ export default function BudgetPage() {
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Добавляю в очередь...
                   </>
-                ) : '📲 Разослать по группам'}
+                ) : '📲 Добавить в очередь'}
               </button>
             </div>
           </div>
