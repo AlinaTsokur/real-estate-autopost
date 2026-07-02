@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Unit Lookup",
+  "version": "1.0",
+  "description": "Быстрый поиск юнитов из таблицы",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Unit Lookup"
+  },
+  "permissions": [],
+  "host_permissions": [
+    "https://real-estate-autopost.vercel.app/*"
+  ]
+}

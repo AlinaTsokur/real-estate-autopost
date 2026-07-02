@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Unit Lookup</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      width: 340px;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 16px;
+    }
+    h1 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .search-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    input {
+      flex: 1;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #f1f5f9;
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus { border-color: #6366f1; }
+    button {
+      background: #6366f1;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button:hover { background: #4f46e5; }
+    button:disabled { background: #334155; cursor: default; }
+    #result { display: none; }
+    .status-badge {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+    }
+    .available { background: #14532d; color: #4ade80; }
+    .unavailable { background: #4c1d1d; color: #f87171; }
+    .field { margin-bottom: 10px; }
+    .field label {
+      font-size: 10px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      display: block;
+      margin-bottom: 3px;
+    }
+    .field-value {
+      font-size: 13px;
+      color: #f1f5f9;
+      word-break: break-all;
+    }
+    .field-value a { color: #818cf8; text-decoration: none; }
+    .field-value a:hover { text-decoration: underline; }
+    .comment-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    .copy-btn {
+      width: 100%;
+      margin-top: 14px;
+      background: #1e293b;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      padding: 8px;
+      font-size: 13px;
+    }
+    .copy-btn:hover { background: #273548; color: #e2e8f0; }
+    .copy-btn.copied { color: #4ade80; border-color: #14532d; }
+    #error-msg {
+      color: #f87171;
+      font-size: 13px;
+      display: none;
+      margin-top: 6px;
+    }
+    #not-found {
+      color: #94a3b8;
+      font-size: 13px;
+      display: none;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Unit Lookup</h1>
+  <div class="search-row">
+    <input type="text" id="code-input" placeholder="Введите код юнита…" autocomplete="off" />
+    <button id="search-btn">Найти</button>
+  </div>
+  <div id="error-msg"></div>
+  <div id="not-found">Юнит не найден</div>
+
+  <div id="result">
+    <span id="status-badge" class="status-badge"></span>
+    <div class="field">
+      <label>Unit</label>
+      <div class="field-value" id="f-unit"></div>
+    </div>
+    <div class="field">
+      <label>Код</label>
+      <div class="field-value" id="f-code"></div>
+    </div>
+    <div class="field" id="link-row">
+      <label>Ссылка на объект</label>
+      <div class="field-value" id="f-link"></div>
+    </div>
+    <div class="field" id="comment-row">
+      <label>Комментарии</label>
+      <div class="comment-box" id="f-comment"></div>
+    </div>
+    <button class="copy-btn" id="copy-btn">📋 Копировать для WhatsApp</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
