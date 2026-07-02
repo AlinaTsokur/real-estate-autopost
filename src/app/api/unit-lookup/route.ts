@@ -6,70 +6,82 @@ export const dynamic = 'force-dynamic';
 
 const LINK_COL_NAMES = ['Ссылка', 'Link', 'URL', 'Ссылка на объект', 'Listing URL', 'Listing Link', 'Property Link', 'Bayut Link', 'PF Link', 'Ссылка на листинг'];
 
-// #f4cccc in 0–1 floats
 function isUnavailableColor(c: { red?: number; green?: number; blue?: number } | undefined | null): boolean {
   if (!c) return false;
-  const r = c.red ?? 0;
-  const g = c.green ?? 0;
-  const b = c.blue ?? 0;
-  // #f4cccc = 0.957, 0.800, 0.800 — allow ±0.06 tolerance
+  const r = c.red ?? 0; const g = c.green ?? 0; const b = c.blue ?? 0;
   return r > 0.9 && g > 0.74 && g < 0.86 && b > 0.74 && b < 0.86;
 }
 
+// Same normalization as approveUnitRow — strips NBSP, all whitespace, leading #
+function norm(v: unknown): string {
+  return String(v ?? '').replace(/ /g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase();
+}
+
 export async function GET(req: NextRequest) {
-  const code = req.nextUrl.searchParams.get('code')?.trim() ?? '';
+  const code  = req.nextUrl.searchParams.get('code')?.trim() ?? '';
+  const debug = req.nextUrl.searchParams.get('debug') === '1';
   if (!code) return NextResponse.json({ found: false, error: 'code required' });
 
   const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
-  if (!spreadsheetId) return NextResponse.json({ found: false, error: 'not configured' });
+  if (!spreadsheetId) return NextResponse.json({ found: false, error: 'GOOGLE_SHEETS_OBJECTS_ID not configured' });
 
-  const sheets = await getGoogleSheetsClient();
+  try {
+    const sheets = await getGoogleSheetsClient();
 
-  const res = await sheets.spreadsheets.get({
-    spreadsheetId,
-    ranges: ['Abu Dhabi!A:AZ'],
-    includeGridData: true,
-  });
-
-  const gridData = res.data.sheets?.[0]?.data?.[0];
-  const rowData = gridData?.rowData;
-  if (!rowData || rowData.length < 2) return NextResponse.json({ found: false, error: 'sheet empty' });
-
-  const getCellText = (cell: any): string =>
-    String(cell?.formattedValue ?? cell?.userEnteredValue?.stringValue ?? cell?.userEnteredValue?.numberValue ?? '').trim();
-
-  const headerCells = rowData[0].values ?? [];
-  const headers = headerCells.map(h => getCellText(h));
-  const headersNorm = headers.map(h => normalizeText(h));
-
-  const codeCol = headersNorm.findIndex(h => h === normalizeText('Код') || h === normalizeText('Code'));
-  const unitCol = headersNorm.findIndex(h => h === normalizeText('Unit'));
-  const commentCol = headersNorm.findIndex(h => h === normalizeText('Комментарии') || h === normalizeText('Comments'));
-  const linkCol = headers.findIndex(h => LINK_COL_NAMES.some(n => normalizeText(h) === normalizeText(n)));
-
-  if (codeCol === -1) return NextResponse.json({ found: false, error: 'Код column not found' });
-
-  const target = code.replace(/\s/g, '').toLowerCase().replace(/^#/, '');
-
-  for (let i = 1; i < rowData.length; i++) {
-    const cells = rowData[i].values ?? [];
-    const rowCode = getCellText(cells[codeCol]).replace(/\s/g, '').toLowerCase().replace(/^#/, '');
-    if (!rowCode || rowCode !== target) continue;
-
-    // Check background color on the first cell of the row (or unit cell)
-    const checkCell = cells[unitCol !== -1 ? unitCol : codeCol];
-    const bg = checkCell?.effectiveFormat?.backgroundColor ?? checkCell?.userEnteredFormat?.backgroundColor;
-    const available = !isUnavailableColor(bg);
-
-    return NextResponse.json({
-      found: true,
-      code: getCellText(cells[codeCol]),
-      unit: unitCol !== -1 ? getCellText(cells[unitCol]) : '',
-      link: linkCol !== -1 ? getCellText(cells[linkCol]) : '',
-      comments: commentCol !== -1 ? getCellText(cells[commentCol]) : '',
-      available,
+    const res = await sheets.spreadsheets.get({
+      spreadsheetId,
+      ranges: ['Abu Dhabi!A:Z'],
+      includeGridData: true,
     });
-  }
 
-  return NextResponse.json({ found: false });
+    const gridData = res.data.sheets?.[0]?.data?.[0];
+    const rowData  = gridData?.rowData;
+    if (!rowData || rowData.length < 2) {
+      return NextResponse.json({ found: false, error: 'sheet empty or not found' });
+    }
+
+    const getCellText = (cell: any): string =>
+      String(cell?.formattedValue ?? cell?.userEnteredValue?.stringValue ?? cell?.userEnteredValue?.numberValue ?? '').trim();
+
+    const headerCells = rowData[0].values ?? [];
+    const headers     = headerCells.map(h => getCellText(h));
+    const headersNorm = headers.map(h => normalizeText(h));
+
+    const codeCol    = headersNorm.findIndex(h => h === normalizeText('Код') || h === normalizeText('Code'));
+    const unitCol    = headersNorm.findIndex(h => h === normalizeText('Unit'));
+    const commentCol = headersNorm.findIndex(h => h === normalizeText('Комментарии') || h === normalizeText('Comments'));
+    const linkCol    = headers.findIndex(h => LINK_COL_NAMES.some(n => normalizeText(h) === normalizeText(n)));
+
+    if (debug) {
+      return NextResponse.json({ headers, codeCol, unitCol, commentCol, linkCol });
+    }
+
+    if (codeCol === -1) {
+      return NextResponse.json({ found: false, error: `Код column not found. Headers: ${headers.slice(0, 10).join(', ')}` });
+    }
+
+    const target = norm(code);
+
+    for (let i = 1; i < rowData.length; i++) {
+      const cells   = rowData[i].values ?? [];
+      const rowCode = norm(getCellText(cells[codeCol]));
+      if (!rowCode || rowCode !== target) continue;
+
+      const checkCell = cells[unitCol !== -1 ? unitCol : codeCol];
+      const bg        = checkCell?.effectiveFormat?.backgroundColor ?? checkCell?.userEnteredFormat?.backgroundColor;
+
+      return NextResponse.json({
+        found:    true,
+        code:     getCellText(cells[codeCol]),
+        unit:     unitCol    !== -1 ? getCellText(cells[unitCol])    : '',
+        link:     linkCol    !== -1 ? getCellText(cells[linkCol])    : '',
+        comments: commentCol !== -1 ? getCellText(cells[commentCol]) : '',
+        available: !isUnavailableColor(bg),
+      });
+    }
+
+    return NextResponse.json({ found: false });
+  } catch (e: any) {
+    return NextResponse.json({ found: false, error: e.message }, { status: 500 });
+  }
 }
