@@ -29,6 +29,7 @@ export async function POST(request: Request) {
           const originalMsgId = cb.message.reply_to_message?.message_id;
           if (originalMsgId) {
             await (bot.telegram as any).callApi('setMessageReaction', { chat_id: chatId, message_id: originalMsgId, reaction: heart });
+            await bot.telegram.deleteMessage(chatId, originalMsgId);
           }
         } catch (e: any) {
           console.error(e);
