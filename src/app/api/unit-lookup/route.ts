@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 const LINK_COL_NAMES = ['Ссылка', 'Link', 'URL', 'Ссылка на объект', 'Listing URL', 'Listing Link', 'Property Link', 'Bayut Link', 'PF Link', 'Ссылка на листинг'];
 
-function isUnavailableColor(c: { red?: number; green?: number; blue?: number } | undefined | null): boolean {
+function isUnavailableColor(c: { red?: number | null; green?: number | null; blue?: number | null } | undefined | null): boolean {
   if (!c) return false;
   const r = c.red ?? 0; const g = c.green ?? 0; const b = c.blue ?? 0;
   return r > 0.9 && g > 0.74 && g < 0.86 && b > 0.74 && b < 0.86;
