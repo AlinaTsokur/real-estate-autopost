@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getBot, sendMediaGroupWithCaption, sendTextMessage, sendPlainTextMessage, sendPhoto } from '@/lib/telegram/bot';
+import { getBot, sendMediaGroupWithCaption, sendTextMessage, sendPlainTextMessage, sendPhoto, updateReviewMessage } from '@/lib/telegram/bot';
 import { getDriveImages, getProjectPhotoFolderId, uploadToWaQueue } from '@/lib/google/drive';
 import { getConfig2, addWaQueueItem } from '@/lib/google/sheets';
 import { buildTelegramHtmlPost, buildWhatsAppMarkdown, PostData } from '@/lib/posts/templates';
@@ -29,6 +29,9 @@ export async function POST(request: Request) {
       allIds.push(...r1.ids);
       const r2 = await sendPlainTextMessage(chatId, whatsappText);
       allIds.push(...r2.ids);
+      if (r1.reviewMsgId) {
+        await updateReviewMessage(chatId, r1.reviewMsgId, data.code || '', allIds).catch(() => {});
+      }
 
       try {
         const label = `PRICE_CHANGE – ${data.code || data.unit || '?'} in ${data.project}`;
@@ -73,6 +76,8 @@ export async function POST(request: Request) {
 
     const r2 = await sendPhoto(chatId, slideBuffer, whatsappText);
     allIds.push(...r2.ids);
+
+    await updateReviewMessage(chatId, r1.reviewMsgId, data.code || data.unit || 'Unknown', allIds).catch(() => {});
 
     try {
       const label = `${data.postType} – ${data.code || data.unit || '?'} in ${data.project}`;

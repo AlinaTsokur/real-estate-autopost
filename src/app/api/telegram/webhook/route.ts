@@ -36,10 +36,19 @@ export async function POST(request: Request) {
           await bot.telegram.answerCbQuery(cb.id, `Error: ${e.message}`);
         }
 
-      } else if (data.startsWith('skip_')) {
-        const code = data.replace('skip_', '');
-        await bot.telegram.editMessageText(chatId, messageId, undefined, `⏭️ Skipped unit: ${code}`);
-        await bot.telegram.answerCbQuery(cb.id, `Skipped ${code}`);
+      } else if (data.startsWith('delete_')) {
+        try {
+          const reviewText = cb.message.text || '';
+          const idsMatch = reviewText.match(/ids:([\d,]+)/);
+          const allIds: number[] = idsMatch
+            ? idsMatch[1].split(',').map(Number)
+            : [];
+          allIds.push(messageId);
+          await Promise.allSettled(allIds.map((id: number) => bot.telegram.deleteMessage(chatId, id)));
+          await bot.telegram.answerCbQuery(cb.id, '🗑 Пост удалён');
+        } catch (e: any) {
+          await bot.telegram.answerCbQuery(cb.id, `Ошибка: ${e.message}`);
+        }
       }
     }
 

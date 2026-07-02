@@ -19,7 +19,7 @@ export async function sendMediaGroupWithCaption(
 
   const formData = new FormData();
   formData.append('chat_id', chatId);
-  
+
   const mediaArray: any[] = [];
   mediaUrlsOrIds.forEach((m, index) => {
     let mediaStr = '';
@@ -27,13 +27,13 @@ export async function sendMediaGroupWithCaption(
       mediaStr = m.media;
     } else {
       const attachName = `photo${index}`;
-      formData.append(attachName, m.media.source, { 
+      formData.append(attachName, m.media.source, {
         filename: m.media.filename || `image${index}.jpg`,
         contentType: 'image/jpeg'
       });
       mediaStr = `attach://${attachName}`;
     }
-    
+
     const mediaItem: any = { type: 'photo', media: mediaStr };
     if (index === 0) {
       mediaItem.caption = captionHtml;
@@ -41,9 +41,9 @@ export async function sendMediaGroupWithCaption(
     }
     mediaArray.push(mediaItem);
   });
-  
+
   formData.append('media', JSON.stringify(mediaArray));
-  
+
   const res = await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMediaGroup`, formData, {
     headers: formData.getHeaders()
   });
@@ -58,14 +58,34 @@ export async function sendMediaGroupWithCaption(
       inline_keyboard: [
         [
           { text: '✅ Approved', callback_data: `approve_${unitCode}` },
-          { text: '⏭️ Skip', callback_data: `skip_${unitCode}` },
+          { text: '🗑 Удалить', callback_data: `delete_${unitCode}` },
         ]
       ]
     }
   });
   ids.push(reviewMsg.message_id);
 
-  return { message, ids };
+  return { message, ids, reviewMsgId: reviewMsg.message_id };
+}
+
+export async function updateReviewMessage(chatId: string, reviewMsgId: number, unitCode: string, allIds: number[]) {
+  const bot = getBot();
+  await bot.telegram.editMessageText(
+    chatId,
+    reviewMsgId,
+    undefined,
+    `Review post for ${unitCode}:\nids:${allIds.join(',')}`,
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '✅ Approved', callback_data: `approve_${unitCode}` },
+            { text: '🗑 Удалить', callback_data: `delete_${unitCode}` },
+          ]
+        ]
+      }
+    }
+  );
 }
 
 export async function sendTextMessage(chatId: string, textHtml: string, unitCode?: string) {
@@ -73,6 +93,7 @@ export async function sendTextMessage(chatId: string, textHtml: string, unitCode
   const msg = await bot.telegram.sendMessage(chatId, textHtml, { parse_mode: 'HTML' });
   const ids: number[] = [msg.message_id];
 
+  let reviewMsgId: number | undefined;
   if (unitCode) {
     const reviewMsg = await bot.telegram.sendMessage(chatId, `Review post for ${unitCode}:`, {
       reply_parameters: { message_id: msg.message_id },
@@ -80,14 +101,15 @@ export async function sendTextMessage(chatId: string, textHtml: string, unitCode
         inline_keyboard: [
           [
             { text: '✅ Approved', callback_data: `approve_${unitCode}` },
-            { text: '⏭️ Skip', callback_data: `skip_${unitCode}` },
+            { text: '🗑 Удалить', callback_data: `delete_${unitCode}` },
           ]
         ]
       }
     });
     ids.push(reviewMsg.message_id);
+    reviewMsgId = reviewMsg.message_id;
   }
-  return { msg, ids };
+  return { msg, ids, reviewMsgId };
 }
 
 export async function sendPlainTextMessage(chatId: string, text: string) {
