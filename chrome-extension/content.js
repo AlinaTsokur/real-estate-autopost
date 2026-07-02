@@ -32,12 +32,12 @@ style.textContent = `
   border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 #ul-header:active { cursor: grabbing; }
-#ul-title { font-size: 10px; font-weight: 600; color: #64748b; letter-spacing: 0.06em; text-transform: uppercase; }
+#ul-title { font-size: 10px; font-weight: 600; color: rgba(255,255,255,.5); letter-spacing: 0.06em; text-transform: uppercase; }
 #ul-toggle {
-  background: none; border: none; color: #64748b; cursor: pointer;
+  background: none; border: none; color: rgba(255,255,255,.5); cursor: pointer;
   font-size: 15px; line-height: 1; padding: 0 2px;
 }
-#ul-toggle:hover { color: #94a3b8; }
+#ul-toggle:hover { color: #fff; }
 #ul-body { padding: 10px 12px 12px; }
 #ul-widget.collapsed #ul-body { display: none; }
 #ul-search-row { display: flex; gap: 7px; margin-bottom: 10px; }
@@ -68,9 +68,9 @@ style.textContent = `
 .ul-ok  { background: rgba(20, 83, 45, 0.8); color: #4ade80; }
 .ul-no  { background: rgba(76, 29, 29, 0.8); color: #f87171; }
 .ul-field { margin-bottom: 7px; }
-.ul-label { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.07em; }
+.ul-label { font-size: 10px; color: rgba(255,255,255,.45); text-transform: uppercase; letter-spacing: 0.07em; }
 .ul-val {
-  color: #f1f5f9; word-break: break-word;
+  color: #fff; word-break: break-word;
   overflow-wrap: break-word; line-height: 1.45; font-size: 13px;
 }
 .ul-val a {
@@ -79,7 +79,7 @@ style.textContent = `
 }
 .ul-val a:hover { text-decoration: underline; }
 .ul-comment-text {
-  color: #94a3b8; font-size: 12px; line-height: 1.5;
+  color: rgba(255,255,255,.65); font-size: 12px; line-height: 1.5;
   white-space: pre-wrap; word-break: break-word;
   font-style: italic;
 }
@@ -91,7 +91,7 @@ style.textContent = `
 }
 #ul-copy:hover { background: rgba(99, 102, 241, 0.25); color: #a5b4fc; }
 #ul-copy.ok { color: #4ade80; border-color: rgba(74, 222, 128, 0.3); background: rgba(20,83,45,0.2); }
-#ul-msg { font-size: 12px; color: #94a3b8; margin-top: 5px; }
+#ul-msg { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 5px; }
 `;
 document.head.appendChild(style);
 
