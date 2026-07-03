@@ -23,13 +23,15 @@ export async function POST(request: Request) {
           await bot.telegram.answerCbQuery(cb.id, `✅ Готово — строка ${result.row}`);
 
           const heart = [{ type: 'emoji', emoji: '❤' }];
-          // React on the review message itself
           await (bot.telegram as any).callApi('setMessageReaction', { chat_id: chatId, message_id: messageId, reaction: heart });
-          // React on the original post (the message the review replied to)
-          const originalMsgId = cb.message.reply_to_message?.message_id;
-          if (originalMsgId) {
-            await (bot.telegram as any).callApi('setMessageReaction', { chat_id: chatId, message_id: originalMsgId, reaction: heart });
-            await bot.telegram.deleteMessage(chatId, originalMsgId);
+
+          // WA photo is the last ID in the stored ids list
+          const reviewText = cb.message.text || '';
+          const idsMatch = reviewText.match(/ids:([\d,]+)/);
+          if (idsMatch) {
+            const allIds = idsMatch[1].split(',').map(Number);
+            const waPhotoId = allIds[allIds.length - 1];
+            await bot.telegram.deleteMessage(chatId, waPhotoId).catch(() => {});
           }
         } catch (e: any) {
           console.error(e);
