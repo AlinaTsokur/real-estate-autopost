@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       const r2 = await sendPlainTextMessage(chatId, whatsappText);
       allIds.push(...r2.ids);
       if (r1.reviewMsgId) {
-        await updateReviewMessage(chatId, r1.reviewMsgId, data.code || '', allIds).catch(() => {});
+        await updateReviewMessage(chatId, r1.reviewMsgId, data.code || '', allIds, r1.mainIds).catch(() => {});
       }
 
       try {
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     const r2 = await sendPhoto(chatId, slideBuffer, whatsappText);
     allIds.push(...r2.ids);
 
-    await updateReviewMessage(chatId, r1.reviewMsgId, data.code || data.unit || 'Unknown', allIds).catch(() => {});
+    await updateReviewMessage(chatId, r1.reviewMsgId, data.code || data.unit || 'Unknown', allIds, r1.mainIds).catch(() => {});
 
     try {
       const label = `${data.postType} – ${data.code || data.unit || '?'} in ${data.project}`;

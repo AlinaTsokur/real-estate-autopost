@@ -9,6 +9,21 @@ export function getBot() {
   return new Telegraf(token);
 }
 
+function reviewKeyboard(unitCode: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: '✅ Approved', callback_data: `approve_${unitCode}` },
+        { text: '🗑 Удалить', callback_data: `delete_${unitCode}` },
+      ],
+      [
+        { text: '📲 WA', callback_data: `wa_${unitCode}` },
+        { text: '✈️ TG канал', callback_data: `tg_${unitCode}` },
+      ],
+    ],
+  };
+}
+
 export async function sendMediaGroupWithCaption(
   chatId: string,
   mediaUrlsOrIds: { type: 'photo'; media: string | { source: Buffer, filename?: string } }[],
@@ -50,41 +65,27 @@ export async function sendMediaGroupWithCaption(
   const message = res.data.result;
 
   const firstMsgId = message[0].message_id;
-  const ids: number[] = message.map((m: any) => m.message_id);
+  const mainIds: number[] = message.map((m: any) => m.message_id);
+  const ids: number[] = [...mainIds];
 
   const reviewMsg = await bot.telegram.sendMessage(chatId, `Review post for ${unitCode}:`, {
     reply_parameters: { message_id: firstMsgId },
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: '✅ Approved', callback_data: `approve_${unitCode}` },
-          { text: '🗑 Удалить', callback_data: `delete_${unitCode}` },
-        ]
-      ]
-    }
+    reply_markup: reviewKeyboard(unitCode),
   });
   ids.push(reviewMsg.message_id);
 
-  return { message, ids, reviewMsgId: reviewMsg.message_id };
+  return { message, ids, mainIds, reviewMsgId: reviewMsg.message_id };
 }
 
-export async function updateReviewMessage(chatId: string, reviewMsgId: number, unitCode: string, allIds: number[]) {
+export async function updateReviewMessage(chatId: string, reviewMsgId: number, unitCode: string, allIds: number[], mainIds?: number[]) {
   const bot = getBot();
+  const mainPart = mainIds ? `\nmain_ids:${mainIds.join(',')}` : '';
   await bot.telegram.editMessageText(
     chatId,
     reviewMsgId,
     undefined,
-    `Review post for ${unitCode}:\nids:${allIds.join(',')}`,
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: '✅ Approved', callback_data: `approve_${unitCode}` },
-            { text: '🗑 Удалить', callback_data: `delete_${unitCode}` },
-          ]
-        ]
-      }
-    }
+    `Review post for ${unitCode}:${mainPart}\nids:${allIds.join(',')}`,
+    { reply_markup: reviewKeyboard(unitCode) }
   );
 }
 
@@ -92,24 +93,18 @@ export async function sendTextMessage(chatId: string, textHtml: string, unitCode
   const bot = getBot();
   const msg = await bot.telegram.sendMessage(chatId, textHtml, { parse_mode: 'HTML' });
   const ids: number[] = [msg.message_id];
+  const mainIds: number[] = [msg.message_id];
 
   let reviewMsgId: number | undefined;
   if (unitCode) {
     const reviewMsg = await bot.telegram.sendMessage(chatId, `Review post for ${unitCode}:`, {
       reply_parameters: { message_id: msg.message_id },
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: '✅ Approved', callback_data: `approve_${unitCode}` },
-            { text: '🗑 Удалить', callback_data: `delete_${unitCode}` },
-          ]
-        ]
-      }
+      reply_markup: reviewKeyboard(unitCode),
     });
     ids.push(reviewMsg.message_id);
     reviewMsgId = reviewMsg.message_id;
   }
-  return { msg, ids, reviewMsgId };
+  return { msg, ids, mainIds, reviewMsgId };
 }
 
 export async function sendPlainTextMessage(chatId: string, text: string) {

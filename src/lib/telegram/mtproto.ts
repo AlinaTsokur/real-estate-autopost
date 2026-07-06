@@ -1,5 +1,8 @@
 import { TelegramClient, Api } from "telegram";
 import { StringSession } from "telegram/sessions";
+import { writeFile, unlink } from "fs/promises";
+import { join } from "path";
+import { tmpdir } from "os";
 
 let clientInstance: TelegramClient | null = null;
 
@@ -96,4 +99,70 @@ export async function searchOldPosts(priceStr: string): Promise<SearchedPost[]> 
   }
 
   return posts;
+}
+
+export async function sendMessage(chatId: string, text: string) {
+  const client = await getMTProtoClient();
+  let peer: any;
+  try {
+    peer = await client.getInputEntity(chatId);
+  } catch {
+    const numId = Math.abs(Number(chatId));
+    try { peer = await client.getInputEntity(`-100${numId}`); }
+    catch { peer = chatId; }
+  }
+  await client.sendMessage(peer, { message: text });
+}
+
+export async function sendDocument(chatId: string, fileBuffer: Buffer, filename: string, thumb?: Buffer | null) {
+  const client = await getMTProtoClient();
+
+  // Ensure dialogs are loaded so entity cache is populated
+  await client.getDialogs({ limit: 100 });
+
+  let peer: any;
+  try {
+    peer = await client.getInputEntity(chatId);
+  } catch {
+    // Try supergroup format: -100XXXXXXXXX
+    const numId = Math.abs(Number(chatId));
+    try {
+      peer = await client.getInputEntity(`-100${numId}`);
+    } catch {
+      peer = chatId;
+    }
+  }
+
+  const ts = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const pdfPath = join(tmpdir(), `tg-doc-${ts}.pdf`);
+  const thumbPath = thumb ? join(tmpdir(), `tg-thumb-${ts}.jpg`) : undefined;
+
+  await writeFile(pdfPath, fileBuffer);
+  if (thumb && thumbPath) await writeFile(thumbPath, thumb);
+
+  try {
+    try {
+      await client.sendFile(peer, {
+        file: pdfPath,
+        forceDocument: true,
+        ...(thumbPath ? { thumb: thumbPath } : {}),
+        attributes: [new Api.DocumentAttributeFilename({ fileName: filename })],
+        caption: '',
+        workers: 1,
+      });
+    } catch (e: any) {
+      if (!thumbPath) throw e;
+      // Retry without thumb
+      await client.sendFile(peer, {
+        file: pdfPath,
+        forceDocument: true,
+        attributes: [new Api.DocumentAttributeFilename({ fileName: filename })],
+        caption: '',
+        workers: 1,
+      });
+    }
+  } finally {
+    await unlink(pdfPath).catch(() => {});
+    if (thumbPath) await unlink(thumbPath).catch(() => {});
+  }
 }
