@@ -87,7 +87,7 @@ export async function searchOldPosts(priceStr: string): Promise<SearchedPost[]> 
     }
 
     return posts;
-  }, "TELEGRAM_BOT_SESSION");
+  }, "TELEGRAM_SESSION");
 }
 
 async function resolvePeer(client: TelegramClient, chatId: string) {
