@@ -19,13 +19,23 @@ function createClient() {
 }
 
 async function withClient<T>(fn: (client: TelegramClient) => Promise<T>): Promise<T> {
-  const client = createClient();
-  await client.connect();
-  try {
-    return await fn(client);
-  } finally {
-    await client.disconnect().catch(() => {});
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const client = createClient();
+    try {
+      await client.connect();
+      return await fn(client);
+    } catch (e: any) {
+      await client.disconnect().catch(() => {});
+      if (e?.errorMessage === 'AUTH_KEY_DUPLICATED' && attempt < 3) {
+        await new Promise(r => setTimeout(r, attempt * 2000));
+        continue;
+      }
+      throw e;
+    } finally {
+      await client.disconnect().catch(() => {});
+    }
   }
+  throw new Error('withClient: exhausted retries');
 }
 
 export interface SearchedPost {
