@@ -4,13 +4,13 @@ import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 
-function createClient() {
+function createClient(sessionEnvVar: string) {
   const apiId = parseInt(process.env.TELEGRAM_API_ID || "0");
   const apiHash = process.env.TELEGRAM_API_HASH || "";
-  const sessionStr = process.env.TELEGRAM_SESSION || "";
+  const sessionStr = process.env[sessionEnvVar] || "";
 
   if (!apiId || !apiHash || !sessionStr) {
-    throw new Error("Missing MTProto credentials (TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_SESSION)");
+    throw new Error(`Missing MTProto credentials: ${sessionEnvVar}`);
   }
 
   return new TelegramClient(new StringSession(sessionStr), apiId, apiHash, {
@@ -18,24 +18,14 @@ function createClient() {
   });
 }
 
-async function withClient<T>(fn: (client: TelegramClient) => Promise<T>): Promise<T> {
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const client = createClient();
-    try {
-      await client.connect();
-      return await fn(client);
-    } catch (e: any) {
-      await client.disconnect().catch(() => {});
-      if (e?.errorMessage === 'AUTH_KEY_DUPLICATED' && attempt < 3) {
-        await new Promise(r => setTimeout(r, attempt * 2000));
-        continue;
-      }
-      throw e;
-    } finally {
-      await client.disconnect().catch(() => {});
-    }
+async function withClient<T>(fn: (client: TelegramClient) => Promise<T>, sessionEnvVar = "TELEGRAM_SESSION"): Promise<T> {
+  const client = createClient(sessionEnvVar);
+  await client.connect();
+  try {
+    return await fn(client);
+  } finally {
+    await client.disconnect().catch(() => {});
   }
-  throw new Error('withClient: exhausted retries');
 }
 
 export interface SearchedPost {
@@ -49,6 +39,7 @@ export async function searchOldPosts(priceStr: string): Promise<SearchedPost[]> 
   const chatId = process.env.TELEGRAM_SEARCH_CHAT_ID;
   if (!chatId) throw new Error("TELEGRAM_SEARCH_CHAT_ID not configured");
 
+  // Use bot session — avoids AUTH_KEY_DUPLICATED on Vercel (dynamic IPs conflict with personal session)
   return withClient(async (client) => {
     const peer = isNaN(Number(chatId)) ? chatId : parseInt(chatId);
 
@@ -96,7 +87,7 @@ export async function searchOldPosts(priceStr: string): Promise<SearchedPost[]> 
     }
 
     return posts;
-  });
+  }, "TELEGRAM_BOT_SESSION");
 }
 
 async function resolvePeer(client: TelegramClient, chatId: string) {
