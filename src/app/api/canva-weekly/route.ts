@@ -1,4 +1,5 @@
-import { PRESENTATIONS, getTomorrowDateTag, getCanvaAccessToken, exportDesignAsPdf, downloadFile } from '@/lib/canva/api';
+import { PRESENTATIONS, getTomorrowDateTag, getCanvaAccessToken, exportDesignAsPdf, exportDesignAsPptx, downloadFile } from '@/lib/canva/api';
+import { getVisiblePageNumbers } from '@/lib/canva/pptx-hidden';
 import { compressPdf } from '@/lib/ilovepdf/compress';
 import { sendDocument, sendMessage } from '@/lib/telegram/mtproto';
 import { pdfToThumb } from '@/lib/pdf-thumb';
@@ -35,7 +36,14 @@ export async function POST() {
 
           try {
             send({ type: 'progress', index: i, name: p.name, step: 'export' });
-            const downloadUrl = await exportDesignAsPdf(p.id, accessToken);
+
+            // Export PPTX first to detect hidden slides
+            const pptxUrl = await exportDesignAsPptx(p.id, accessToken);
+            const pptxBuffer = await downloadFile(pptxUrl);
+            const visiblePages = getVisiblePageNumbers(pptxBuffer);
+            send({ type: 'log', message: `${p.name}: видимых страниц ${visiblePages.length}` });
+
+            const downloadUrl = await exportDesignAsPdf(p.id, accessToken, visiblePages);
 
             send({ type: 'progress', index: i, name: p.name, step: 'download' });
             const pdfBuffer = await downloadFile(downloadUrl);

@@ -72,7 +72,7 @@ export async function getCanvaAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-export async function exportDesignAsPdf(designId: string, accessToken: string): Promise<string> {
+export async function exportDesignAsPptx(designId: string, accessToken: string): Promise<string> {
   const res = await fetch(`${CANVA_API}/exports`, {
     method: 'POST',
     headers: {
@@ -81,7 +81,44 @@ export async function exportDesignAsPdf(designId: string, accessToken: string): 
     },
     body: JSON.stringify({
       design_id: designId,
-      format: { type: 'pdf', export_quality: 'regular' },
+      format: { type: 'pptx' },
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(`PPTX export start failed for ${designId}: ${JSON.stringify(data)}`);
+
+  const exportId: string = data.job?.id;
+  if (!exportId) throw new Error(`No export job id for ${designId}`);
+
+  for (let i = 0; i < 60; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    const pollRes = await fetch(`${CANVA_API}/exports/${exportId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const pollData = await pollRes.json();
+    const status = pollData.job?.status;
+    if (status === 'success') {
+      const url = pollData.job?.urls?.[0];
+      if (!url) throw new Error(`No download URL for PPTX ${designId}`);
+      return url;
+    }
+    if (status === 'failed') throw new Error(`PPTX export failed for ${designId}: ${JSON.stringify(pollData)}`);
+  }
+
+  throw new Error(`PPTX export timeout for ${designId}`);
+}
+
+export async function exportDesignAsPdf(designId: string, accessToken: string, pages?: number[]): Promise<string> {
+  const res = await fetch(`${CANVA_API}/exports`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      design_id: designId,
+      format: { type: 'pdf', export_quality: 'regular', ...(pages ? { pages } : {}) },
     }),
   });
 
