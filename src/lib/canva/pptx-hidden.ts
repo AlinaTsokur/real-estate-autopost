@@ -34,8 +34,8 @@ export function getVisiblePageNumbers(pptxBuffer: Buffer): number[] {
       return;
     }
     const slideXml = entry.getData().toString('utf-8');
-    // Hidden slides have show="0" on the root <p:sld> element
-    if (!/<p:sld[^>]*show="0"/.test(slideXml)) {
+    // Canva exports hidden slides with show="false" on the root <p:sld> element
+    if (!/<p:sld[^>]*show="false"/.test(slideXml)) {
       visible.push(idx + 1);
     }
   });
