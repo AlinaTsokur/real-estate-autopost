@@ -28,9 +28,9 @@ export async function POST(request: Request) {
           const heart = [{ type: 'emoji', emoji: '❤' }];
           await (bot.telegram as any).callApi('setMessageReaction', { chat_id: chatId, message_id: messageId, reaction: heart });
 
-          // WA photo is the last ID in the stored ids list
+          // WA photo/text is the last ID in the ids: line (not main_ids:)
           const reviewText = cb.message.text || '';
-          const idsMatch = reviewText.match(/ids:([\d,]+)/);
+          const idsMatch = reviewText.match(/\nids:([\d,]+)/);
           if (idsMatch) {
             const allIds = idsMatch[1].split(',').map(Number);
             const waPhotoId = allIds[allIds.length - 1];
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       } else if (data.startsWith('delete_')) {
         try {
           const reviewText = cb.message.text || '';
-          const idsMatch = reviewText.match(/ids:([\d,]+)/);
+          const idsMatch = reviewText.match(/\nids:([\d,]+)/);
           const allIds: number[] = idsMatch
             ? idsMatch[1].split(',').map(Number)
             : [];
