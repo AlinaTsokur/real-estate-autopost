@@ -107,6 +107,18 @@ export async function sendMessage(chatId: string, text: string) {
   });
 }
 
+export async function forwardToChannel(fromChatId: string, messageIds: number[], toChatId: string): Promise<void> {
+  return withClient(async (client) => {
+    const from = await resolvePeer(client, fromChatId);
+    const to = await resolvePeer(client, toChatId);
+    await client.forwardMessages(to as any, {
+      messages: messageIds,
+      fromPeer: from as any,
+      dropAuthor: true,
+    });
+  });
+}
+
 export async function sendDocument(chatId: string, fileBuffer: Buffer, filename: string, thumb?: Buffer | null) {
   const ts = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const pdfPath = join(tmpdir(), `tg-doc-${ts}.pdf`);

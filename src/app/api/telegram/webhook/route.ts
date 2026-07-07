@@ -3,7 +3,7 @@ import { approveUnitRow, getWaQueue, deleteWaQueueRow } from '@/lib/google/sheet
 import { getBot } from '@/lib/telegram/bot';
 import { dispatchWaItem } from '@/lib/whatsapp/dispatch';
 import { getInstanceState } from '@/lib/whatsapp/green-api';
-import axios from 'axios';
+import { forwardToChannel } from '@/lib/telegram/mtproto';
 
 export async function POST(request: Request) {
   try {
@@ -99,11 +99,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ ok: true });
           }
 
-          await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/copyMessages`, {
-            chat_id: channelId,
-            from_chat_id: chatId,
-            message_ids: sourceIds,
-          });
+          await forwardToChannel(String(chatId), sourceIds, channelId);
 
           await bot.telegram.answerCbQuery(cb.id, '✅ Отправлено в TG канал');
         } catch (e: any) {
