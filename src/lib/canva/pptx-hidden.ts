@@ -9,7 +9,7 @@ export function getVisiblePageNumbers(pptxBuffer: Buffer): number[] {
   for (const m of relsXml.matchAll(/Id="([^"]+)"[^>]*Target="([^"]+)"/g)) {
     const target = m[2];
     if (target.includes('/slide') && !target.includes('Layout') && !target.includes('Master')) {
-      const filePath = target.startsWith('../') ? target.slice(3) : `ppt/${target}`;
+      const filePath = target.startsWith('../') ? 'ppt/' + target.slice(3) : `ppt/${target}`;
       idToFile[m[1]] = filePath;
     }
   }
