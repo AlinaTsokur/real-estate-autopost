@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID ?? '';
-    const data = await getSheetData(spreadsheetId, 'OBJECTS');
+    const data = await getSheetData(spreadsheetId, 'CONFIG2');
     if (!data || data.length < 2) return NextResponse.json({ found: false });
 
     const headers = (data[0] as string[]).map(h => String(h).trim());
