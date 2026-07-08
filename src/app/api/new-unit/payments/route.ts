@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSheetData } from '@/lib/google/sheets';
 import { normalizeText } from '@/lib/posts/formatters';
 
-function col(headers: string[], ...names: string[]): number {
+function findCol(headers: string[], ...names: string[]): number {
   for (const name of names) {
-    const idx = headers.findIndex(h => h === name);
+    const idx = headers.findIndex(h => h === normalizeText(name));
     if (idx !== -1) return idx;
   }
   return -1;
@@ -28,15 +28,15 @@ export async function GET(req: NextRequest) {
     const data = await getSheetData(spreadsheetId, 'CONFIG2');
     if (!data || data.length < 2) return NextResponse.json({ found: false });
 
-    const headers = (data[0] as string[]).map(h => String(h).trim());
+    const headers = (data[0] as string[]).map(h => normalizeText(String(h)));
 
-    const projectCol = col(headers, 'Проект', 'Project Name');
-    const prefixCol  = col(headers, 'Код префикс', 'Code Prefix');
-    const p2Col      = col(headers, 'Payment 2');
-    const p3Col      = col(headers, 'Payment 3');
-    const p4Col      = col(headers, 'Payment 4');
-    const p5Col      = col(headers, 'Payment 5');
-    const p6Col      = col(headers, 'Payment 6');
+    const projectCol = findCol(headers, 'Проект', 'Project Name');
+    const prefixCol  = findCol(headers, 'Код префикс', 'Code Prefix');
+    const p2Col      = findCol(headers, 'Payment 2');
+    const p3Col      = findCol(headers, 'Payment 3');
+    const p4Col      = findCol(headers, 'Payment 4');
+    const p5Col      = findCol(headers, 'Payment 5');
+    const p6Col      = findCol(headers, 'Payment 6');
 
     if (projectCol === -1 || prefixCol === -1) return NextResponse.json({ found: false });
 
@@ -68,7 +68,8 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ found: false });
-  } catch {
+  } catch (e) {
+    console.error('payments route error:', e);
     return NextResponse.json({ found: false });
   }
 }

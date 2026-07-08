@@ -225,17 +225,6 @@ export default function NewUnitPage() {
 
   const [form, setForm] = useState<FormState>(EMPTY);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('newUnit_draft');
-      if (raw) {
-        const draft = { ...EMPTY, ...JSON.parse(raw) };
-        setForm(draft);
-        if (draft.projectName) setProjectSearch(draft.projectName);
-      }
-    } catch {}
-  }, []);
-
   const [loadCode, setLoadCode] = useState('');
   const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'found' | 'notfound'>('idle');
 
@@ -280,10 +269,6 @@ export default function NewUnitPage() {
       .catch(e => setOptError(e.message))
       .finally(() => setOptLoading(false));
   }, []);
-
-  useEffect(() => {
-    try { localStorage.setItem('newUnit_draft', JSON.stringify(form)); } catch {}
-  }, [form]);
 
   const up = useCallback(
     (field: keyof FormState) =>
@@ -380,7 +365,11 @@ export default function NewUnitPage() {
     setForm(EMPTY);
     setProjectSearch('');
     setSaveResult(null);
-    try { localStorage.removeItem('newUnit_draft'); } catch {}
+    setShowPayments(false);
+    setHandoverAuto(false);
+    setHandoverOptions([]);
+    setHandoverReadyToMove(false);
+    setSelectedHandoverBuilding(null);
   };
 
   const validate = (): string => {
@@ -427,12 +416,21 @@ export default function NewUnitPage() {
   return (
     <div className="max-w-3xl mx-auto w-full">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white tracking-tight mb-2">New Unit</h1>
-        <p className="text-slate-400 text-sm">
-          Заполни поля — цены и площади принимаются в любом формате.
-          Черновик сохраняется автоматически.
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-white tracking-tight mb-2">New Unit</h1>
+          <p className="text-slate-400 text-sm">
+            Заполни поля — цены и площади принимаются в любом формате.
+            Черновик сохраняется автоматически.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={clearForm}
+          className="shrink-0 mt-1 px-4 py-2 rounded-xl border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-all text-sm font-medium"
+        >
+          Сбросить форму
+        </button>
       </div>
 
       {/* ── Загрузить из рабочей таблицы ── */}
