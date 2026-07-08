@@ -333,7 +333,7 @@ export default function NewUnitPage() {
     const prefix = form.code.replace(/\D/g, '').slice(0, 4);
     if (prefix.length < 4) return;
 
-    fetch(`/api/new-unit/payments?code=${encodeURIComponent(form.code)}`)
+    fetch(`/api/new-unit/payments?project=${encodeURIComponent(form.projectName)}&code=${encodeURIComponent(form.code)}`)
       .then(r => r.json())
       .then(d => {
         if (!d.found) return;
@@ -356,7 +356,7 @@ export default function NewUnitPage() {
         }
       })
       .catch(() => {});
-  }, [form.code]);
+  }, [form.code, form.projectName]);
 
   // Project search with Ru→En transliteration
   const handleProjectSearch = (e: React.ChangeEvent<HTMLInputElement>) => {

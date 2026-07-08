@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetData } from '@/lib/google/sheets';
+import { normalizeText } from '@/lib/posts/formatters';
 
 function col(headers: string[], ...names: string[]): number {
   for (const name of names) {
-    const idx = headers.findIndex(h => h.toLowerCase().trim() === name.toLowerCase());
+    const idx = headers.findIndex(h => h === name);
     if (idx !== -1) return idx;
   }
   return -1;
@@ -14,10 +15,13 @@ function cell(row: unknown[], idx: number): string {
 }
 
 export async function GET(req: NextRequest) {
-  const code = req.nextUrl.searchParams.get('code')?.trim() ?? '';
-  if (!code) return NextResponse.json({ found: false });
+  const project = req.nextUrl.searchParams.get('project')?.trim() ?? '';
+  const code    = req.nextUrl.searchParams.get('code')?.trim() ?? '';
 
-  const normalCode = code.replace(/^#/, '').replace(/\s/g, '').toLowerCase();
+  if (!project || !code) return NextResponse.json({ found: false });
+
+  const codePrefix = code.replace(/\D/g, '').slice(0, 4);
+  if (codePrefix.length < 4) return NextResponse.json({ found: false });
 
   try {
     const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID ?? '';
@@ -26,41 +30,40 @@ export async function GET(req: NextRequest) {
 
     const headers = (data[0] as string[]).map(h => String(h).trim());
 
-    const codeCol        = col(headers, 'Code');
-    const handoverDateCol = col(headers, 'Handover Date');
-    const handoverAedCol  = col(headers, 'Handover AED');
-    const p2DateCol       = col(headers, 'Payment 2 Date');
-    const p2AedCol        = col(headers, 'Payment 2 AED');
-    const p3DateCol       = col(headers, 'Payment 3 Date');
-    const p3AedCol        = col(headers, 'Payment 3 AED');
-    const p4DateCol       = col(headers, 'Payment 4 Date');
-    const p4AedCol        = col(headers, 'Payment 4 AED');
-    const p5DateCol       = col(headers, 'Payment 5 Date');
-    const p5AedCol        = col(headers, 'Payment 5 AED');
-    const p6DateCol       = col(headers, 'Payment 6 Date');
-    const p6AedCol        = col(headers, 'Payment 6 AED');
+    const projectCol = col(headers, 'Проект', 'Project Name');
+    const prefixCol  = col(headers, 'Код префикс', 'Code Prefix');
+    const p2Col      = col(headers, 'Payment 2');
+    const p3Col      = col(headers, 'Payment 3');
+    const p4Col      = col(headers, 'Payment 4');
+    const p5Col      = col(headers, 'Payment 5');
+    const p6Col      = col(headers, 'Payment 6');
 
-    if (codeCol === -1) return NextResponse.json({ found: false });
+    if (projectCol === -1 || prefixCol === -1) return NextResponse.json({ found: false });
+
+    const targetProject = normalizeText(project);
 
     for (let i = 1; i < data.length; i++) {
       const row = data[i] as unknown[];
-      const rowCode = String(row[codeCol] ?? '').replace(/^#/, '').replace(/\s/g, '').toLowerCase();
-      if (rowCode !== normalCode) continue;
+      const rowProject = normalizeText(String(row[projectCol] ?? ''));
+      const rowPrefix  = String(row[prefixCol] ?? '').replace(/\D/g, '').slice(0, 4);
+
+      if (rowProject !== targetProject || rowPrefix !== codePrefix) continue;
+
+      const p2 = cell(row, p2Col);
+      const p3 = cell(row, p3Col);
+      const p4 = cell(row, p4Col);
+      const p5 = cell(row, p5Col);
+      const p6 = cell(row, p6Col);
+
+      if (!p2 && !p3 && !p4 && !p5 && !p6) return NextResponse.json({ found: false });
 
       return NextResponse.json({
         found: true,
-        handoverDate:  cell(row, handoverDateCol),
-        handoverAed:   cell(row, handoverAedCol),
-        payment2Date:  cell(row, p2DateCol),
-        payment2Aed:   cell(row, p2AedCol),
-        payment3Date:  cell(row, p3DateCol),
-        payment3Aed:   cell(row, p3AedCol),
-        payment4Date:  cell(row, p4DateCol),
-        payment4Aed:   cell(row, p4AedCol),
-        payment5Date:  cell(row, p5DateCol),
-        payment5Aed:   cell(row, p5AedCol),
-        payment6Date:  cell(row, p6DateCol),
-        payment6Aed:   cell(row, p6AedCol),
+        payment2Date: p2,
+        payment3Date: p3,
+        payment4Date: p4,
+        payment5Date: p5,
+        payment6Date: p6,
       });
     }
 
