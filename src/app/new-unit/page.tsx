@@ -328,6 +328,36 @@ export default function NewUnitPage() {
       .catch(() => {});
   }, [form.code, form.projectName]);
 
+  // Auto-fill Payment 2-6 + Handover AED from OBJECTS when code has 4+ digits
+  useEffect(() => {
+    const prefix = form.code.replace(/\D/g, '').slice(0, 4);
+    if (prefix.length < 4) return;
+
+    fetch(`/api/new-unit/payments?code=${encodeURIComponent(form.code)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (!d.found) return;
+        setForm(prev => ({
+          ...prev,
+          ...(d.handoverAed   && !prev.handoverAed   ? { handoverAed:   d.handoverAed   } : {}),
+          ...(d.payment2Date  && !prev.payment2Date  ? { payment2Date:  d.payment2Date  } : {}),
+          ...(d.payment2Aed   && !prev.payment2Aed   ? { payment2Aed:   d.payment2Aed   } : {}),
+          ...(d.payment3Date  && !prev.payment3Date  ? { payment3Date:  d.payment3Date  } : {}),
+          ...(d.payment3Aed   && !prev.payment3Aed   ? { payment3Aed:   d.payment3Aed   } : {}),
+          ...(d.payment4Date  && !prev.payment4Date  ? { payment4Date:  d.payment4Date  } : {}),
+          ...(d.payment4Aed   && !prev.payment4Aed   ? { payment4Aed:   d.payment4Aed   } : {}),
+          ...(d.payment5Date  && !prev.payment5Date  ? { payment5Date:  d.payment5Date  } : {}),
+          ...(d.payment5Aed   && !prev.payment5Aed   ? { payment5Aed:   d.payment5Aed   } : {}),
+          ...(d.payment6Date  && !prev.payment6Date  ? { payment6Date:  d.payment6Date  } : {}),
+          ...(d.payment6Aed   && !prev.payment6Aed   ? { payment6Aed:   d.payment6Aed   } : {}),
+        }));
+        if (d.payment2Date || d.payment3Date || d.payment4Date || d.payment5Date || d.payment6Date) {
+          setShowPayments(true);
+        }
+      })
+      .catch(() => {});
+  }, [form.code]);
+
   // Project search with Ru→En transliteration
   const handleProjectSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
