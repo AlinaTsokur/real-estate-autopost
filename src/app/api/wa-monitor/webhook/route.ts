@@ -55,25 +55,28 @@ export async function POST(request: Request) {
     // Also support incoming in case someone else sends the trigger (edge case)
     const isOutgoing = body.typeWebhook === 'outgoingMessageReceived';
     const isIncoming = body.typeWebhook === 'incomingMessageReceived';
+    console.log('WA webhook type:', body.typeWebhook, 'instance:', body.instanceData?.idInstance);
     if (!isOutgoing && !isIncoming) {
-      return NextResponse.json({ ok: true, skipped: 'not a message' });
+      return NextResponse.json({ ok: true, skipped: 'not a message', type: body.typeWebhook });
     }
 
     const { triggers, instances } = await getConfig();
     const instanceId = String(body.instanceData?.idInstance || '');
     const instanceCfg = instances[instanceId];
+    console.log('WA instance check:', instanceId, 'known:', Object.keys(instances));
 
     if (!instanceCfg) {
-      return NextResponse.json({ ok: true, skipped: 'unknown instance' });
+      return NextResponse.json({ ok: true, skipped: 'unknown instance', instanceId, known: Object.keys(instances) });
     }
 
     const messageData = body.messageData;
     const myText = extractText(messageData).trim().toLowerCase();
     const { text: quotedText, participant: quotedParticipant } = extractQuoted(messageData);
+    console.log('WA text:', myText, '| quoted:', quotedText?.slice(0, 50), '| triggers:', triggers);
 
     const isTrigger = triggers.some(w => myText.includes(w));
     if (!isTrigger || !quotedText) {
-      return NextResponse.json({ ok: true, skipped: 'no trigger or no quoted message' });
+      return NextResponse.json({ ok: true, skipped: 'no trigger or no quoted message', myText, hasQuoted: !!quotedText });
     }
 
     // For outgoing (user replied): broker = whoever wrote the quoted message
