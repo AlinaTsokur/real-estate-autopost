@@ -337,9 +337,16 @@ function wamCheck(node) {
 wamLoadTriggers();
 setInterval(wamLoadTriggers, 5 * 60 * 1000);
 
-const wamObserver = new MutationObserver(mutations => {
-  for (const m of mutations) {
-    for (const node of m.addedNodes) wamCheck(node);
-  }
+// Approach 1: scan DOM after any mutation
+const wamObserver = new MutationObserver(() => {
+  document.querySelectorAll('[data-testid="message-out"]').forEach(wamCheck);
 });
 wamObserver.observe(document.body, { childList: true, subtree: true });
+
+// Approach 2: intercept Enter key as backup
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.shiftKey) return;
+  setTimeout(() => {
+    document.querySelectorAll('[data-testid="message-out"]').forEach(wamCheck);
+  }, 500);
+}, true);
