@@ -25,10 +25,13 @@ async function getConfig() {
   }
 }
 
+// Field structure verified empirically against real Green API notifications.
+// A quoted reply has typeMessage='quotedMessage', my text in extendedTextMessageData.text,
+// and the broker's original in quotedMessage.textMessage / .extendedTextMessage.text.
 function extractText(messageData: any): string {
   return (
-    messageData?.textMessageData?.textMessage ||
     messageData?.extendedTextMessageData?.text ||
+    messageData?.textMessageData?.textMessage ||
     messageData?.extendedTextMessageData?.description ||
     ''
   );
@@ -38,11 +41,13 @@ function extractQuoted(messageData: any): { text: string; participant: string } 
   const q = messageData?.quotedMessage;
   if (!q) return { text: '', participant: '' };
   const text =
-    q.textMessageData?.textMessage ||
+    q.textMessage ||
+    q.extendedTextMessage?.text ||
     q.extendedTextMessageData?.text ||
-    q.extendedTextMessageData?.description ||
+    q.textMessageData?.textMessage ||
+    q.caption ||
     '';
-  // participant = phone of whoever wrote the quoted message
+  // participant = phone of whoever wrote the quoted message (the broker)
   const participant = (q.participant || '').replace('@c.us', '').replace('@s.whatsapp.net', '');
   return { text, participant };
 }
