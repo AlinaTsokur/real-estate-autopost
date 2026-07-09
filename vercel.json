@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/wa-monitor/cron?secret=my_super_password_2026",
-      "schedule": "* * * * *"
+      "schedule": "0 8 * * *"
     }
   ]
 }
