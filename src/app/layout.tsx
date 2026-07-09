@@ -20,6 +20,7 @@ const navItems = [
   { href: '/catalog', label: 'Catalog Builder', icon: '📄' },
   { href: '/quick-sales', label: 'Quick Sales', icon: '⚡' },
   { href: '/drive-audit', label: 'Drive Audit', icon: '📂' },
+  { href: '/wa-monitor', label: 'WA Monitor', icon: '📌' },
 ];
 
 export default function RootLayout({
