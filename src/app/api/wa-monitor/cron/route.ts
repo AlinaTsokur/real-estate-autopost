@@ -18,12 +18,7 @@ function formatDate(iso: string) {
   } catch { return iso; }
 }
 
-export async function GET(request: Request) {
-  const secret = new URL(request.url).searchParams.get('secret');
-  if (secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  }
-
+export async function GET() {
   const pending = await getPendingReminders();
   let sent = 0;
 
