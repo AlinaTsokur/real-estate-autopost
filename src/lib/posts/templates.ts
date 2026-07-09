@@ -41,6 +41,11 @@ export async function buildTelegramHtmlPost(data: any) {
   return buildApartmentPostText(data);
 }
 
+// Inserts a zero-width space after the first word so WhatsApp stops auto-detecting place names as geo-links.
+function noGeoLink(s: string): string {
+  return s.replace(' ', '​ ');
+}
+
 export async function buildWhatsAppMarkdown(data: any) {
   if (data.postType === 'PRICE_CHANGE') {
     return buildReducedPriceWhatsAppText(data);
@@ -178,9 +183,9 @@ async function buildApartmentWhatsAppPostText(data: any) {
   let text = '';
 
   text += '*' + title + '*\n\n';
-  text += '*' + data.type + ' in ' + data.project;
+  text += '*' + data.type + ' in ' + noGeoLink(data.project);
 
-  if (cfg.island) text += ' - ' + cfg.island;
+  if (cfg.island) text += ' - ' + noGeoLink(cfg.island);
   if (cfg.emoji) text += ' ' + cfg.emoji;
   text += '*\n\n';
 
@@ -216,9 +221,9 @@ async function buildVillaWhatsAppPostText(data: any) {
   let text = '';
 
   text += '*' + title + '*\n\n';
-  text += '*' + data.type + ' in ' + data.project;
+  text += '*' + data.type + ' in ' + noGeoLink(data.project);
 
-  if (cfg.island) text += ' - ' + cfg.island;
+  if (cfg.island) text += ' - ' + noGeoLink(cfg.island);
   if (cfg.emoji) text += ' ' + cfg.emoji;
   text += '*\n\n';
 
