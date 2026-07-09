@@ -30,10 +30,25 @@ export default function WaMonitorPage() {
   const save = async () => {
     setSaving(true);
     setSaved(false);
+
+    // Pick up a word typed in the box but not yet added via "Добавить"
+    const pendingTrigger = newTrigger.trim().toLowerCase();
+    const triggersToSave = pendingTrigger && !triggers.includes(pendingTrigger)
+      ? [...triggers, pendingTrigger]
+      : triggers;
+    // Pick up an instance typed but not yet added
+    const instancesToSave = newInstance.id.trim()
+      ? [...instances, { ...newInstance }]
+      : instances;
+
+    if (triggersToSave !== triggers) setTriggers(triggersToSave);
+    if (instancesToSave !== instances) { setInstances(instancesToSave); setNewInstance({ id: '', token: '', name: '' }); }
+    setNewTrigger('');
+
     await fetch('/api/wa-monitor/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ triggers, instances })
+      body: JSON.stringify({ triggers: triggersToSave, instances: instancesToSave })
     });
     setSaving(false);
     setSaved(true);
