@@ -2,6 +2,7 @@ import { getGoogleSheetsClient } from '@/lib/google/sheets';
 
 const SHEET_ID = process.env.GOOGLE_SHEETS_CONFIG_ID!;
 const SHEET_NAME = 'WA_MONITOR';
+const PROCESSED_SHEET = 'WA_MONITOR_PROCESSED';
 
 // Columns: Timestamp | Instance | InstanceName | Phone | Name | Request | RemindAt | Reminded
 export async function ensureWaMonitorSheet() {
@@ -87,5 +88,35 @@ export async function markReminded(rowIndex: number) {
     range: `${SHEET_NAME}!H${rowIndex}`,
     valueInputOption: 'RAW',
     requestBody: { values: [['true']] }
+  });
+}
+
+export async function getProcessedIds(): Promise<Set<string>> {
+  const sheets = await getGoogleSheetsClient();
+  try {
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties' });
+    const exists = meta.data.sheets?.some(s => s.properties?.title === PROCESSED_SHEET);
+    if (!exists) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: { requests: [{ addSheet: { properties: { title: PROCESSED_SHEET } } }] }
+      });
+      return new Set();
+    }
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${PROCESSED_SHEET}!A:A` });
+    const rows = (res.data.values || []) as string[][];
+    return new Set(rows.flat());
+  } catch {
+    return new Set();
+  }
+}
+
+export async function markProcessed(msgId: string) {
+  const sheets = await getGoogleSheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: `${PROCESSED_SHEET}!A:A`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [[msgId]] }
   });
 }
