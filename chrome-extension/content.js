@@ -257,3 +257,76 @@ async function lookup() {
 
 btn.addEventListener('click', lookup);
 inp.addEventListener('keydown', e => { if (e.key === 'Enter') lookup(); });
+
+// ── WA Monitor: detect outgoing replies with trigger words ────────────────────
+
+let wamTriggers = ['запрос', 'follow', 'фидбэк', 'feedback', 'follow up'];
+
+async function wamLoadTriggers() {
+  try {
+    const res = await fetch(`${API_BASE}/api/wa-monitor/config`);
+    const data = await res.json();
+    if (data.triggers && data.triggers.length) wamTriggers = data.triggers.map(t => t.toLowerCase());
+  } catch {}
+}
+
+const wamSeen = new Set();
+
+function wamCheck(node) {
+  if (node.nodeType !== 1) return;
+
+  // Find outgoing message element (self or child)
+  const msgOut = node.matches('[data-testid="message-out"]')
+    ? node
+    : node.querySelector('[data-testid="message-out"]');
+  if (!msgOut) return;
+
+  const msgId = msgOut.getAttribute('data-id') || msgOut.getAttribute('data-key-id') || '';
+  if (!msgId || wamSeen.has(msgId)) return;
+  wamSeen.add(msgId);
+
+  // Must have a quoted message (it's a reply)
+  const quotedEl = msgOut.querySelector('[data-testid="quoted"]') ||
+                   msgOut.querySelector('.quoted-mention') ||
+                   msgOut.querySelector('[class*="quoted"]');
+  if (!quotedEl) return;
+
+  // Get my text
+  const textEl = msgOut.querySelector('.selectable-text.copyable-text');
+  const myText = (textEl?.textContent || '').trim().toLowerCase();
+
+  // Check trigger word
+  if (!wamTriggers.some(w => myText.includes(w))) return;
+
+  // Get quoted text (broker's original message)
+  const quotedText = (
+    quotedEl.querySelector('.quoted-text')?.textContent ||
+    quotedEl.querySelector('.selectable-text')?.textContent ||
+    quotedEl.textContent
+  ).trim();
+
+  if (!quotedText) return;
+
+  // Get chat name
+  const chatName = (
+    document.querySelector('[data-testid="conversation-info-header-chat-title"] span')?.textContent ||
+    document.querySelector('header [title]')?.getAttribute('title') ||
+    ''
+  ).trim();
+
+  fetch(`${API_BASE}/api/wa-monitor/ext-trigger`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ quotedText, chatName, instanceName: 'Алина (Web)' })
+  }).catch(() => {});
+}
+
+wamLoadTriggers();
+setInterval(wamLoadTriggers, 5 * 60 * 1000);
+
+const wamObserver = new MutationObserver(mutations => {
+  for (const m of mutations) {
+    for (const node of m.addedNodes) wamCheck(node);
+  }
+});
+wamObserver.observe(document.body, { childList: true, subtree: true });
