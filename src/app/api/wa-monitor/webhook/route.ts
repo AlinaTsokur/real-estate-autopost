@@ -1,19 +1,29 @@
 import { NextResponse } from 'next/server';
 import { saveWaRequest } from '@/lib/wa-monitor/sheets';
+import { getGoogleSheetsClient } from '@/lib/google/sheets';
 
-// Instance config: add your colleague's instance here when ready
-const INSTANCES: Record<string, { name: string; token: string }> = {
-  [process.env.GREENAPI_ID_INSTANCE || '']: {
-    name: 'Алина',
-    token: process.env.GREENAPI_API_TOKEN || ''
-  }
-};
-
-// Trigger words: if your REPLY contains any of these → save as request
-const TRIGGER_WORDS = ['запрос', 'follow', 'фолоу', 'follow up'];
+const SHEET_ID = process.env.GOOGLE_SHEETS_CONFIG_ID!;
+const SHEET_NAME = 'WA_MONITOR_CONFIG';
 
 // Reminder delay: 5 min for testing, change to 2 * 24 * 60 * 60 * 1000 for production
 const REMIND_DELAY_MS = 5 * 60 * 1000;
+
+async function getConfig() {
+  try {
+    const sheets = await getGoogleSheetsClient();
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${SHEET_NAME}!A:D` });
+    const rows = (res.data.values || []) as string[][];
+    const triggers: string[] = [];
+    const instances: Record<string, { name: string; token: string }> = {};
+    for (const row of rows.slice(1)) {
+      if (row[0] === 'TRIGGER' && row[1]) triggers.push(row[1].toLowerCase());
+      if (row[0] === 'INSTANCE' && row[1]) instances[row[1]] = { token: row[2] || '', name: row[3] || '' };
+    }
+    return { triggers, instances };
+  } catch {
+    return { triggers: ['запрос', 'follow'], instances: {} as Record<string, { name: string; token: string }> };
+  }
+}
 
 function extractText(messageData: any): string {
   return (
@@ -39,15 +49,14 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // Only handle incoming messages
     if (body.typeWebhook !== 'incomingMessageReceived') {
       return NextResponse.json({ ok: true, skipped: 'not incoming' });
     }
 
+    const { triggers, instances } = await getConfig();
     const instanceId = String(body.instanceData?.idInstance || '');
-    const instanceCfg = INSTANCES[instanceId];
+    const instanceCfg = instances[instanceId];
 
-    // Unknown instance → ignore (but don't error)
     if (!instanceCfg) {
       return NextResponse.json({ ok: true, skipped: 'unknown instance' });
     }
@@ -56,8 +65,7 @@ export async function POST(request: Request) {
     const myText = extractText(messageData).trim().toLowerCase();
     const quotedText = extractQuoted(messageData).trim();
 
-    // Must be a reply with a trigger word and have quoted content
-    const isTrigger = TRIGGER_WORDS.some(w => myText.includes(w));
+    const isTrigger = triggers.some(w => myText.includes(w));
     if (!isTrigger || !quotedText) {
       return NextResponse.json({ ok: true, skipped: 'no trigger or no quoted message' });
     }
@@ -75,7 +83,6 @@ export async function POST(request: Request) {
       remindAt
     });
 
-    console.log(`WA Monitor: saved request from ${name} (${phone}), remind at ${remindAt.toISOString()}`);
     return NextResponse.json({ ok: true, saved: true });
   } catch (e: any) {
     console.error('WA Monitor webhook error:', e);
