@@ -272,33 +272,46 @@ async function wamLoadTriggers() {
 
 const wamSeen = new Set();
 
+function wamToast(text, color) {
+  const t = document.createElement('div');
+  t.textContent = text;
+  t.style.cssText = `position:fixed;bottom:20px;right:20px;z-index:999999;background:${color||'#333'};color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;font-family:sans-serif;opacity:1;transition:opacity 1s;max-width:300px;word-break:break-word`;
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 1000); }, 3000);
+}
+
 function wamCheck(node) {
   if (node.nodeType !== 1) return;
 
-  // Find outgoing message element (self or child)
-  const msgOut = node.matches('[data-testid="message-out"]')
-    ? node
-    : node.querySelector('[data-testid="message-out"]');
+  // Try multiple selectors for outgoing messages
+  const msgOut = node.matches('[data-testid="message-out"]') ? node
+    : node.matches('.message-out') ? node
+    : node.querySelector('[data-testid="message-out"]')
+    || node.querySelector('.message-out');
   if (!msgOut) return;
 
-  const msgId = msgOut.getAttribute('data-id') || msgOut.getAttribute('data-key-id') || '';
-  if (!msgId || wamSeen.has(msgId)) return;
+  const msgId = msgOut.getAttribute('data-id') || msgOut.getAttribute('data-key-id') || Math.random().toString();
+  if (wamSeen.has(msgId)) return;
   wamSeen.add(msgId);
 
-  // Must have a quoted message (it's a reply)
-  const quotedEl = msgOut.querySelector('[data-testid="quoted"]') ||
-                   msgOut.querySelector('.quoted-mention') ||
-                   msgOut.querySelector('[class*="quoted"]');
-  if (!quotedEl) return;
-
   // Get my text
-  const textEl = msgOut.querySelector('.selectable-text.copyable-text');
+  const textEl = msgOut.querySelector('.selectable-text.copyable-text') || msgOut.querySelector('[class*="selectable-text"]');
   const myText = (textEl?.textContent || '').trim().toLowerCase();
+
+  // Debug: show toast for ANY outgoing message so we know observer works
+  wamToast('👁 Outgoing: ' + myText.slice(0, 40), '#1a1a2e');
+
+  // Must have a quoted message (it's a reply)
+  const quotedEl = msgOut.querySelector('[data-testid="quoted"]')
+    || msgOut.querySelector('[data-testid="quoted-mention"]')
+    || msgOut.querySelector('.quoted-mention')
+    || msgOut.querySelector('[class*="quoted"]');
+  if (!quotedEl) return;
 
   // Check trigger word
   if (!wamTriggers.some(w => myText.includes(w))) return;
 
-  // Get quoted text (broker's original message)
+  // Get quoted text
   const quotedText = (
     quotedEl.querySelector('.quoted-text')?.textContent ||
     quotedEl.querySelector('.selectable-text')?.textContent ||
@@ -307,18 +320,18 @@ function wamCheck(node) {
 
   if (!quotedText) return;
 
-  // Get chat name
   const chatName = (
     document.querySelector('[data-testid="conversation-info-header-chat-title"] span')?.textContent ||
-    document.querySelector('header [title]')?.getAttribute('title') ||
-    ''
+    document.querySelector('header [title]')?.getAttribute('title') || ''
   ).trim();
+
+  wamToast('📌 Сохраняю запрос...', '#14532d');
 
   fetch(`${API_BASE}/api/wa-monitor/ext-trigger`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ quotedText, chatName, instanceName: 'Алина (Web)' })
-  }).catch(() => {});
+  }).then(() => wamToast('✅ Запрос сохранён!', '#14532d')).catch(() => wamToast('❌ Ошибка API', '#7f1d1d'));
 }
 
 wamLoadTriggers();
