@@ -1,25 +1,16 @@
 import { NextResponse } from 'next/server';
-import { saveWaRequest } from '@/lib/wa-monitor/sheets';
-import { getGoogleSheetsClient } from '@/lib/google/sheets';
-
-const SHEET_ID = process.env.GOOGLE_SHEETS_CONFIG_ID!;
-const SHEET_NAME = 'WA_MONITOR_CONFIG';
+import { saveWaRequest, getConfig } from '@/lib/wa-monitor/sheets';
 
 // 5 min for testing → change to 2 * 24 * 60 * 60 * 1000 for production
 const REMIND_DELAY_MS = 5 * 60 * 1000;
 
-async function getConfig() {
+// Config as a { triggers[], instances: map } shape for the webhook.
+async function loadConfig() {
   try {
-    const sheets = await getGoogleSheetsClient();
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${SHEET_NAME}!A:D` });
-    const rows = (res.data.values || []) as string[][];
-    const triggers: string[] = [];
-    const instances: Record<string, { name: string; token: string }> = {};
-    for (const row of rows.slice(1)) {
-      if (row[0] === 'TRIGGER' && row[1]) triggers.push(row[1].toLowerCase());
-      if (row[0] === 'INSTANCE' && row[1]) instances[row[1]] = { token: row[2] || '', name: row[3] || '' };
-    }
-    return { triggers, instances };
+    const { triggers, instances } = await getConfig();
+    const map: Record<string, { name: string; token: string }> = {};
+    for (const i of instances) map[i.id] = { name: i.name, token: i.token };
+    return { triggers: triggers.map(t => t.toLowerCase()), instances: map };
   } catch {
     return { triggers: ['запрос', 'follow'], instances: {} as Record<string, { name: string; token: string }> };
   }
@@ -81,7 +72,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, skipped: 'not a message', type: body.typeWebhook });
     }
 
-    const { triggers, instances } = await getConfig();
+    const { triggers, instances } = await loadConfig();
     const instanceId = String(body.instanceData?.idInstance || '');
     const instanceCfg = instances[instanceId];
     console.log('WA instance check:', instanceId, 'known:', Object.keys(instances));

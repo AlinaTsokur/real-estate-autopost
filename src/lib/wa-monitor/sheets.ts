@@ -1,28 +1,27 @@
-import { getGoogleSheetsClient } from '@/lib/google/sheets';
+// WA Monitor data layer — backed by Neon (Postgres), not Google Sheets.
+// Tables: wa_requests, wa_triggers, wa_instances (created via migration).
+import { neon } from '@neondatabase/serverless';
 
-const SHEET_ID = process.env.GOOGLE_SHEETS_CONFIG_ID!;
-const SHEET_NAME = 'WA_MONITOR';
+const sql = neon(process.env.DATABASE_URL!);
 
-// Columns: Timestamp | Instance | InstanceName | Phone | Name | Request | RemindAt | Reminded | Chat
-export async function ensureWaMonitorSheet() {
-  const sheets = await getGoogleSheetsClient();
-  const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties' });
-  const exists = meta.data.sheets?.some(s => s.properties?.title === SHEET_NAME);
-  if (!exists) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: SHEET_ID,
-      requestBody: {
-        requests: [{ addSheet: { properties: { title: SHEET_NAME } } }]
-      }
-    });
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SHEET_ID,
-      range: `${SHEET_NAME}!A1`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [['Timestamp', 'Instance', 'InstanceName', 'Phone', 'Name', 'Request', 'RemindAt', 'Reminded', 'Chat']] }
-    });
-  }
+export interface WaInstance {
+  id: string;
+  token: string;
+  name: string;
 }
+
+export interface PendingReminder {
+  id: number;
+  instance: string;
+  instanceName: string;
+  phone: string;
+  name: string;
+  request: string;
+  timestamp: string;
+  chat: string;
+}
+
+// ── Requests ────────────────────────────────────────────────────────────────
 
 export async function saveWaRequest(opts: {
   instance: string;
@@ -33,89 +32,71 @@ export async function saveWaRequest(opts: {
   remindAt: Date;
   chat?: string;
 }) {
-  await ensureWaMonitorSheet();
-  const sheets = await getGoogleSheetsClient();
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SHEET_ID,
-    range: `${SHEET_NAME}!A:I`,
-    valueInputOption: 'RAW',
-    requestBody: {
-      values: [[
-        new Date().toISOString(),
-        opts.instance,
-        opts.instanceName,
-        opts.phone,
-        opts.name,
-        opts.request,
-        opts.remindAt.toISOString(),
-        'false',
-        opts.chat || ''
-      ]]
-    }
-  });
+  await sql`
+    INSERT INTO wa_requests (instance, instance_name, phone, name, request, remind_at, chat)
+    VALUES (${opts.instance}, ${opts.instanceName}, ${opts.phone}, ${opts.name}, ${opts.request}, ${opts.remindAt.toISOString()}, ${opts.chat || ''})
+  `;
 }
 
-export async function getPendingReminders() {
-  const sheets = await getGoogleSheetsClient();
-  let rows: string[][];
-  try {
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range: `${SHEET_NAME}!A:I`
-    });
-    rows = (res.data.values || []) as string[][];
-  } catch {
-    return [];
-  }
-
-  const now = new Date();
-  const pending: { rowIndex: number; instance: string; instanceName: string; phone: string; name: string; request: string; timestamp: string; chat: string }[] = [];
-
-  for (let i = 1; i < rows.length; i++) {
-    const [timestamp, instance, instanceName, phone, name, request, remindAt, reminded, chat] = rows[i];
-    if (reminded === 'true') continue;
-    if (!remindAt) continue;
-    if (new Date(remindAt) <= now) {
-      pending.push({ rowIndex: i + 1, instance, instanceName, phone, name, request, timestamp, chat: chat || '' });
-    }
-  }
-  return pending;
+export async function getPendingReminders(): Promise<PendingReminder[]> {
+  const rows = await sql`
+    SELECT id, instance, instance_name, phone, name, request, chat, created_at
+    FROM wa_requests
+    WHERE reminded = false AND remind_at <= now()
+    ORDER BY id
+  ` as any[];
+  return rows.map(r => ({
+    id: Number(r.id),
+    instance: r.instance || '',
+    instanceName: r.instance_name || '',
+    phone: r.phone || '',
+    name: r.name || '',
+    request: r.request || '',
+    timestamp: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+    chat: r.chat || '',
+  }));
 }
 
-// 1-based row indices of already-reminded rows (legacy rows marked 'true').
-export async function getRemindedRowIndices(): Promise<number[]> {
-  const sheets = await getGoogleSheetsClient();
-  try {
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${SHEET_NAME}!A:I` });
-    const rows = (res.data.values || []) as string[][];
-    const out: number[] = [];
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i][7] === 'true') out.push(i + 1);
-    }
-    return out;
-  } catch {
-    return [];
-  }
+// Delete requests by id (called after a reminder is sent).
+export async function deleteWaRequests(ids: number[]) {
+  if (!ids.length) return;
+  await sql`DELETE FROM wa_requests WHERE id = ANY(${ids})`;
 }
 
-// Delete the given 1-based sheet rows from WA_MONITOR. Deletes highest-index
-// first so earlier deletions don't shift the rows still to be removed.
-export async function deleteWaMonitorRows(rowIndices: number[]) {
-  if (!rowIndices.length) return;
-  const sheets = await getGoogleSheetsClient();
-  const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties' });
-  const sheetId = meta.data.sheets?.find(s => s.properties?.title === SHEET_NAME)?.properties?.sheetId;
-  if (sheetId == null) return;
+// ── Config (triggers + instances) ─────────────────────────────────────────────
 
-  const sorted = [...new Set(rowIndices)].sort((a, b) => b - a);
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId: SHEET_ID,
-    requestBody: {
-      requests: sorted.map(rowIndex => ({
-        deleteDimension: {
-          range: { sheetId, dimension: 'ROWS', startIndex: rowIndex - 1, endIndex: rowIndex },
-        },
-      })),
-    },
-  });
+export async function getConfig(): Promise<{ triggers: string[]; instances: WaInstance[] }> {
+  const [t, i] = await Promise.all([
+    sql`SELECT word FROM wa_triggers ORDER BY word` as Promise<any[]>,
+    sql`SELECT instance_id, token, name FROM wa_instances ORDER BY name` as Promise<any[]>,
+  ]);
+  return {
+    triggers: t.map(r => String(r.word)),
+    instances: i.map(r => ({ id: String(r.instance_id), token: String(r.token || ''), name: String(r.name || '') })),
+  };
+}
+
+export async function saveConfig(triggers: string[], instances: WaInstance[]) {
+  // Replace triggers wholesale
+  await sql`DELETE FROM wa_triggers`;
+  for (const w of triggers) {
+    const word = w.trim().toLowerCase();
+    if (word) await sql`INSERT INTO wa_triggers (word) VALUES (${word}) ON CONFLICT (word) DO NOTHING`;
+  }
+  // Upsert instances; drop ones no longer present
+  const keepIds = instances.map(i => i.id.trim()).filter(Boolean);
+  if (keepIds.length) {
+    await sql`DELETE FROM wa_instances WHERE instance_id <> ALL(${keepIds})`;
+  } else {
+    await sql`DELETE FROM wa_instances`;
+  }
+  for (const inst of instances) {
+    const id = inst.id.trim();
+    if (!id) continue;
+    await sql`
+      INSERT INTO wa_instances (instance_id, token, name)
+      VALUES (${id}, ${inst.token.trim()}, ${inst.name.trim()})
+      ON CONFLICT (instance_id) DO UPDATE SET token = EXCLUDED.token, name = EXCLUDED.name
+    `;
+  }
 }
