@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getBot, sendMediaGroupWithCaption, sendTextMessage, sendPlainTextMessage, sendPhoto, updateReviewMessage } from '@/lib/telegram/bot';
+
+// Heavy flow: downloads Drive photos + uploads a media group to Telegram + writes
+// to Sheets. The 10s Hobby default is too short — give it room.
+export const maxDuration = 60;
 import { getDriveImages, getProjectPhotoFolderId, uploadToWaQueue } from '@/lib/google/drive';
 import { getConfig2, addWaQueueItem } from '@/lib/google/sheets';
 import { buildTelegramHtmlPost, buildWhatsAppMarkdown, PostData } from '@/lib/posts/templates';
