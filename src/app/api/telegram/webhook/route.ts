@@ -20,10 +20,13 @@ export async function POST(request: Request) {
       if (data.startsWith('approve_')) {
         const code = data.replace('approve_', '');
 
+        // Acknowledge the tap IMMEDIATELY so mobile Telegram doesn't time out
+        // (Google Sheets work below can take several seconds).
+        await bot.telegram.answerCbQuery(cb.id, '⏳ Обрабатываю…').catch(() => {});
+
         try {
           const result = await approveUnitRow(code);
           await bot.telegram.editMessageText(chatId, messageId, undefined, `✅ Approved: строка ${result.row} закрашена зелёным (#${code})`);
-          await bot.telegram.answerCbQuery(cb.id, `✅ Готово — строка ${result.row}`);
 
           const heart = [{ type: 'emoji', emoji: '❤' }];
           await (bot.telegram as any).callApi('setMessageReaction', { chat_id: chatId, message_id: messageId, reaction: heart });
@@ -37,8 +40,9 @@ export async function POST(request: Request) {
             await bot.telegram.deleteMessage(chatId, waPhotoId).catch(() => {});
           }
         } catch (e: any) {
-          console.error(e);
-          await bot.telegram.answerCbQuery(cb.id, `Error: ${e.message}`);
+          console.error('approve error:', e);
+          // Callback already answered; surface the error in the message instead.
+          await bot.telegram.editMessageText(chatId, messageId, undefined, `❌ Ошибка approve (#${code}): ${e.message}`).catch(() => {});
         }
 
       } else if (data.startsWith('delete_')) {
