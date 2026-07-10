@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import { saveWaRequest, getConfig } from '@/lib/wa-monitor/sheets';
-
-// 5 min for testing → change to 2 * 24 * 60 * 60 * 1000 for production
-const REMIND_DELAY_MS = 5 * 60 * 1000;
+import { saveWaRequest, getConfig, getRemindDelayMinutes } from '@/lib/wa-monitor/sheets';
 
 // Config as a { triggers[], instances: map } shape for the webhook.
 async function loadConfig() {
@@ -120,7 +117,8 @@ export async function POST(request: Request) {
       else if (!isGroup && body.senderData?.chatName) name = body.senderData.chatName;
     }
 
-    const remindAt = new Date(Date.now() + REMIND_DELAY_MS);
+    const delayMinutes = await getRemindDelayMinutes();
+    const remindAt = new Date(Date.now() + delayMinutes * 60 * 1000);
 
     await saveWaRequest({
       instance: instanceId,

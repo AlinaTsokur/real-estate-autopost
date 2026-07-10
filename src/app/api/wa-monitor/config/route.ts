@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getConfig, saveConfig } from '@/lib/wa-monitor/sheets';
+import { getConfig, saveConfig, setRemindDelayMinutes } from '@/lib/wa-monitor/sheets';
 
 export async function GET() {
   try {
@@ -12,8 +12,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { triggers, instances } = await request.json();
+    const { triggers, instances, remindDelayMinutes } = await request.json();
     await saveConfig(triggers || [], instances || []);
+    if (typeof remindDelayMinutes === 'number') {
+      await setRemindDelayMinutes(remindDelayMinutes);
+    }
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

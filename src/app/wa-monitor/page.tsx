@@ -16,6 +16,7 @@ export default function WaMonitorPage() {
   const [saved, setSaved] = useState(false);
   const [newTrigger, setNewTrigger] = useState('');
   const [newInstance, setNewInstance] = useState<Instance>({ id: '', token: '', name: '' });
+  const [remindDelayMinutes, setRemindDelayMinutes] = useState(2880);
 
   useEffect(() => {
     fetch('/api/wa-monitor/config')
@@ -23,6 +24,7 @@ export default function WaMonitorPage() {
       .then(d => {
         setTriggers(d.triggers || []);
         setInstances(d.instances || []);
+        if (typeof d.remindDelayMinutes === 'number') setRemindDelayMinutes(d.remindDelayMinutes);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -48,7 +50,7 @@ export default function WaMonitorPage() {
     await fetch('/api/wa-monitor/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ triggers: triggersToSave, instances: instancesToSave })
+      body: JSON.stringify({ triggers: triggersToSave, instances: instancesToSave, remindDelayMinutes })
     });
     setSaving(false);
     setSaved(true);
@@ -106,6 +108,34 @@ export default function WaMonitorPage() {
           <button onClick={addTrigger} className="bg-[#333] hover:bg-[#444] px-4 py-2 rounded text-sm">
             Добавить
           </button>
+        </div>
+      </section>
+
+      {/* Reminder delay */}
+      <section className="mb-10">
+        <h2 className="text-lg font-semibold mb-1">Через сколько напоминать</h2>
+        <p className="text-sm text-gray-400 mb-4">
+          Сколько ждать после запроса брокера, прежде чем прислать напоминание в Telegram.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: '5 минут (тест)', value: 5 },
+            { label: '1 день', value: 1440 },
+            { label: '2 дня', value: 2880 },
+            { label: '3 дня', value: 4320 },
+          ].map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setRemindDelayMinutes(opt.value)}
+              className={`px-4 py-2 rounded text-sm border ${
+                remindDelayMinutes === opt.value
+                  ? 'bg-white text-black border-white'
+                  : 'bg-[#1a1a1a] border-[#333] text-gray-300 hover:border-[#555]'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
       </section>
 

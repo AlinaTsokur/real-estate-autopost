@@ -65,14 +65,35 @@ export async function deleteWaRequests(ids: number[]) {
 
 // ── Config (triggers + instances) ─────────────────────────────────────────────
 
-export async function getConfig(): Promise<{ triggers: string[]; instances: WaInstance[] }> {
-  const [t, i] = await Promise.all([
+// Reminder delay in minutes (default 2 days if unset). Read by the webhook.
+export async function getRemindDelayMinutes(): Promise<number> {
+  try {
+    const r = await sql`SELECT value FROM wa_settings WHERE key = 'remind_delay_minutes'` as any[];
+    const n = parseInt(r[0]?.value, 10);
+    return Number.isFinite(n) && n > 0 ? n : 2880;
+  } catch {
+    return 2880;
+  }
+}
+
+export async function setRemindDelayMinutes(minutes: number) {
+  const n = Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : 2880;
+  await sql`
+    INSERT INTO wa_settings (key, value) VALUES ('remind_delay_minutes', ${String(n)})
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+  `;
+}
+
+export async function getConfig(): Promise<{ triggers: string[]; instances: WaInstance[]; remindDelayMinutes: number }> {
+  const [t, i, delay] = await Promise.all([
     sql`SELECT word FROM wa_triggers ORDER BY word` as Promise<any[]>,
     sql`SELECT instance_id, token, name FROM wa_instances ORDER BY name` as Promise<any[]>,
+    getRemindDelayMinutes(),
   ]);
   return {
     triggers: t.map(r => String(r.word)),
     instances: i.map(r => ({ id: String(r.instance_id), token: String(r.token || ''), name: String(r.name || '') })),
+    remindDelayMinutes: delay,
   };
 }
 
