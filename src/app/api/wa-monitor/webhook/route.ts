@@ -60,13 +60,12 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // We listen to OUTGOING messages — that's when Alina/colleague replies with trigger word
-    // Also support incoming in case someone else sends the trigger (edge case)
+    // Only the user's OWN replies flag a request. Incoming broker messages never trigger
+    // (they'd create noise, e.g. brokers posting "🔥request:" listings in group chats).
     const isOutgoing = body.typeWebhook === 'outgoingMessageReceived';
-    const isIncoming = body.typeWebhook === 'incomingMessageReceived';
     console.log('WA webhook type:', body.typeWebhook, 'instance:', body.instanceData?.idInstance);
-    if (!isOutgoing && !isIncoming) {
-      return NextResponse.json({ ok: true, skipped: 'not a message', type: body.typeWebhook });
+    if (!isOutgoing) {
+      return NextResponse.json({ ok: true, skipped: 'not an outgoing message', type: body.typeWebhook });
     }
 
     const { triggers, instances } = await loadConfig();
@@ -83,9 +82,11 @@ export async function POST(request: Request) {
     const { text: quotedText, participant: quotedParticipant } = extractQuoted(messageData);
     console.log('WA text:', myText, '| quoted:', quotedText?.slice(0, 50), '| triggers:', triggers);
 
-    const isTrigger = triggers.some(w => myText.includes(w));
+    // The reply must BE a trigger word (exact match after trim/lowercase), not merely
+    // contain it — otherwise normal replies like "will follow up" would false-trigger.
+    const isTrigger = triggers.includes(myText);
     if (!isTrigger || !quotedText) {
-      return NextResponse.json({ ok: true, skipped: 'no trigger or no quoted message', myText, hasQuoted: !!quotedText });
+      return NextResponse.json({ ok: true, skipped: 'reply is not exactly a trigger word, or no quoted message', myText, hasQuoted: !!quotedText });
     }
 
     // Broker = whoever wrote the quoted message.
