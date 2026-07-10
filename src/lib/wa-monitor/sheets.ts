@@ -8,6 +8,7 @@ export interface WaInstance {
   id: string;
   token: string;
   name: string;
+  tgMentions: string;
 }
 
 export interface PendingReminder {
@@ -19,6 +20,7 @@ export interface PendingReminder {
   request: string;
   timestamp: string;
   chat: string;
+  tgMentions: string;
 }
 
 // ── Requests ────────────────────────────────────────────────────────────────
@@ -40,10 +42,12 @@ export async function saveWaRequest(opts: {
 
 export async function getPendingReminders(): Promise<PendingReminder[]> {
   const rows = await sql`
-    SELECT id, instance, instance_name, phone, name, request, chat, created_at
-    FROM wa_requests
-    WHERE reminded = false AND remind_at <= now()
-    ORDER BY id
+    SELECT r.id, r.instance, r.instance_name, r.phone, r.name, r.request, r.chat, r.created_at,
+           COALESCE(i.tg_mentions, '') AS tg_mentions
+    FROM wa_requests r
+    LEFT JOIN wa_instances i ON i.instance_id = r.instance
+    WHERE r.reminded = false AND r.remind_at <= now()
+    ORDER BY r.id
   ` as any[];
   return rows.map(r => ({
     id: Number(r.id),
@@ -54,6 +58,7 @@ export async function getPendingReminders(): Promise<PendingReminder[]> {
     request: r.request || '',
     timestamp: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
     chat: r.chat || '',
+    tgMentions: r.tg_mentions || '',
   }));
 }
 
@@ -87,12 +92,12 @@ export async function setRemindDelayMinutes(minutes: number) {
 export async function getConfig(): Promise<{ triggers: string[]; instances: WaInstance[]; remindDelayMinutes: number }> {
   const [t, i, delay] = await Promise.all([
     sql`SELECT word FROM wa_triggers ORDER BY word` as Promise<any[]>,
-    sql`SELECT instance_id, token, name FROM wa_instances ORDER BY name` as Promise<any[]>,
+    sql`SELECT instance_id, token, name, tg_mentions FROM wa_instances ORDER BY name` as Promise<any[]>,
     getRemindDelayMinutes(),
   ]);
   return {
     triggers: t.map(r => String(r.word)),
-    instances: i.map(r => ({ id: String(r.instance_id), token: String(r.token || ''), name: String(r.name || '') })),
+    instances: i.map(r => ({ id: String(r.instance_id), token: String(r.token || ''), name: String(r.name || ''), tgMentions: String(r.tg_mentions || '') })),
     remindDelayMinutes: delay,
   };
 }
@@ -115,9 +120,9 @@ export async function saveConfig(triggers: string[], instances: WaInstance[]) {
     const id = inst.id.trim();
     if (!id) continue;
     await sql`
-      INSERT INTO wa_instances (instance_id, token, name)
-      VALUES (${id}, ${inst.token.trim()}, ${inst.name.trim()})
-      ON CONFLICT (instance_id) DO UPDATE SET token = EXCLUDED.token, name = EXCLUDED.name
+      INSERT INTO wa_instances (instance_id, token, name, tg_mentions)
+      VALUES (${id}, ${inst.token.trim()}, ${inst.name.trim()}, ${(inst.tgMentions || '').trim()})
+      ON CONFLICT (instance_id) DO UPDATE SET token = EXCLUDED.token, name = EXCLUDED.name, tg_mentions = EXCLUDED.tg_mentions
     `;
   }
 }

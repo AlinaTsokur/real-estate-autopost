@@ -6,6 +6,7 @@ interface Instance {
   id: string;
   token: string;
   name: string;
+  tgMentions: string;
 }
 
 export default function WaMonitorPage() {
@@ -15,7 +16,7 @@ export default function WaMonitorPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [newTrigger, setNewTrigger] = useState('');
-  const [newInstance, setNewInstance] = useState<Instance>({ id: '', token: '', name: '' });
+  const [newInstance, setNewInstance] = useState<Instance>({ id: '', token: '', name: '', tgMentions: '' });
   const [remindDelayMinutes, setRemindDelayMinutes] = useState(2880);
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function WaMonitorPage() {
       : instances;
 
     if (triggersToSave !== triggers) setTriggers(triggersToSave);
-    if (instancesToSave !== instances) { setInstances(instancesToSave); setNewInstance({ id: '', token: '', name: '' }); }
+    if (instancesToSave !== instances) { setInstances(instancesToSave); setNewInstance({ id: '', token: '', name: '', tgMentions: '' }); }
     setNewTrigger('');
 
     await fetch('/api/wa-monitor/config', {
@@ -68,7 +69,7 @@ export default function WaMonitorPage() {
   const addInstance = () => {
     if (newInstance.id.trim()) {
       setInstances([...instances, { ...newInstance }]);
-      setNewInstance({ id: '', token: '', name: '' });
+      setNewInstance({ id: '', token: '', name: '', tgMentions: '' });
     }
   };
 
@@ -150,7 +151,7 @@ export default function WaMonitorPage() {
           {instances.map((inst, i) => (
             <div key={i} className="flex items-center gap-3 bg-[#1a1a1a] border border-[#333] rounded px-3 py-2">
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-sm">{inst.name || 'Без имени'}</div>
+                <div className="font-medium text-sm">{inst.name || 'Без имени'}{inst.tgMentions ? <span className="text-indigo-400 font-normal"> · {inst.tgMentions}</span> : null}</div>
                 <div className="text-xs text-gray-500">ID: {inst.id} · Token: {inst.token.slice(0, 8)}...</div>
               </div>
               <button onClick={() => removeInstance(i)} className="text-gray-500 hover:text-red-400 text-sm shrink-0">
@@ -161,11 +162,17 @@ export default function WaMonitorPage() {
           {instances.length === 0 && <p className="text-gray-500 text-sm">Нет инстансов</p>}
         </div>
 
-        <div className="grid grid-cols-3 gap-2 mb-2">
+        <div className="grid grid-cols-2 gap-2 mb-2">
           <input
             value={newInstance.name}
             onChange={e => setNewInstance({ ...newInstance, name: e.target.value })}
-            placeholder="Имя (Алина)"
+            placeholder="Имя (Наташа)"
+            className="bg-[#1a1a1a] border border-[#333] rounded px-3 py-2 text-sm focus:outline-none focus:border-[#555]"
+          />
+          <input
+            value={newInstance.tgMentions}
+            onChange={e => setNewInstance({ ...newInstance, tgMentions: e.target.value })}
+            placeholder="Теги TG (@user1 @user2)"
             className="bg-[#1a1a1a] border border-[#333] rounded px-3 py-2 text-sm focus:outline-none focus:border-[#555]"
           />
           <input

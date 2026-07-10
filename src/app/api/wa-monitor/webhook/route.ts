@@ -56,6 +56,19 @@ function extractQuoted(messageData: any): { text: string; participant: string } 
   return { text, participant };
 }
 
+// True if `trigger` appears in `text` as a whole word/phrase (not inside a larger word).
+// Unicode-aware boundaries so it works for Cyrillic too (\b in JS is ASCII-only).
+function containsWord(text: string, trigger: string): boolean {
+  const t = trigger.trim().toLowerCase();
+  if (!t) return false;
+  const esc = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  try {
+    return new RegExp(`(^|[^\\p{L}\\p{N}])${esc}([^\\p{L}\\p{N}]|$)`, 'iu').test(text);
+  } catch {
+    return text.includes(t);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -82,11 +95,11 @@ export async function POST(request: Request) {
     const { text: quotedText, participant: quotedParticipant } = extractQuoted(messageData);
     console.log('WA text:', myText, '| quoted:', quotedText?.slice(0, 50), '| triggers:', triggers);
 
-    // The reply must BE a trigger word (exact match after trim/lowercase), not merely
-    // contain it — otherwise normal replies like "will follow up" would false-trigger.
-    const isTrigger = triggers.includes(myText);
+    // The reply may be any phrase, but must CONTAIN a trigger word as a whole word.
+    // Word-boundary (Unicode-aware) matching so "follow" doesn't fire inside "following".
+    const isTrigger = triggers.some(w => containsWord(myText, w));
     if (!isTrigger || !quotedText) {
-      return NextResponse.json({ ok: true, skipped: 'reply is not exactly a trigger word, or no quoted message', myText, hasQuoted: !!quotedText });
+      return NextResponse.json({ ok: true, skipped: 'no trigger word or no quoted message', myText, hasQuoted: !!quotedText });
     }
 
     // Broker = whoever wrote the quoted message.

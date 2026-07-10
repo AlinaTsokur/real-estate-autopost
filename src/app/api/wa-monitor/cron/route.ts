@@ -16,9 +16,13 @@ function esc(s: string) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// Dubai time (UTC+4).
 function formatDate(iso: string) {
   try {
-    return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleString('ru-RU', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Dubai',
+    });
   } catch { return iso; }
 }
 
@@ -27,15 +31,20 @@ export async function GET() {
   const sentIds: number[] = [];
 
   for (const item of pending) {
+    const line = item.tgMentions
+      ? `${esc(item.instanceName)} ${item.tgMentions}`  // mentions must not be escaped so TG pings them
+      : esc(item.instanceName);
+
     const lines = [
       `📌 <b>Напоминание о запросе брокера</b>`,
       ``,
-      `👤 <b>Линия:</b> ${esc(item.instanceName)}`,
-      `📞 <b>Брокер:</b> ${esc(item.name)} (+${esc(item.phone)})`,
+      `👤 <b>Линия:</b> ${line}`,
+      // Phone: monospace (tap to copy), no leading plus
+      `📞 <b>Брокер:</b> ${esc(item.name)} <code>${esc(item.phone)}</code>`,
     ];
     if (item.chat) lines.push(`👥 <b>Группа:</b> ${esc(item.chat)}`);
     lines.push(`💬 <b>Запрос:</b> ${esc(item.request)}`);
-    lines.push(`📅 <b>Написал:</b> ${formatDate(item.timestamp)}`);
+    lines.push(`📅 <b>Написал (Дубай):</b> ${formatDate(item.timestamp)}`);
 
     await sendTgMessage(lines.join('\n'));
     sentIds.push(item.id);
