@@ -12,6 +12,10 @@ async function sendTgMessage(text: string) {
   });
 }
 
+function esc(s: string) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function formatDate(iso: string) {
   try {
     return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -23,16 +27,17 @@ export async function GET() {
   let sent = 0;
 
   for (const item of pending) {
-    const msg = [
+    const lines = [
       `📌 <b>Напоминание о запросе брокера</b>`,
       ``,
-      `👤 <b>Линия:</b> ${item.instanceName}`,
-      `📞 <b>Брокер:</b> ${item.name} (+${item.phone})`,
-      `💬 <b>Запрос:</b> ${item.request}`,
-      `📅 <b>Написал:</b> ${formatDate(item.timestamp)}`,
-    ].join('\n');
+      `👤 <b>Линия:</b> ${esc(item.instanceName)}`,
+      `📞 <b>Брокер:</b> ${esc(item.name)} (+${esc(item.phone)})`,
+    ];
+    if (item.chat) lines.push(`👥 <b>Группа:</b> ${esc(item.chat)}`);
+    lines.push(`💬 <b>Запрос:</b> ${esc(item.request)}`);
+    lines.push(`📅 <b>Написал:</b> ${formatDate(item.timestamp)}`);
 
-    await sendTgMessage(msg);
+    await sendTgMessage(lines.join('\n'));
     await markReminded(item.rowIndex);
     sent++;
   }

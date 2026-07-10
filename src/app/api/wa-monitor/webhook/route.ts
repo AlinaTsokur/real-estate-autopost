@@ -25,6 +25,22 @@ async function getConfig() {
   }
 }
 
+// Resolve a contact's name as saved in the WhatsApp phone contacts (falls back to pushname).
+async function getContactName(instanceId: string, token: string, chatId: string): Promise<string> {
+  try {
+    const res = await fetch(`https://api.green-api.com/waInstance${instanceId}/getContactInfo/${token}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chatId }),
+    });
+    if (!res.ok) return '';
+    const d = await res.json();
+    return d.contactName || d.name || '';
+  } catch {
+    return '';
+  }
+}
+
 // Field structure verified empirically against real Green API notifications.
 // A quoted reply has typeMessage='quotedMessage', my text in extendedTextMessageData.text,
 // and the broker's original in quotedMessage.textMessage / .extendedTextMessage.text.
@@ -84,17 +100,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, skipped: 'no trigger or no quoted message', myText, hasQuoted: !!quotedText });
     }
 
-    // For outgoing (user replied): broker = whoever wrote the quoted message
-    // For incoming (rare): broker = the sender
-    let phone: string;
-    let name: string;
+    // Broker = whoever wrote the quoted message.
+    // Direct chat: the chat itself is the broker. Group: broker = quoted participant, keep group name.
+    const chatId: string = body.senderData?.chatId || '';
+    const isGroup = chatId.endsWith('@g.us');
 
-    if (isOutgoing && quotedParticipant) {
-      phone = quotedParticipant;
-      name = body.senderData?.chatName || phone;
+    let phone: string;
+    let brokerChatId: string;
+    let chat = ''; // group name (empty for direct chats)
+
+    if (isGroup) {
+      chat = body.senderData?.chatName || '';
+      phone = quotedParticipant || '';
+      brokerChatId = phone ? `${phone}@c.us` : '';
     } else {
-      phone = (body.senderData?.sender || '').replace('@c.us', '').replace('@s.whatsapp.net', '') || 'unknown';
-      name = body.senderData?.senderName || body.senderData?.chatName || phone;
+      phone = chatId.replace('@c.us', '').replace('@s.whatsapp.net', '')
+        || quotedParticipant
+        || (body.senderData?.sender || '').replace('@c.us', '').replace('@s.whatsapp.net', '')
+        || 'unknown';
+      brokerChatId = chatId || (phone !== 'unknown' ? `${phone}@c.us` : '');
+    }
+
+    // Resolve the broker's name as saved in WhatsApp contacts.
+    let name = phone;
+    if (brokerChatId) {
+      const resolved = await getContactName(instanceId, instanceCfg.token, brokerChatId);
+      if (resolved) name = resolved;
+      else if (!isGroup && body.senderData?.chatName) name = body.senderData.chatName;
     }
 
     const remindAt = new Date(Date.now() + REMIND_DELAY_MS);
@@ -105,7 +137,8 @@ export async function POST(request: Request) {
       phone,
       name,
       request: quotedText.slice(0, 1000),
-      remindAt
+      remindAt,
+      chat
     });
 
     return NextResponse.json({ ok: true, saved: true });
