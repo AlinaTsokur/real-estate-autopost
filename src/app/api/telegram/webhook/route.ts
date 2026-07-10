@@ -61,33 +61,41 @@ export async function POST(request: Request) {
 
       } else if (data.startsWith('wa_')) {
         const code = data.replace('wa_', '');
+        // Acknowledge immediately so mobile Telegram doesn't time out during the send.
+        await bot.telegram.answerCbQuery(cb.id, '⏳ Отправляю в WhatsApp…').catch(() => {});
+        const reply = (text: string) =>
+          bot.telegram.sendMessage(chatId, text, { reply_parameters: { message_id: messageId } }).catch(() => {});
         try {
           const state = await getInstanceState().catch(() => 'unknown');
           if (state !== 'authorized') {
-            await bot.telegram.answerCbQuery(cb.id, `❌ WhatsApp не подключён (${state})`);
+            await reply(`❌ WhatsApp не подключён (${state})`);
             return NextResponse.json({ ok: true });
           }
           const { config, items } = await getWaQueue();
           if (!config.wa_chatid) {
-            await bot.telegram.answerCbQuery(cb.id, '❌ WA Chat ID не настроен');
+            await reply('❌ WA Chat ID не настроен');
             return NextResponse.json({ ok: true });
           }
           const item = items.find(i => i.label.includes(code));
           if (!item) {
-            await bot.telegram.answerCbQuery(cb.id, '❌ Пост не найден в очереди WA');
+            await reply('❌ Пост не найден в очереди WA');
             return NextResponse.json({ ok: true });
           }
           await dispatchWaItem(item, config.wa_chatid);
           await deleteWaQueueRow(item.rowIndex);
-          await bot.telegram.answerCbQuery(cb.id, '✅ Отправлено в WhatsApp');
+          await reply('✅ Отправлено в WhatsApp');
         } catch (e: any) {
-          await bot.telegram.answerCbQuery(cb.id, `❌ WA ошибка: ${e.message}`);
+          await reply(`❌ WA ошибка: ${e.message}`);
         }
 
       } else if (data.startsWith('tg_')) {
+        // Acknowledge immediately so mobile Telegram doesn't time out during the forward.
+        await bot.telegram.answerCbQuery(cb.id, '⏳ Отправляю в TG канал…').catch(() => {});
+        const reply = (text: string) =>
+          bot.telegram.sendMessage(chatId, text, { reply_parameters: { message_id: messageId } }).catch(() => {});
         const channelId = process.env.TELEGRAM_CHANNEL_ID;
         if (!channelId) {
-          await bot.telegram.answerCbQuery(cb.id, '❌ TELEGRAM_CHANNEL_ID не настроен');
+          await reply('❌ TELEGRAM_CHANNEL_ID не настроен');
           return NextResponse.json({ ok: true });
         }
         try {
@@ -99,15 +107,15 @@ export async function POST(request: Request) {
             : idsMatch ? idsMatch[1].split(',').map(Number).slice(0, -2) : [];
 
           if (!sourceIds.length) {
-            await bot.telegram.answerCbQuery(cb.id, '❌ Нет ID сообщений');
+            await reply('❌ Нет ID сообщений');
             return NextResponse.json({ ok: true });
           }
 
           await forwardToChannel(String(chatId), sourceIds, channelId);
 
-          await bot.telegram.answerCbQuery(cb.id, '✅ Отправлено в TG канал');
+          await reply('✅ Отправлено в TG канал');
         } catch (e: any) {
-          await bot.telegram.answerCbQuery(cb.id, `❌ TG ошибка: ${e.message}`);
+          await reply(`❌ TG ошибка: ${e.message}`);
         }
       }
     }
