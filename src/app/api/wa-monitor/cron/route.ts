@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPendingReminders, markReminded } from '@/lib/wa-monitor/sheets';
+import { getPendingReminders, deleteWaMonitorRows, getRemindedRowIndices } from '@/lib/wa-monitor/sheets';
 
 const TG_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const TG_CHAT_ID = '-1004423234391';
@@ -24,7 +24,7 @@ function formatDate(iso: string) {
 
 export async function GET() {
   const pending = await getPendingReminders();
-  let sent = 0;
+  const sentRows: number[] = [];
 
   for (const item of pending) {
     const lines = [
@@ -38,9 +38,13 @@ export async function GET() {
     lines.push(`📅 <b>Написал:</b> ${formatDate(item.timestamp)}`);
 
     await sendTgMessage(lines.join('\n'));
-    await markReminded(item.rowIndex);
-    sent++;
+    sentRows.push(item.rowIndex);
   }
 
-  return NextResponse.json({ ok: true, sent });
+  // Remove the just-reminded rows + any legacy rows already marked 'true'
+  // so the sheet keeps only pending requests (rows shift up automatically).
+  const legacyReminded = await getRemindedRowIndices();
+  await deleteWaMonitorRows([...sentRows, ...legacyReminded]);
+
+  return NextResponse.json({ ok: true, sent: sentRows.length, cleaned: legacyReminded.length });
 }
