@@ -60,6 +60,21 @@ export async function getDriveImageUrls(folderId: string, limit = 5): Promise<st
   return files.filter(f => f.id).map(f => `https://drive.google.com/uc?export=view&id=${f.id}`);
 }
 
+// Downscale + recompress an image so uploads to Telegram stay small and fast.
+// Telegram shows photos at ~1280px anyway; source real-estate photos can be 3–10 MB.
+export async function compressImageBuffer(buffer: Buffer): Promise<Buffer> {
+  try {
+    const sharp = (await import('sharp')).default;
+    return await sharp(buffer)
+      .rotate() // respect EXIF orientation
+      .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+  } catch {
+    return buffer; // on any failure, fall back to the original
+  }
+}
+
 export async function getDriveImages(folderId: string, limit = 5): Promise<Buffer[]> {
   const drive = await getGoogleDriveClient();
   
@@ -83,7 +98,8 @@ export async function getDriveImages(folderId: string, limit = 5): Promise<Buffe
       { fileId: file.id, alt: 'media' },
       { responseType: 'arraybuffer' }
     );
-    buffers.push(Buffer.from(fileRes.data as ArrayBuffer));
+    const raw = Buffer.from(fileRes.data as ArrayBuffer);
+    buffers.push(await compressImageBuffer(raw));
   }
 
   return buffers;

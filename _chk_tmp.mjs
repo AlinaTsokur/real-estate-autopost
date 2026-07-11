@@ -1,0 +1,11 @@
+import { neon } from '@neondatabase/serverless';
+import fs from 'fs';
+const env = fs.readFileSync('.env.local','utf8');
+const sql = neon(env.match(/DATABASE_URL="([^"]+)"/)[1]);
+const rows = await sql`SELECT id, instance_name, name, left(request,40) AS req, created_at, remind_at, reminded FROM wa_requests ORDER BY id DESC LIMIT 10`;
+console.log('rows in wa_requests:', rows.length);
+for (const r of rows) console.log(JSON.stringify(r));
+const delay = await sql`SELECT value FROM wa_settings WHERE key='remind_delay_minutes'`;
+console.log('remind_delay_minutes:', delay[0]?.value);
+console.log('now (server UTC):', new Date().toISOString());
+process.exit(0);

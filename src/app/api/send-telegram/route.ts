@@ -4,7 +4,7 @@ import { getBot, sendMediaGroupWithCaption, sendTextMessage, sendPlainTextMessag
 // Heavy flow: downloads Drive photos + uploads a media group to Telegram + writes
 // to Sheets. The 10s Hobby default is too short — give it room.
 export const maxDuration = 60;
-import { getDriveImages, getProjectPhotoFolderId, uploadToWaQueue } from '@/lib/google/drive';
+import { getDriveImages, getProjectPhotoFolderId, uploadToWaQueue, compressImageBuffer } from '@/lib/google/drive';
 import { getConfig2, addWaQueueItem } from '@/lib/google/sheets';
 import { buildTelegramHtmlPost, buildWhatsAppMarkdown, PostData } from '@/lib/posts/templates';
 import { validatePostData } from '@/lib/posts/validators';
@@ -52,8 +52,9 @@ export async function POST(request: Request) {
       throw new Error('Slide image required for normal post');
     }
 
-    const slideBuffer = Buffer.from(data.slideDataUrl.split(',')[1], 'base64');
-    
+    const slideRaw = Buffer.from(data.slideDataUrl.split(',')[1], 'base64');
+    const slideBuffer = await compressImageBuffer(slideRaw);
+
     // Media group
     const media: { type: 'photo'; media: any }[] = [
       { type: 'photo', media: { source: slideBuffer, filename: 'slide.jpg' } }

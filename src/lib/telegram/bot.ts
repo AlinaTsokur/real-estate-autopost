@@ -60,7 +60,10 @@ export async function sendMediaGroupWithCaption(
   formData.append('media', JSON.stringify(mediaArray));
 
   const res = await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMediaGroup`, formData, {
-    headers: formData.getHeaders()
+    headers: formData.getHeaders(),
+    timeout: 45000,
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
   });
   const message = res.data.result;
 
