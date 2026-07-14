@@ -413,8 +413,18 @@ export async function getC3UnitData(unitStr: string): Promise<any> {
       const unitVal = String(data[i][unitCol] || '').trim();
       let floorVal = floorCol !== -1 ? String(data[i][floorCol] || '').trim() : '';
       if (!floorVal) {
-        if (unitVal.toUpperCase().startsWith('G')) floorVal = 'Ground Floor';
-        else if (unitVal.startsWith('2')) floorVal = '2nd Floor';
+        // C3's Floor column is empty, so derive the floor from the unit number:
+        // G0x → Ground, otherwise the leading digit is the floor (101→1st, 203→2nd, ...).
+        const uv = unitVal.toUpperCase();
+        if (uv.startsWith('G')) {
+          floorVal = 'Ground Floor';
+        } else {
+          const firstDigit = parseInt(uv.replace(/\D/g, '').charAt(0), 10);
+          if (firstDigit >= 1) {
+            const ord = firstDigit === 1 ? '1st' : firstDigit === 2 ? '2nd' : firstDigit === 3 ? '3rd' : `${firstDigit}th`;
+            floorVal = `${ord} Floor`;
+          }
+        }
       }
 
       return {
