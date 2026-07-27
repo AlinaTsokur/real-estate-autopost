@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     const cfg2 = await import('@/lib/google/sheets').then(m => m.getConfig2(projectName));
     const isVilla = import('@/lib/posts/formatters').then(m => m.isVillaObject(objectType));
 
-    let title = '💰 Best Budget Units | ' + projectName;
+    let title = '💰 Best Budget ' + (selected.length === 1 ? 'Unit' : 'Units') + ' | ' + projectName;
     if (cfg2.island) title += ' - ' + cfg2.island;
     if (cfg2.emoji) title += ' ' + cfg2.emoji;
 
