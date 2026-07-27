@@ -12,6 +12,7 @@ const WA_GROUPS = [
   { id: '120363180834286557@g.us', name: 'VIP Properties Abu Dhabi', defaultOn: true },
   { id: '120363023065348490@g.us', name: 'AD&D Realtors', defaultOn: true },
   { id: '120363179418473887@g.us', name: 'AUH Rent/Invest', defaultOn: true },
+  { id: '120363425347743544@g.us', name: 'Abu Dhabi Off-Plan/Resale', defaultOn: true },
 ];
 
 const convertRuToEn = (str: string) => {
