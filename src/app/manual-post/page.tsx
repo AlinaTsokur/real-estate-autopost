@@ -26,6 +26,8 @@ export default function ManualPostPage() {
   const [deleting, setDeleting] = useState(false);
   const [editableTgHtml, setEditableTgHtml] = useState('');
   const [editableWaText, setEditableWaText] = useState('');
+  // Once the user manually edits a field, the live preview must stop overwriting it.
+  const [editedByUser, setEditedByUser] = useState(false);
 
 
   // Fetch projects and floors from Google Sheets on page load
@@ -62,19 +64,25 @@ export default function ManualPostPage() {
           body: JSON.stringify({ data: payload })
         });
         const data = await res.json();
-        if (data.preview) { setPostPreview(data.preview); setEditableTgHtml(data.preview); }
-        if (data.whatsappText) setEditableWaText(data.whatsappText);
+        // Always refresh the read-only reference; only re-seed the editable
+        // fields while the user hasn't started editing them by hand.
+        if (data.preview) {
+          setPostPreview(data.preview);
+          if (!editedByUser) setEditableTgHtml(data.preview);
+        }
+        if (data.whatsappText && !editedByUser) setEditableWaText(data.whatsappText);
       } catch (e) {
         console.error("Preview error", e);
       }
     }, 500);
 
     return () => clearTimeout(debounce);
-  }, [parsedData, postType, project]);
+  }, [parsedData, postType, project, editedByUser]);
 
   const handleParse = async () => {
     if (!project || !rawText) return alert('Select project and paste text');
     setLoading(true);
+    setEditedByUser(false); // new post → let the preview re-seed the editable fields
     try {
       const res = await fetch('/api/parse-row', {
         method: 'POST',
@@ -381,7 +389,7 @@ export default function ManualPostPage() {
                 <textarea
                   rows={8}
                   value={editableTgHtml}
-                  onChange={e => setEditableTgHtml(e.target.value)}
+                  onChange={e => { setEditableTgHtml(e.target.value); setEditedByUser(true); }}
                   className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-slate-300 font-mono outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y"
                   spellCheck={false}
                 />
@@ -391,7 +399,7 @@ export default function ManualPostPage() {
                 <textarea
                   rows={8}
                   value={editableWaText}
-                  onChange={e => setEditableWaText(e.target.value)}
+                  onChange={e => { setEditableWaText(e.target.value); setEditedByUser(true); }}
                   className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-slate-300 font-mono outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y"
                   spellCheck={false}
                 />
