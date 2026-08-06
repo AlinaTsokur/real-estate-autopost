@@ -33,15 +33,18 @@ export async function POST(request: Request) {
       allIds.push(...r1.ids);
       const r2 = await sendPlainTextMessage(chatId, whatsappText);
       allIds.push(...r2.ids);
-      if (r1.reviewMsgId) {
-        await updateReviewMessage(chatId, r1.reviewMsgId, data.code || '', allIds, r1.mainIds).catch(() => {});
-      }
 
+      // Queue first: the WA button needs the queue item's id to be unambiguous.
+      let waQueueId = '';
       try {
         const label = `PRICE_CHANGE – ${data.code || data.unit || '?'} in ${data.project}`;
-        await addWaQueueItem(label, whatsappText, '');
+        waQueueId = await addWaQueueItem(label, whatsappText, '');
       } catch (e) {
         console.error('WA queue save error (price change):', e);
+      }
+
+      if (r1.reviewMsgId) {
+        await updateReviewMessage(chatId, r1.reviewMsgId, data.code || '', allIds, r1.mainIds, waQueueId).catch(() => {});
       }
 
       return NextResponse.json({ ok: true, whatsappText, messageIds: allIds, chatId });
@@ -82,16 +85,18 @@ export async function POST(request: Request) {
     const r2 = await sendPhoto(chatId, slideBuffer, whatsappText);
     allIds.push(...r2.ids);
 
-    await updateReviewMessage(chatId, r1.reviewMsgId, data.code || data.unit || 'Unknown', allIds, r1.mainIds).catch(() => {});
-
+    // Queue first: the WA button needs the queue item's id to be unambiguous.
+    let waQueueId = '';
     try {
       const label = `${data.postType} – ${data.code || data.unit || '?'} in ${data.project}`;
       const filename = `wa_${Date.now()}.jpg`;
       const driveFileId = await uploadToWaQueue(slideBuffer, filename);
-      await addWaQueueItem(label, whatsappText, driveFileId);
+      waQueueId = await addWaQueueItem(label, whatsappText, driveFileId);
     } catch (e) {
       console.error('WA queue save error:', e);
     }
+
+    await updateReviewMessage(chatId, r1.reviewMsgId, data.code || data.unit || 'Unknown', allIds, r1.mainIds, waQueueId).catch(() => {});
 
     return NextResponse.json({ ok: true, whatsappText, messageIds: allIds, chatId });
   } catch (error: any) {

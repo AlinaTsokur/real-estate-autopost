@@ -599,6 +599,26 @@ export async function updateWaQueueItemSchedule(rowIndex: number, scheduledAt: s
   });
 }
 
+// Deletes by the item's own id, re-reading the sheet first. Row numbers shift whenever
+// anything else (e.g. the cron) removes a row, so a rowIndex captured earlier can point
+// at the wrong post by the time we get here.
+export async function deleteWaQueueItemById(id: string): Promise<boolean> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
+
+  const sheets = await getGoogleSheetsClient();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: WA_QUEUE_SHEET });
+  const rows = res.data.values || [];
+
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0] ?? '').trim() === id) {
+      await deleteWaQueueRow(i + 1);
+      return true;
+    }
+  }
+  return false;
+}
+
 export async function deleteWaQueueRow(rowIndex: number) {
   const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
   if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');

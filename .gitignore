@@ -44,3 +44,7 @@ legacy-appscript/
 .claude/
 _*_tmp.mjs
 _chk_tmp.mjs
+
+# WhatsApp export (клиентские переписки — не коммитить)
+scratch-wa-data/
+scratch-*.mjs

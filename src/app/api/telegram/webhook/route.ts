@@ -1,9 +1,27 @@
 import { NextResponse } from 'next/server';
-import { approveUnitRow, getWaQueue, deleteWaQueueRow } from '@/lib/google/sheets';
+import { approveUnitRow, getWaQueue, deleteWaQueueItemById, WaQueueItem } from '@/lib/google/sheets';
 import { getBot } from '@/lib/telegram/bot';
 import { dispatchWaItem } from '@/lib/whatsapp/dispatch';
 import { getInstanceState } from '@/lib/whatsapp/green-api';
 import { forwardToChannel } from '@/lib/telegram/mtproto';
+
+// Labels look like "POST_TYPE – <code or unit> in <project>".
+function labelSubject(label: string): string {
+  const m = label.match(/–\s*(.+?)\s+in\s/);
+  return m ? m[1].trim() : '';
+}
+
+// The WA button sends the queue item's id. Older review messages (posted before this
+// existed) still send a unit code, so fall back to an EXACT subject match — never a
+// substring, which is what used to send an unrelated post.
+function findWaItem(items: WaQueueItem[], key: string): WaQueueItem | undefined {
+  const byId = items.find(i => i.id === key);
+  if (byId) return byId;
+
+  const bare = (s: string) => s.replace(/^#/, '').toLowerCase();
+  const matches = items.filter(i => bare(labelSubject(i.label)) === bare(key));
+  return matches[matches.length - 1]; // newest wins if the same unit was posted twice
+}
 
 export async function POST(request: Request) {
   try {
@@ -60,7 +78,7 @@ export async function POST(request: Request) {
         }
 
       } else if (data.startsWith('wa_')) {
-        const code = data.replace('wa_', '');
+        const key = data.replace('wa_', '');
         // Acknowledge immediately so mobile Telegram doesn't time out during the send.
         await bot.telegram.answerCbQuery(cb.id, '⏳ Отправляю в WhatsApp…').catch(() => {});
         const reply = (text: string) =>
@@ -76,14 +94,14 @@ export async function POST(request: Request) {
             await reply('❌ WA Chat ID не настроен');
             return NextResponse.json({ ok: true });
           }
-          const item = items.find(i => i.label.includes(code));
+          const item = findWaItem(items, key);
           if (!item) {
             await reply('❌ Пост не найден в очереди WA');
             return NextResponse.json({ ok: true });
           }
-          await dispatchWaItem(item, config.wa_chatid);
-          await deleteWaQueueRow(item.rowIndex);
-          await reply('✅ Отправлено в WhatsApp');
+          await dispatchWaItem(item, item.item_chatid || config.wa_chatid);
+          await deleteWaQueueItemById(item.id);
+          await reply(`✅ Отправлено в WhatsApp: ${item.label}`);
         } catch (e: any) {
           await reply(`❌ WA ошибка: ${e.message}`);
         }

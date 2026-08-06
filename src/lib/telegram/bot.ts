@@ -9,7 +9,10 @@ export function getBot() {
   return new Telegraf(token);
 }
 
-function reviewKeyboard(unitCode: string) {
+// The WA button carries the queue item's own id when we have it. Matching by unit code
+// is ambiguous — a short C3 unit like "109" is a substring of codes such as "#210914",
+// so the bot used to pick a completely unrelated post.
+function reviewKeyboard(unitCode: string, waQueueId?: string) {
   return {
     inline_keyboard: [
       [
@@ -17,7 +20,7 @@ function reviewKeyboard(unitCode: string) {
         { text: '🗑 Удалить', callback_data: `delete_${unitCode}` },
       ],
       [
-        { text: '📲 WA', callback_data: `wa_${unitCode}` },
+        { text: '📲 WA', callback_data: `wa_${waQueueId || unitCode}` },
         { text: '✈️ TG канал', callback_data: `tg_${unitCode}` },
       ],
     ],
@@ -80,7 +83,14 @@ export async function sendMediaGroupWithCaption(
   return { message, ids, mainIds, reviewMsgId: reviewMsg.message_id };
 }
 
-export async function updateReviewMessage(chatId: string, reviewMsgId: number, unitCode: string, allIds: number[], mainIds?: number[]) {
+export async function updateReviewMessage(
+  chatId: string,
+  reviewMsgId: number,
+  unitCode: string,
+  allIds: number[],
+  mainIds?: number[],
+  waQueueId?: string,
+) {
   const bot = getBot();
   const mainPart = mainIds ? `\nmain_ids:${mainIds.join(',')}` : '';
   await bot.telegram.editMessageText(
@@ -88,7 +98,7 @@ export async function updateReviewMessage(chatId: string, reviewMsgId: number, u
     reviewMsgId,
     undefined,
     `Review post for ${unitCode}:${mainPart}\nids:${allIds.join(',')}`,
-    { reply_markup: reviewKeyboard(unitCode) }
+    { reply_markup: reviewKeyboard(unitCode, waQueueId) }
   );
 }
 
