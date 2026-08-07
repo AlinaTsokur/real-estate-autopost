@@ -38,18 +38,16 @@ export async function POST(request: Request) {
       if (data.startsWith('approve_')) {
         const code = data.replace('approve_', '');
 
-        // Acknowledge the tap IMMEDIATELY so mobile Telegram doesn't time out
-        // (Google Sheets work below can take several seconds).
+        // Acknowledge the tap IMMEDIATELY so mobile Telegram doesn't time out.
         await bot.telegram.answerCbQuery(cb.id, '⏳ Обрабатываю…').catch(() => {});
 
-        try {
-          const result = await approveUnitRow(code);
-          await bot.telegram.editMessageText(chatId, messageId, undefined, `✅ Approved: строка ${result.row} закрашена зелёным (#${code})`);
+        // Units from the new DB have a middle-dot code (NNN·NN·NNN) and are NOT
+        // in the Google sheet — we don't (and can't) colour a row for them.
+        const isDbUnit = code.includes('·');
+        const heart = [{ type: 'emoji', emoji: '❤' }];
 
-          const heart = [{ type: 'emoji', emoji: '❤' }];
-          await (bot.telegram as any).callApi('setMessageReaction', { chat_id: chatId, message_id: messageId, reaction: heart });
-
-          // WA photo/text is the last ID in the ids: line (not main_ids:)
+        // Delete the WA photo (last id in the ids: line) — same for both sources.
+        const deleteWaPhoto = async () => {
           const reviewText = cb.message.text || '';
           const idsMatch = reviewText.match(/\nids:([\d,]+)/);
           if (idsMatch) {
@@ -57,9 +55,23 @@ export async function POST(request: Request) {
             const waPhotoId = allIds[allIds.length - 1];
             await bot.telegram.deleteMessage(chatId, waPhotoId).catch(() => {});
           }
+        };
+
+        try {
+          if (isDbUnit) {
+            // New DB unit: no sheet row to colour — just remind to log the post date.
+            await bot.telegram.editMessageText(chatId, messageId, undefined,
+              `✅ Approved (${code})\n\n⚠️ Занеси дату поста в базу (поле «Дата первого поста» для этого юнита).`);
+            await (bot.telegram as any).callApi('setMessageReaction', { chat_id: chatId, message_id: messageId, reaction: heart });
+            await deleteWaPhoto();
+          } else {
+            const result = await approveUnitRow(code);
+            await bot.telegram.editMessageText(chatId, messageId, undefined, `✅ Approved: строка ${result.row} закрашена зелёным (#${code})`);
+            await (bot.telegram as any).callApi('setMessageReaction', { chat_id: chatId, message_id: messageId, reaction: heart });
+            await deleteWaPhoto();
+          }
         } catch (e: any) {
           console.error('approve error:', e);
-          // Callback already answered; surface the error in the message instead.
           await bot.telegram.editMessageText(chatId, messageId, undefined, `❌ Ошибка approve (#${code}): ${e.message}`).catch(() => {});
         }
 
