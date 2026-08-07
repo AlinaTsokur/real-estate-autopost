@@ -10,7 +10,7 @@ async function readOnly<T = any>(queries: any[]): Promise<T[][]> {
   return (await sql.transaction(queries, { readOnly: true })) as T[][];
 }
 
-// Abu Dhabi projects that actually have units, for the dropdown (read live).
+// Abu Dhabi projects that actually have units, for the post dropdown (read live).
 export async function listAbuDhabiProjects(): Promise<{ id: string; name: string }[]> {
   const [rows] = await readOnly([
     sql`
@@ -18,6 +18,18 @@ export async function listAbuDhabiProjects(): Promise<{ id: string; name: string
       FROM units u JOIN projects p ON p.id = u.project_id
       WHERE u.emirate::text = 'Abu Dhabi'
       ORDER BY p.name
+    `,
+  ]);
+  return (rows as any[]).map(r => ({ id: String(r.id), name: String(r.name || '') }));
+}
+
+// ALL active Abu Dhabi projects (even without units yet) — for the emoji list/sync.
+export async function listAllAbuDhabiProjects(): Promise<{ id: string; name: string }[]> {
+  const [rows] = await readOnly([
+    sql`
+      SELECT id, name FROM projects
+      WHERE emirate::text = 'Abu Dhabi' AND archived_at IS NULL
+      ORDER BY name
     `,
   ]);
   return (rows as any[]).map(r => ({ id: String(r.id), name: String(r.name || '') }));

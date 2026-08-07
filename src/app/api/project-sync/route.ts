@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listAbuDhabiProjects } from '@/lib/units-db/units';
+import { listAllAbuDhabiProjects } from '@/lib/units-db/units';
 import { syncProjectStubs } from '@/lib/post-meta/emoji';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 // empty emoji so they can be filled in; existing emojis are never touched.
 export async function GET() {
   try {
-    const projects = await listAbuDhabiProjects();
+    const projects = await listAllAbuDhabiProjects();
     const added = await syncProjectStubs(projects);
     return NextResponse.json({ ok: true, total: projects.length, added });
   } catch (e: any) {

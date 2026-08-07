@@ -33,6 +33,8 @@ export default function ManualPostPage() {
   const [source, setSource] = useState<'paste' | 'db'>('paste');
   const [dbProjects, setDbProjects] = useState<{ id: string; name: string }[]>([]);
   const [dbProjectId, setDbProjectId] = useState('');
+  const [dbProjectSearch, setDbProjectSearch] = useState('');
+  const [dbDropdownOpen, setDbDropdownOpen] = useState(false);
   const [unitQuery, setUnitQuery] = useState('');
   const [unitResults, setUnitResults] = useState<{ id: string; code: string; unitNumber: string; project: string }[]>([]);
   const [dbLoading, setDbLoading] = useState(false);
@@ -365,16 +367,33 @@ export default function ManualPostPage() {
 
               {source === 'db' && (
                 <>
-                  <div>
+                  <div className="relative">
                     <label className="block text-sm font-medium text-slate-300 mb-2">Проект (из базы)</label>
-                    <select
-                      value={dbProjectId}
-                      onChange={e => { setDbProjectId(e.target.value); setUnitResults([]); }}
-                      className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-white appearance-none cursor-pointer"
-                    >
-                      <option value="">— все проекты —</option>
-                      {dbProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
+                    <input
+                      type="text"
+                      value={dbProjectSearch}
+                      onChange={e => { setDbProjectSearch(convertRuToEn(e.target.value)); setDbDropdownOpen(true); setDbProjectId(''); }}
+                      onFocus={() => setDbDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setDbDropdownOpen(false), 200)}
+                      placeholder="Начни вводить (рус/англ)…"
+                      className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-white placeholder-slate-500"
+                    />
+                    {dbDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl shadow-black/50 max-h-60 overflow-y-auto p-1 custom-scrollbar">
+                        {dbProjects.filter(p => p.name.toLowerCase().includes(dbProjectSearch.toLowerCase())).map(p => (
+                          <div
+                            key={p.id}
+                            onClick={() => { setDbProjectId(p.id); setDbProjectSearch(p.name); setDbDropdownOpen(false); setUnitResults([]); }}
+                            className={`px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors ${dbProjectId === p.id ? 'bg-indigo-500/20 text-indigo-300 font-medium' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}
+                          >
+                            {p.name}
+                          </div>
+                        ))}
+                        {dbProjects.filter(p => p.name.toLowerCase().includes(dbProjectSearch.toLowerCase())).length === 0 && (
+                          <div className="px-4 py-3 text-sm text-slate-500 text-center">Проект не найден</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="relative">
                     <label className="block text-sm font-medium text-slate-300 mb-2">Юнит — код (с точками или без) или название</label>
