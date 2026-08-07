@@ -32,6 +32,10 @@ export interface PostData {
   slideDataUrl?: string;
   slideName?: string;
   oldPostUrl?: string;
+  // Optional header overrides used by DB-sourced posts. When absent, the
+  // builders fall back to CONFIG2 (getConfig2) exactly as before.
+  island?: string;
+  emoji?: string;
 }
 
 export async function buildTelegramHtmlPost(data: any) {
@@ -62,6 +66,9 @@ export async function buildWhatsAppMarkdown(data: any) {
 
 async function buildApartmentPostText(data: any) {
   const cfg = await getConfig2(data.project);
+  // DB-sourced posts carry their own island/emoji; use them over CONFIG2 when present.
+  if (data.island) cfg.island = data.island;
+  if (data.emoji) cfg.emoji = data.emoji;
 
   if (data.postType === 'PRICE_CHANGE') {
     return buildReducedPriceText(data, cfg);
@@ -105,6 +112,9 @@ async function buildApartmentPostText(data: any) {
 
 async function buildVillaPostText(data: any) {
   const cfg = await getConfig2(data.project);
+  // DB-sourced posts carry their own island/emoji; use them over CONFIG2 when present.
+  if (data.island) cfg.island = data.island;
+  if (data.emoji) cfg.emoji = data.emoji;
 
   if (data.postType === 'PRICE_CHANGE') {
     return buildReducedPriceText(data, cfg);
@@ -179,6 +189,9 @@ function buildReducedPriceText(data: any, cfg: any) {
 
 async function buildApartmentWhatsAppPostText(data: any) {
   const cfg = await getConfig2(data.project);
+  // DB-sourced posts carry their own island/emoji; use them over CONFIG2 when present.
+  if (data.island) cfg.island = data.island;
+  if (data.emoji) cfg.emoji = data.emoji;
   const title = getPostTitle(data.postType);
   let text = '';
 
@@ -217,6 +230,9 @@ async function buildApartmentWhatsAppPostText(data: any) {
 
 async function buildVillaWhatsAppPostText(data: any) {
   const cfg = await getConfig2(data.project);
+  // DB-sourced posts carry their own island/emoji; use them over CONFIG2 when present.
+  if (data.island) cfg.island = data.island;
+  if (data.emoji) cfg.emoji = data.emoji;
   const title = getPostTitle(data.postType);
   let text = '';
 
