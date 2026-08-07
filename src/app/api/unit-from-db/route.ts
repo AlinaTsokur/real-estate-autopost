@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listAbuDhabiProjects, searchUnits, getRawUnit } from '@/lib/units-db/units';
+import { listAbuDhabiProjects, searchUnits, getRawUnit, listUnitsWithoutPost } from '@/lib/units-db/units';
 import { mapRawUnitToPostData } from '@/lib/units-db/map';
 import { getProjectMeta } from '@/lib/post-meta/emoji';
 
@@ -12,6 +12,11 @@ export async function GET(request: Request) {
     // ?projects=1 → project dropdown (Abu Dhabi, live)
     if (url.searchParams.get('projects')) {
       return NextResponse.json({ projects: await listAbuDhabiProjects() });
+    }
+
+    // ?nopost=1 → available units that have never been posted
+    if (url.searchParams.get('nopost')) {
+      return NextResponse.json({ units: await listUnitsWithoutPost() });
     }
 
     // ?id=<uuid> → full mapped post for one unit

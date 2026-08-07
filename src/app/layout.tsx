@@ -22,6 +22,7 @@ const navItems = [
   { href: '/drive-audit', label: 'Drive Audit', icon: '📂' },
   { href: '/wa-monitor', label: 'WA Monitor', icon: '📌' },
   { href: '/project-emoji', label: 'Смайлики проектов', icon: '🎨' },
+  { href: '/no-posts', label: 'Юниты без постов', icon: '📝' },
 ];
 
 export default function RootLayout({
@@ -63,13 +64,6 @@ export default function RootLayout({
               <div className="pt-6 pb-2 px-3">
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Automations</span>
               </div>
-              <Link
-                href="/c3-autopost"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-indigo-300 hover:text-indigo-200 hover:bg-indigo-600/10 transition-all duration-200"
-              >
-                <span className="text-base">🏢</span>
-                <span>C3 Autopost</span>
-              </Link>
               <Link
                 href="/scheduled"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-green-300 hover:text-green-200 hover:bg-green-600/10 transition-all duration-200"

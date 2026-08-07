@@ -35,6 +35,21 @@ export async function listAllAbuDhabiProjects(): Promise<{ id: string; name: str
   return (rows as any[]).map(r => ({ id: String(r.id), name: String(r.name || '') }));
 }
 
+// Available Abu Dhabi units that have never been posted (first_post_date is null).
+export async function listUnitsWithoutPost(): Promise<{ code: string; unitNumber: string; project: string }[]> {
+  const [rows] = await readOnly([
+    sql`
+      SELECT u.code, u.unit_number, p.name AS project
+      FROM units u JOIN projects p ON p.id = u.project_id
+      WHERE u.emirate::text = 'Abu Dhabi'
+        AND u.status::text = 'available'
+        AND u.first_post_date IS NULL
+      ORDER BY p.name, u.code
+    `,
+  ]);
+  return (rows as any[]).map(r => ({ code: String(r.code || ''), unitNumber: String(r.unit_number || ''), project: String(r.project || '') }));
+}
+
 export interface UnitSearchResult {
   id: string;
   code: string;
