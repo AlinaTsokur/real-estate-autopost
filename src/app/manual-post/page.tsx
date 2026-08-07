@@ -29,8 +29,11 @@ export default function ManualPostPage() {
   // Once the user manually edits a field, the live preview must stop overwriting it.
   const [editedByUser, setEditedByUser] = useState(false);
 
-  // ── "Из базы" (Neon) source ──────────────────────────────────────────────
-  const [source, setSource] = useState<'paste' | 'db'>('paste');
+  // ── source: paste (Sheets), db (Neon), c3 (C3 autopost from Sheets+Drive) ──
+  const [source, setSource] = useState<'paste' | 'db' | 'c3'>('paste');
+  const [c3Units, setC3Units] = useState<string[]>([]);
+  const [c3Unit, setC3Unit] = useState('');
+  const [c3Loading, setC3Loading] = useState(false);
   const [dbProjects, setDbProjects] = useState<{ id: string; name: string }[]>([]);
   const [dbProjectId, setDbProjectId] = useState('');
   const [dbProjectSearch, setDbProjectSearch] = useState('');
@@ -97,6 +100,36 @@ export default function ManualPostPage() {
     // inject emoji into the current post so the preview updates immediately
     setParsedData((prev: any) => ({ ...prev, emoji: emojiInput.trim() }));
     setEmojiMissing(null);
+  };
+
+  // Load C3 units (from Google Sheets) when switching to the C3 source
+  useEffect(() => {
+    if (source !== 'c3' || c3Units.length) return;
+    fetch('/api/c3-autopost')
+      .then(r => r.json())
+      .then(d => setC3Units(d.units || []))
+      .catch(() => {});
+  }, [source]);
+
+  const pickC3Unit = async (unit: string) => {
+    setC3Unit(unit);
+    if (!unit) return;
+    setC3Loading(true);
+    setEditedByUser(false);
+    try {
+      const d = await fetch('/api/c3-autopost', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unit }),
+      }).then(r => r.json());
+      if (d.error) throw new Error(d.error);
+      setParsedData(d.parsed);          // includes slideDataUrl from Drive
+      setProject('C3 Garden Residence');
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setC3Loading(false);
+    }
   };
 
 
@@ -354,10 +387,13 @@ export default function ManualPostPage() {
             <div className="space-y-5">
               {/* Source toggle */}
               <div className="flex gap-2 p-1 bg-slate-950/50 border border-white/10 rounded-xl">
-                {([['paste', '📋 Вставить текст'], ['db', '🗄 Из базы']] as const).map(([val, label]) => (
+                {([['paste', '📋 Вставить текст'], ['db', '🗄 Из базы'], ['c3', '⭐ C3']] as const).map(([val, label]) => (
                   <button
                     key={val}
-                    onClick={() => setSource(val)}
+                    onClick={() => {
+                      setSource(val);
+                      if (val === 'c3' && postType !== 'READY_TO_MOVE' && postType !== 'NEW_PRICE') setPostType('READY_TO_MOVE');
+                    }}
                     className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${source === val ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}
                   >
                     {label}
@@ -439,6 +475,21 @@ export default function ManualPostPage() {
                 </>
               )}
 
+              {source === 'c3' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Юнит C3 (из Google-таблицы)</label>
+                  <select
+                    value={c3Unit}
+                    onChange={e => pickC3Unit(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-white appearance-none cursor-pointer"
+                  >
+                    <option value="">— выбери юнит —</option>
+                    {c3Units.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                  {c3Loading && <div className="mt-2 text-xs text-slate-400">Загружаю юнит и слайд…</div>}
+                </div>
+              )}
+
               {source === 'paste' && (
               <div className="relative">
                 <label className="block text-sm font-medium text-slate-300 mb-2">Project</label>
@@ -503,12 +554,21 @@ export default function ManualPostPage() {
                   onChange={(e) => setPostType(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all text-white appearance-none cursor-pointer"
                 >
-                  <option value="NEW">🔥 NEW</option>
-                  <option value="HOT_PRICE">🔥 HOT PRICE</option>
-                  <option value="DISTRESS">⚡ QUICK SALE</option>
-                  <option value="NEW_PRICE">🔥 NEW PRICE</option>
-                  <option value="READY_TO_MOVE">❗️ READY TO MOVE</option>
-                  <option value="PRICE_CHANGE">❗️ PRICE CHANGE</option>
+                  {source === 'c3' ? (
+                    <>
+                      <option value="READY_TO_MOVE">❗️ READY TO MOVE</option>
+                      <option value="NEW_PRICE">🔥 NEW PRICE</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="NEW">🔥 NEW</option>
+                      <option value="HOT_PRICE">🔥 HOT PRICE</option>
+                      <option value="DISTRESS">⚡ QUICK SALE</option>
+                      <option value="NEW_PRICE">🔥 NEW PRICE</option>
+                      <option value="READY_TO_MOVE">❗️ READY TO MOVE</option>
+                      <option value="PRICE_CHANGE">❗️ PRICE CHANGE</option>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -693,6 +753,10 @@ export default function ManualPostPage() {
                           className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50 appearance-none cursor-pointer"
                         >
                           <option value="">Select floor...</option>
+                          {/* value from the DB may not be in the sheet list — keep it selectable */}
+                          {parsedData.floor && !floors.includes(parsedData.floor) && (
+                            <option value={parsedData.floor}>{parsedData.floor}</option>
+                          )}
                           {floors.map((f, idx) => (
                             <option key={idx} value={f}>{f}</option>
                           ))}
