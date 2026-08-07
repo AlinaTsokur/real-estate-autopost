@@ -29,6 +29,74 @@ export default function ManualPostPage() {
   // Once the user manually edits a field, the live preview must stop overwriting it.
   const [editedByUser, setEditedByUser] = useState(false);
 
+  // ── "Из базы" (Neon) source ──────────────────────────────────────────────
+  const [source, setSource] = useState<'paste' | 'db'>('paste');
+  const [dbProjects, setDbProjects] = useState<{ id: string; name: string }[]>([]);
+  const [dbProjectId, setDbProjectId] = useState('');
+  const [unitQuery, setUnitQuery] = useState('');
+  const [unitResults, setUnitResults] = useState<{ id: string; code: string; unitNumber: string; project: string }[]>([]);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [emojiMissing, setEmojiMissing] = useState<{ projectId: string; projectName: string } | null>(null);
+  const [emojiInput, setEmojiInput] = useState('');
+
+  // Load the IT team's Abu Dhabi projects when switching to "Из базы"
+  useEffect(() => {
+    if (source !== 'db' || dbProjects.length) return;
+    fetch('/api/unit-from-db?projects=1')
+      .then(r => r.json())
+      .then(d => setDbProjects(d.projects || []))
+      .catch(() => {});
+  }, [source]);
+
+  // Search units by code (dots optional) or name, scoped to the picked project
+  useEffect(() => {
+    if (source !== 'db') return;
+    const t = setTimeout(async () => {
+      if (!unitQuery.trim() && !dbProjectId) { setUnitResults([]); return; }
+      try {
+        const params = new URLSearchParams();
+        if (unitQuery.trim()) params.set('q', unitQuery.trim());
+        if (dbProjectId) params.set('projectId', dbProjectId);
+        const d = await fetch(`/api/unit-from-db?${params}`).then(r => r.json());
+        setUnitResults(d.results || []);
+      } catch { /* ignore */ }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [unitQuery, dbProjectId, source]);
+
+  const pickDbUnit = async (id: string) => {
+    setDbLoading(true);
+    setEditedByUser(false);
+    setEmojiMissing(null);
+    try {
+      const d = await fetch(`/api/unit-from-db?id=${id}`).then(r => r.json());
+      if (d.error) throw new Error(d.error);
+      setParsedData(d.post);
+      setProject(d.post.project || '');
+      if (d.emojiMissing) {
+        setEmojiMissing({ projectId: d.projectId, projectName: d.projectName });
+        setEmojiInput('');
+      }
+      setUnitResults([]);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setDbLoading(false);
+    }
+  };
+
+  const saveEmoji = async () => {
+    if (!emojiMissing || !emojiInput.trim()) return;
+    await fetch('/api/project-emoji', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...emojiMissing, emoji: emojiInput.trim() }),
+    });
+    // inject emoji into the current post so the preview updates immediately
+    setParsedData((prev: any) => ({ ...prev, emoji: emojiInput.trim() }));
+    setEmojiMissing(null);
+  };
+
 
   // Fetch projects and floors from Google Sheets on page load
   useEffect(() => {
@@ -282,6 +350,77 @@ export default function ManualPostPage() {
             <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
 
             <div className="space-y-5">
+              {/* Source toggle */}
+              <div className="flex gap-2 p-1 bg-slate-950/50 border border-white/10 rounded-xl">
+                {([['paste', '📋 Вставить текст'], ['db', '🗄 Из базы']] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setSource(val)}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${source === val ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {source === 'db' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Проект (из базы)</label>
+                    <select
+                      value={dbProjectId}
+                      onChange={e => { setDbProjectId(e.target.value); setUnitResults([]); }}
+                      className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-white appearance-none cursor-pointer"
+                    >
+                      <option value="">— все проекты —</option>
+                      {dbProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="relative">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Юнит — код (с точками или без) или название</label>
+                    <input
+                      type="text"
+                      value={unitQuery}
+                      onChange={e => setUnitQuery(e.target.value)}
+                      placeholder="003·02·001 / 00302001 / Un-902"
+                      className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-white placeholder-slate-500 font-mono text-sm"
+                    />
+                    {unitResults.length > 0 && (
+                      <div className="mt-2 bg-slate-900 border border-white/10 rounded-xl max-h-64 overflow-y-auto p-1 custom-scrollbar">
+                        {unitResults.map(u => (
+                          <div
+                            key={u.id}
+                            onClick={() => pickDbUnit(u.id)}
+                            className="px-3 py-2.5 rounded-lg cursor-pointer text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center justify-between gap-3"
+                          >
+                            <span className="font-mono text-indigo-300">{u.code}</span>
+                            <span className="flex-1 truncate">{u.unitNumber}</span>
+                            <span className="text-xs text-slate-500 truncate">{u.project}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {dbLoading && <div className="mt-2 text-xs text-slate-400">Загружаю юнит…</div>}
+                  </div>
+
+                  {emojiMissing && (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                      <div className="text-xs text-amber-300 mb-2">⚠️ У проекта «{emojiMissing.projectName}» не задан смайлик. Добавь — сохранится в базу:</div>
+                      <div className="flex gap-2">
+                        <input
+                          value={emojiInput}
+                          onChange={e => setEmojiInput(e.target.value)}
+                          placeholder="🌿"
+                          className="w-20 px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-center text-lg outline-none focus:ring-2 focus:ring-amber-500/50"
+                        />
+                        <button onClick={saveEmoji} className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium px-4 rounded-lg">Сохранить</button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {source === 'paste' && (
               <div className="relative">
                 <label className="block text-sm font-medium text-slate-300 mb-2">Project</label>
                 {projectsLoading ? (
@@ -336,6 +475,7 @@ export default function ManualPostPage() {
                   </div>
                 )}
               </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">Post Type</label>
@@ -353,24 +493,28 @@ export default function ManualPostPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Paste Row (from Canva/Sheets)</label>
-                <textarea
-                  rows={4}
-                  value={rawText}
-                  onChange={(e) => setRawText(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all text-white placeholder-slate-500 font-mono text-sm"
-                  placeholder="Paste TSV row here..."
-                />
-              </div>
+              {source === 'paste' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Paste Row (from Canva/Sheets)</label>
+                    <textarea
+                      rows={4}
+                      value={rawText}
+                      onChange={(e) => setRawText(e.target.value)}
+                      className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all text-white placeholder-slate-500 font-mono text-sm"
+                      placeholder="Paste TSV row here..."
+                    />
+                  </div>
 
-              <button
-                onClick={handleParse}
-                disabled={loading || !project}
-                className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg shadow-indigo-500/25 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-              >
-                {loading ? 'Parsing...' : 'Parse Data'}
-              </button>
+                  <button
+                    onClick={handleParse}
+                    disabled={loading || !project}
+                    className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg shadow-indigo-500/25 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    {loading ? 'Parsing...' : 'Parse Data'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
