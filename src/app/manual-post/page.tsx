@@ -28,6 +28,9 @@ export default function ManualPostPage() {
   const [editableWaText, setEditableWaText] = useState('');
   // Once the user manually edits a field, the live preview must stop overwriting it.
   const [editedByUser, setEditedByUser] = useState(false);
+  // Раскрытые исходники занимают пол-экрана — держим их свёрнутыми, пока не понадобится правка.
+  const [showTgSource, setShowTgSource] = useState(false);
+  const [showWaSource, setShowWaSource] = useState(false);
 
   // ── source: paste (Sheets), db (Neon), c3 (C3 autopost from Sheets+Drive) ──
   const [source, setSource] = useState<'paste' | 'db' | 'c3'>('paste');
@@ -604,28 +607,46 @@ export default function ManualPostPage() {
                 Preview &amp; Edit
               </h3>
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5">Telegram (HTML)</label>
                 <div
-                  className="whitespace-pre-wrap font-sans text-[14px] text-slate-200 bg-slate-950/50 p-4 rounded-xl border border-white/5 leading-relaxed mb-2"
+                  className="whitespace-pre-wrap font-sans text-[14px] text-slate-200 bg-slate-950/50 p-4 rounded-xl border border-white/5 leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: editableTgHtml.replace(/\n/g, '<br/>') }}
                 />
-                <textarea
-                  rows={8}
-                  value={editableTgHtml}
-                  onChange={e => { setEditableTgHtml(e.target.value); setEditedByUser(true); }}
-                  className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-slate-300 font-mono outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y"
-                  spellCheck={false}
-                />
+                <button
+                  type="button"
+                  onClick={() => setShowTgSource(v => !v)}
+                  className="mt-2 flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                >
+                  <span className="inline-block w-3 text-center">{showTgSource ? '▾' : '▸'}</span>
+                  Telegram (HTML)
+                </button>
+                {showTgSource && (
+                  <textarea
+                    rows={8}
+                    value={editableTgHtml}
+                    onChange={e => { setEditableTgHtml(e.target.value); setEditedByUser(true); }}
+                    className="mt-1.5 w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-slate-300 font-mono outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y"
+                    spellCheck={false}
+                  />
+                )}
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5">WhatsApp</label>
-                <textarea
-                  rows={8}
-                  value={editableWaText}
-                  onChange={e => { setEditableWaText(e.target.value); setEditedByUser(true); }}
-                  className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-slate-300 font-mono outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y"
-                  spellCheck={false}
-                />
+                <button
+                  type="button"
+                  onClick={() => setShowWaSource(v => !v)}
+                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                >
+                  <span className="inline-block w-3 text-center">{showWaSource ? '▾' : '▸'}</span>
+                  WhatsApp
+                </button>
+                {showWaSource && (
+                  <textarea
+                    rows={8}
+                    value={editableWaText}
+                    onChange={e => { setEditableWaText(e.target.value); setEditedByUser(true); }}
+                    className="mt-1.5 w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-slate-300 font-mono outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y"
+                    spellCheck={false}
+                  />
+                )}
               </div>
             </div>
           )}
