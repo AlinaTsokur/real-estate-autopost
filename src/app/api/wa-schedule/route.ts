@@ -60,6 +60,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    // Clear the whole queue (delete every post, keep the CONFIG row).
+    // Delete highest rowIndex first so earlier deletions don't shift the rest.
+    if (body.action === 'clear-all') {
+      const { items } = await getWaQueue();
+      const sorted = [...items].sort((a, b) => b.rowIndex - a.rowIndex);
+      for (const it of sorted) await deleteWaQueueRow(it.rowIndex);
+      return NextResponse.json({ ok: true, cleared: sorted.length });
+    }
+
     // Save the WhatsApp chat id
     if (body.action === 'config') {
       const { configRowIndex, waChatId } = body as { configRowIndex: number; waChatId: string };

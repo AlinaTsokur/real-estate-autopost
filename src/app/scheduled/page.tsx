@@ -99,6 +99,26 @@ export default function ScheduledPage() {
     }
   };
 
+  const [clearing, setClearing] = useState(false);
+  const clearAll = async () => {
+    if (!confirm('Удалить ВСЕ посты из очереди? Это не отменить.')) return;
+    setClearing(true);
+    try {
+      const res = await fetch('/api/wa-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'clear-all' }),
+      });
+      const d = await res.json();
+      if (d.error) throw new Error(d.error);
+      await load();
+    } catch (e: any) {
+      setErrorMsg('Ошибка очистки: ' + e.message);
+    } finally {
+      setClearing(false);
+    }
+  };
+
   const deleteOne = async (item: WaItem) => {
     setBusyId(item.id);
     try {
@@ -215,7 +235,18 @@ export default function ScheduledPage() {
 
       {/* Queue */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">📋 Очередь ({waiting.length})</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">📋 Очередь ({waiting.length})</h2>
+          {waiting.length > 0 && (
+            <button
+              onClick={clearAll}
+              disabled={clearing}
+              className="text-xs px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 rounded-lg transition-all disabled:opacity-50"
+            >
+              {clearing ? 'Очищаю…' : '🗑 Очистить всё'}
+            </button>
+          )}
+        </div>
 
         {waiting.length === 0 ? (
           <div className="p-8 rounded-2xl border border-white/5 bg-slate-900/30 text-center text-slate-500 text-sm">
