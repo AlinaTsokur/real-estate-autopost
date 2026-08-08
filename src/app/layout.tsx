@@ -15,10 +15,9 @@ export const metadata: Metadata = {
 
 const navItems = [
   { href: '/new-unit', label: 'New Unit', icon: '➕' },
-  { href: '/manual-post', label: 'Manual Post Builder', icon: '✏️' },
-  { href: '/budget', label: 'Budget Builder', icon: '💰' },
+  { href: '/manual-post', label: 'Посты', icon: '✏️' },
+  { href: '/budget', label: 'Рассылки', icon: '💰' },
   { href: '/catalog', label: 'Catalog Builder', icon: '📄' },
-  { href: '/quick-sales', label: 'Quick Sales', icon: '⚡' },
   { href: '/drive-audit', label: 'Drive Audit', icon: '📂' },
   { href: '/wa-monitor', label: 'WA Monitor', icon: '📌' },
   { href: '/project-emoji', label: 'Смайлики проектов', icon: '🎨' },

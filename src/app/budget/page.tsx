@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import QuickSalesPage from '../quick-sales/page';
 
 const WA_GROUPS = [
   { id: '120363213058937905@g.us', name: 'Abu Dhabi & Dubai properties', defaultOn: true },
@@ -64,6 +65,7 @@ async function persistChecked(c: Record<string, boolean>) {
 }
 
 export default function BudgetPage() {
+  const [mode, setMode] = useState<'budget' | 'quick'>('budget');
   const [projects, setProjects] = useState<string[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectSearch, setProjectSearch] = useState('');
@@ -154,11 +156,34 @@ export default function BudgetPage() {
 
   return (
     <div className="max-w-6xl mx-auto w-full space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight mb-1">Budget Builder</h1>
-        <p className="text-slate-400 text-sm">Paste your raw TSV table data to generate a budget plan.</p>
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold text-white tracking-tight mb-1">Рассылки</h1>
+          <p className="text-slate-400 text-sm">Две утренние рассылки: список Budget Units и Quick Sales.</p>
+        </div>
+        {/* ── MODE TOGGLE ── */}
+        <div className="inline-flex p-1 rounded-xl bg-slate-900/60 border border-white/10 shrink-0">
+          <button
+            onClick={() => setMode('budget')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
+              ${mode === 'budget' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'text-slate-400 hover:text-white border border-transparent'}`}
+          >
+            💰 Budget Units
+          </button>
+          <button
+            onClick={() => setMode('quick')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
+              ${mode === 'quick' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' : 'text-slate-400 hover:text-white border border-transparent'}`}
+          >
+            ⚡ Quick Sales
+          </button>
+        </div>
       </div>
 
+      {mode === 'quick' ? (
+        <QuickSalesPage />
+      ) : (
+        <>
       {/* ── TRACKER ── */}
       <div className="p-5 rounded-2xl bg-slate-900/60 border border-white/5 backdrop-blur-xl relative overflow-visible">
         <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent rounded-t-2xl" />
@@ -376,6 +401,8 @@ export default function BudgetPage() {
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }
