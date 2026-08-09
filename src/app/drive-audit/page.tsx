@@ -10,10 +10,10 @@ const EXPECTED_LABEL: Record<string, string> = {
 };
 
 const STATUS_STYLE: Record<string, string> = {
-  ok:             'text-emerald-400',
-  wrong:          'text-rose-400',
-  not_found:      'text-amber-400',
-  config_missing: 'text-slate-400',
+  ok:             'bb-ok',
+  wrong:          'bb-bad',
+  not_found:      'bb-warn',
+  config_missing: 'bb-ink-3',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -62,8 +62,8 @@ export default function DriveAuditPage() {
   return (
     <div className="max-w-5xl mx-auto w-full">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold  tracking-tight mb-2" style={{ color: 'var(--ink-900)' }}>Drive Folder Audit</h1>
-        <p className="text-slate-400 text-sm">
+        <h1 className="text-3xl font-bold tracking-tight mb-2" style={{ color: 'var(--ink-900)' }}>Аудит папок Drive</h1>
+        <p className="bb-ink-3 text-sm">
           Проверяет что все папки юнитов находятся в правильном месте согласно статусу в Abu Dhabi.
         </p>
       </div>
@@ -72,22 +72,22 @@ export default function DriveAuditPage() {
         <button
           onClick={run}
           disabled={running}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-6 rounded-xl transition-all disabled:opacity-50 disabled:pointer-events-none"
+          className="flex items-center gap-2 bb-fill-accent hover:bb-fill-accent text-white font-semibold py-3 px-6 rounded-xl transition-all disabled:opacity-50 disabled:pointer-events-none"
         >
           {running ? (
             <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 bb-spin rounded-full animate-spin" />
               Проверяю...
             </>
           ) : '🔍 Запустить проверку'}
         </button>
         {running && (
-          <p className="text-slate-400 text-sm">Это может занять несколько минут — проверяем каждую папку в Drive</p>
+          <p className="bb-ink-3 text-sm">Это может занять несколько минут — проверяем каждую папку в Drive</p>
         )}
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm mb-6">
+        <div className="p-4 rounded-xl bb-tint-bad border bb-edge bb-bad text-sm mb-6">
           {error}
         </div>
       )}
@@ -97,14 +97,14 @@ export default function DriveAuditPage() {
           {/* Summary */}
           <div className="grid grid-cols-4 gap-4 mb-6">
             {[
-              { label: 'Всего проверено', value: result.total, color: 'text-white' },
-              { label: 'На месте',        value: result.ok,    color: 'text-emerald-400' },
-              { label: 'Не там',          value: result.wrong, color: 'text-rose-400' },
-              { label: 'Не найдено',      value: result.missing, color: 'text-amber-400' },
+              { label: 'Всего проверено', value: result.total, color: 'bb-ink' },
+              { label: 'На месте',        value: result.ok,    color: 'bb-ok' },
+              { label: 'Не там',          value: result.wrong, color: 'bb-bad' },
+              { label: 'Не найдено',      value: result.missing, color: 'bb-warn' },
             ].map(s => (
-              <div key={s.label} className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 text-center">
+              <div key={s.label} className="p-4 rounded-2xl bb-surface border bb-edge text-center">
                 <div className={`text-3xl font-bold ${s.color}`}>{s.value}</div>
-                <div className="text-xs text-slate-400 mt-1">{s.label}</div>
+                <div className="text-xs bb-ink-3 mt-1">{s.label}</div>
               </div>
             ))}
           </div>
@@ -117,8 +117,8 @@ export default function DriveAuditPage() {
                 onClick={() => setFilter(f)}
                 className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   filter === f
-                    ? 'bg-indigo-500/25 text-indigo-300 border border-indigo-500/40'
-                    : 'text-slate-400 border border-white/10 hover:text-white hover:bg-white/5'
+                    ? 'bb-tint-accent bb-accent border bb-edge'
+                    : 'bb-ink-3 border bb-edge hover:bb-ink hover:bb-surface-soft'
                 }`}
               >
                 {f === 'all' ? 'Все' : f === 'wrong' ? 'Проблемные' : 'ОК'}
@@ -127,55 +127,55 @@ export default function DriveAuditPage() {
           </div>
 
           {/* Table */}
-          <div className="rounded-2xl bg-slate-900/60 border border-white/5 overflow-auto max-h-[70vh]">
+          <div className="rounded-2xl bb-surface border bb-edge overflow-auto max-h-[70vh]">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-slate-900">
-                <tr className="border-b border-white/5 text-left">
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Строка</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Код</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Юнит</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Комментарий</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Должна быть</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Сейчас в</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Статус</th>
+              <thead className="sticky top-0 z-10 bb-surface">
+                <tr className="border-b bb-edge text-left">
+                  <th className="px-4 py-3 text-xs font-semibold bb-ink-3 uppercase tracking-wide">Строка</th>
+                  <th className="px-4 py-3 text-xs font-semibold bb-ink-3 uppercase tracking-wide">Код</th>
+                  <th className="px-4 py-3 text-xs font-semibold bb-ink-3 uppercase tracking-wide">Юнит</th>
+                  <th className="px-4 py-3 text-xs font-semibold bb-ink-3 uppercase tracking-wide">Комментарий</th>
+                  <th className="px-4 py-3 text-xs font-semibold bb-ink-3 uppercase tracking-wide">Должна быть</th>
+                  <th className="px-4 py-3 text-xs font-semibold bb-ink-3 uppercase tracking-wide">Сейчас в</th>
+                  <th className="px-4 py-3 text-xs font-semibold bb-ink-3 uppercase tracking-wide">Статус</th>
                 </tr>
               </thead>
               <tbody>
                 {visible.map((row, i) => (
                   <tr
                     key={row.rowNum}
-                    className={`border-b border-white/[0.04] ${i % 2 === 0 ? '' : 'bg-white/[0.01]'} ${
-                      row.status === 'wrong' ? 'bg-rose-500/5' : ''
+                    className={`border-b bb-edge ${i % 2 === 0 ? '' : 'bb-surface-soft'} ${
+                      row.status === 'wrong' ? 'bb-tint-bad' : ''
                     }`}
                   >
-                    <td className="px-4 py-3 text-slate-500">{row.rowNum}</td>
-                    <td className="px-4 py-3 text-slate-300 font-mono text-xs">
+                    <td className="px-4 py-3 bb-ink-4">{row.rowNum}</td>
+                    <td className="px-4 py-3 bb-ink-2 font-mono text-xs">
                       <a
                         href={`https://drive.google.com/drive/folders/${row.unitFolderId}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="hover:text-indigo-300 transition-colors"
+                        className="hover:bb-accent transition-colors"
                       >
                         {row.code}
                       </a>
                     </td>
-                    <td className="px-4 py-3 text-slate-300 max-w-[180px] truncate" title={row.folderName || row.unit}>
+                    <td className="px-4 py-3 bb-ink-2 max-w-[180px] truncate" title={row.folderName || row.unit}>
                       {row.folderName || row.unit}
                     </td>
-                    <td className="px-4 py-3 text-slate-400 text-xs">{row.comment || '—'}</td>
-                    <td className="px-4 py-3 text-slate-300 text-xs">{EXPECTED_LABEL[row.expected]}</td>
+                    <td className="px-4 py-3 bb-ink-3 text-xs">{row.comment || '—'}</td>
+                    <td className="px-4 py-3 bb-ink-2 text-xs">{EXPECTED_LABEL[row.expected]}</td>
                     <td className="px-4 py-3 text-xs">
                       {row.actualParentName ? (
                         <a
                           href={`https://drive.google.com/drive/folders/${row.actualParentId}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-slate-300 hover:text-indigo-300 transition-colors"
+                          className="bb-ink-2 hover:bb-accent transition-colors"
                         >
                           {row.actualParentName}
                         </a>
                       ) : (
-                        <span className="text-slate-500">—</span>
+                        <span className="bb-ink-4">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -183,14 +183,14 @@ export default function DriveAuditPage() {
                         {STATUS_LABEL[row.status]}
                       </span>
                       {row.detail && row.status === 'wrong' && (
-                        <p className="text-[10px] text-slate-500 mt-0.5 max-w-[200px]">{row.detail}</p>
+                        <p className="text-[10px] bb-ink-4 mt-0.5 max-w-[200px]">{row.detail}</p>
                       )}
                     </td>
                   </tr>
                 ))}
                 {visible.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                    <td colSpan={7} className="px-4 py-8 text-center bb-ink-4">
                       {filter === 'wrong' ? 'Все папки на своих местах 🎉' : 'Нет данных'}
                     </td>
                   </tr>

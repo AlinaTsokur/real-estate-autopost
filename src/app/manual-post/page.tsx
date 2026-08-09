@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Segmented from '@/components/Segmented';
 
 export default function ManualPostPage() {
   const [projects, setProjects] = useState<string[]>([]);
@@ -321,13 +322,13 @@ export default function ManualPostPage() {
   return (
     <div className="max-w-6xl mx-auto w-full">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold  tracking-tight mb-2" style={{ color: 'var(--ink-900)' }}>Manual Post Builder</h1>
-        <p className="text-slate-400">Parse a single row and prepare it for Telegram.</p>
+        <h1 className="text-3xl font-bold tracking-tight mb-2" style={{ color: 'var(--ink-900)' }}>Посты</h1>
+        <p className="bb-ink-3">Разбери строку из таблицы и собери из неё пост.</p>
       </div>
 
       {lastSent && (
-        <div className="flex items-center gap-4 mb-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
-          <div className="flex-1 text-sm text-emerald-300">
+        <div className="flex items-center gap-4 mb-6 p-4 rounded-2xl bb-tint-ok border bb-edge">
+          <div className="flex-1 text-sm bb-ok">
             Пост отправлен —{' '}
             <span className="font-mono font-semibold">{lastSent.code || lastSent.unit}</span>
             . Отметить как Approved в таблице?
@@ -335,11 +336,11 @@ export default function ManualPostPage() {
           <button
             onClick={handleApprove}
             disabled={approving}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-5 rounded-xl transition-all disabled:opacity-50 disabled:pointer-events-none text-sm"
+            className="flex items-center gap-2 bb-fill-accent hover:bb-fill-accent text-white font-semibold py-2 px-5 rounded-xl transition-all disabled:opacity-50 disabled:pointer-events-none text-sm"
           >
             {approving ? (
               <>
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-3.5 h-3.5 border-2 bb-spin rounded-full animate-spin" />
                 Сохраняю...
               </>
             ) : '✓ Approved'}
@@ -365,16 +366,16 @@ export default function ManualPostPage() {
                 }
               }}
               disabled={deleting}
-              className="flex items-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 font-medium py-2 px-4 rounded-xl transition-all disabled:opacity-50 disabled:pointer-events-none text-sm"
+              className="flex items-center gap-1.5 bb-tint-bad hover:bb-tint-bad border bb-edge bb-bad hover:bb-bad font-medium py-2 px-4 rounded-xl transition-all disabled:opacity-50 disabled:pointer-events-none text-sm"
             >
               {deleting ? (
-                <div className="w-3.5 h-3.5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
+                <div className="w-3.5 h-3.5 border-2 bb-spin rounded-full animate-spin" />
               ) : '🗑️ Удалить из TG'}
             </button>
           )}
           <button
             onClick={() => { setLastSent(null); setSentPost(null); }}
-            className="text-slate-500 hover:text-slate-300 text-xs transition-colors"
+            className="bb-ink-4 hover:bb-ink-2 text-xs transition-colors"
           >
             Пропустить
           </button>
@@ -384,30 +385,28 @@ export default function ManualPostPage() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* Left Column: Input Form & Preview */}
         <div className="space-y-8">
-          <div className="p-6 rounded-2xl bg-slate-900/60 border border-white/5 backdrop-blur-xl relative overflow-hidden">
-            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
+          <div className="p-6 rounded-2xl bb-surface border bb-edge relative overflow-hidden">
 
             <div className="space-y-5">
               {/* Source toggle */}
-              <div className="flex gap-2 p-1 bg-slate-950/50 border border-white/10 rounded-xl">
-                {([['paste', '📋 Вставить текст'], ['db', '🗄 Из базы'], ['c3', '⭐ C3']] as const).map(([val, label]) => (
-                  <button
-                    key={val}
-                    onClick={() => {
-                      setSource(val);
-                      if (val === 'c3' && postType !== 'READY_TO_MOVE' && postType !== 'NEW_PRICE') setPostType('READY_TO_MOVE');
-                    }}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${source === val ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <Segmented
+                full
+                value={source}
+                onChange={val => {
+                  setSource(val);
+                  if (val === 'c3' && postType !== 'READY_TO_MOVE' && postType !== 'NEW_PRICE') setPostType('READY_TO_MOVE');
+                }}
+                options={[
+                  { value: 'paste', label: 'Вставить текст', icon: '📋' },
+                  { value: 'db', label: 'Из базы', icon: '🗄' },
+                  { value: 'c3', label: 'C3', icon: '⭐' },
+                ] as const}
+              />
 
               {source === 'db' && (
                 <>
                   <div className="relative">
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Проект (из базы)</label>
+                    <label className="block text-sm font-medium bb-ink-2 mb-2">Проект (из базы)</label>
                     <input
                       type="text"
                       value={dbProjectSearch}
@@ -415,63 +414,63 @@ export default function ManualPostPage() {
                       onFocus={() => setDbDropdownOpen(true)}
                       onBlur={() => setTimeout(() => setDbDropdownOpen(false), 200)}
                       placeholder="Начни вводить (рус/англ)…"
-                      className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-white placeholder-slate-500"
+                      className="w-full px-4 py-3 bb-surface-soft border bb-edge rounded-xl focus:ring-2 focus:bb-ring outline-none bb-ink bb-ph"
                     />
                     {dbDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl shadow-black/50 max-h-60 overflow-y-auto p-1 custom-scrollbar">
+                      <div className="absolute z-50 w-full mt-2 bb-surface border bb-edge rounded-xl shadow-xl bb-lift max-h-60 overflow-y-auto p-1 custom-scrollbar">
                         {dbProjects.filter(p => p.name.toLowerCase().includes(dbProjectSearch.toLowerCase())).map(p => (
                           <div
                             key={p.id}
                             onClick={() => { setDbProjectId(p.id); setDbProjectSearch(p.name); setDbDropdownOpen(false); setUnitResults([]); }}
-                            className={`px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors ${dbProjectId === p.id ? 'bg-indigo-500/20 text-indigo-300 font-medium' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}
+                            className={`px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors ${dbProjectId === p.id ? 'bb-tint-accent bb-accent font-medium' : 'bb-ink-2 hover:bb-surface-soft hover:bb-ink'}`}
                           >
                             {p.name}
                           </div>
                         ))}
                         {dbProjects.filter(p => p.name.toLowerCase().includes(dbProjectSearch.toLowerCase())).length === 0 && (
-                          <div className="px-4 py-3 text-sm text-slate-500 text-center">Проект не найден</div>
+                          <div className="px-4 py-3 text-sm bb-ink-4 text-center">Проект не найден</div>
                         )}
                       </div>
                     )}
                   </div>
                   <div className="relative">
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Юнит — код (с точками или без) или название</label>
+                    <label className="block text-sm font-medium bb-ink-2 mb-2">Юнит — код (с точками или без) или название</label>
                     <input
                       type="text"
                       value={unitQuery}
                       onChange={e => setUnitQuery(e.target.value)}
                       placeholder="003·02·001 / 00302001 / Un-902"
-                      className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-white placeholder-slate-500 font-mono text-sm"
+                      className="w-full px-4 py-3 bb-surface-soft border bb-edge rounded-xl focus:ring-2 focus:bb-ring outline-none bb-ink bb-ph font-mono text-sm"
                     />
                     {unitResults.length > 0 && (
-                      <div className="mt-2 bg-slate-900 border border-white/10 rounded-xl max-h-64 overflow-y-auto p-1 custom-scrollbar">
+                      <div className="mt-2 bb-surface border bb-edge rounded-xl max-h-64 overflow-y-auto p-1 custom-scrollbar">
                         {unitResults.map(u => (
                           <div
                             key={u.id}
                             onClick={() => pickDbUnit(u.id)}
-                            className="px-3 py-2.5 rounded-lg cursor-pointer text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center justify-between gap-3"
+                            className="px-3 py-2.5 rounded-lg cursor-pointer text-sm bb-ink-2 hover:bb-surface-soft hover:bb-ink flex items-center justify-between gap-3"
                           >
-                            <span className="font-mono text-indigo-300">{u.code}</span>
+                            <span className="font-mono bb-accent">{u.code}</span>
                             <span className="flex-1 truncate">{u.unitNumber}</span>
-                            <span className="text-xs text-slate-500 truncate">{u.project}</span>
+                            <span className="text-xs bb-ink-4 truncate">{u.project}</span>
                           </div>
                         ))}
                       </div>
                     )}
-                    {dbLoading && <div className="mt-2 text-xs text-slate-400">Загружаю юнит…</div>}
+                    {dbLoading && <div className="mt-2 text-xs bb-ink-3">Загружаю юнит…</div>}
                   </div>
 
                   {emojiMissing && (
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                      <div className="text-xs text-amber-300 mb-2">⚠️ У проекта «{emojiMissing.projectName}» не задан смайлик. Добавь — сохранится в базу:</div>
+                    <div className="p-3 rounded-xl bb-tint-warn border bb-edge">
+                      <div className="text-xs bb-warn mb-2">⚠️ У проекта «{emojiMissing.projectName}» не задан смайлик. Добавь — сохранится в базу:</div>
                       <div className="flex gap-2">
                         <input
                           value={emojiInput}
                           onChange={e => setEmojiInput(e.target.value)}
                           placeholder="🌿"
-                          className="w-20 px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-center text-lg outline-none focus:ring-2 focus:ring-amber-500/50"
+                          className="w-20 px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-center text-lg outline-none focus:ring-2 focus:bb-ring"
                         />
-                        <button onClick={saveEmoji} className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium px-4 rounded-lg">Сохранить</button>
+                        <button onClick={saveEmoji} className="bb-fill-accent text-white text-sm font-bold px-4 rounded-full">Сохранить</button>
                       </div>
                     </div>
                   )}
@@ -480,25 +479,25 @@ export default function ManualPostPage() {
 
               {source === 'c3' && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Юнит C3 (из Google-таблицы)</label>
+                  <label className="block text-sm font-medium bb-ink-2 mb-2">Юнит C3 (из Google-таблицы)</label>
                   <select
                     value={c3Unit}
                     onChange={e => pickC3Unit(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-white appearance-none cursor-pointer"
+                    className="w-full px-4 py-3 bb-surface-soft border bb-edge rounded-xl focus:ring-2 focus:bb-ring outline-none bb-ink appearance-none cursor-pointer"
                   >
                     <option value="">— выбери юнит —</option>
                     {c3Units.map(u => <option key={u} value={u}>{u}</option>)}
                   </select>
-                  {c3Loading && <div className="mt-2 text-xs text-slate-400">Загружаю юнит и слайд…</div>}
+                  {c3Loading && <div className="mt-2 text-xs bb-ink-3">Загружаю юнит и слайд…</div>}
                 </div>
               )}
 
               {source === 'paste' && (
               <div className="relative">
-                <label className="block text-sm font-medium text-slate-300 mb-2">Project</label>
+                <label className="block text-sm font-medium bb-ink-2 mb-2">Project</label>
                 {projectsLoading ? (
-                  <div className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl text-slate-500 flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-full px-4 py-3 bb-surface-soft border bb-edge rounded-xl bb-ink-4 flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 bb-spin rounded-full animate-spin" />
                     Loading projects...
                   </div>
                 ) : projects.length > 0 ? (
@@ -514,14 +513,14 @@ export default function ManualPostPage() {
                       onFocus={() => setIsDropdownOpen(true)}
                       onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
                       placeholder="Search project..."
-                      className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all text-white placeholder-slate-500"
+                      className="w-full px-4 py-3 bb-surface-soft border bb-edge rounded-xl focus:ring-2 focus:bb-ring focus:bb-edge outline-none transition-all bb-ink bb-ph"
                     />
                     <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                      <svg className="w-4 h-4 bb-ink-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
                     
                     {isDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl shadow-black/50 max-h-60 overflow-y-auto overflow-x-hidden p-1 custom-scrollbar">
+                      <div className="absolute z-50 w-full mt-2 bb-surface border bb-edge rounded-xl shadow-xl bb-lift max-h-60 overflow-y-auto overflow-x-hidden p-1 custom-scrollbar">
                         {filteredProjects.length > 0 ? (
                           filteredProjects.map((p) => (
                             <div
@@ -531,19 +530,19 @@ export default function ManualPostPage() {
                                 setProjectSearch(p);
                                 setIsDropdownOpen(false);
                               }}
-                              className={`px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors ${project === p ? 'bg-indigo-500/20 text-indigo-300 font-medium' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}
+                              className={`px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors ${project === p ? 'bb-tint-accent bb-accent font-medium' : 'bb-ink-2 hover:bb-surface-soft hover:bb-ink'}`}
                             >
                               {p}
                             </div>
                           ))
                         ) : (
-                          <div className="px-4 py-3 text-sm text-slate-500 text-center">No projects found</div>
+                          <div className="px-4 py-3 text-sm bb-ink-4 text-center">No projects found</div>
                         )}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="w-full px-4 py-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-sm">
+                  <div className="w-full px-4 py-3 bb-tint-bad border bb-edge rounded-xl bb-bad text-sm">
                     Failed to load projects.
                   </div>
                 )}
@@ -551,11 +550,11 @@ export default function ManualPostPage() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Post Type</label>
+                <label className="block text-sm font-medium bb-ink-2 mb-2">Post Type</label>
                 <select
                   value={postType}
                   onChange={(e) => setPostType(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all text-white appearance-none cursor-pointer"
+                  className="w-full px-4 py-3 bb-surface-soft border bb-edge rounded-xl focus:ring-2 focus:bb-ring focus:bb-edge outline-none transition-all bb-ink appearance-none cursor-pointer"
                 >
                   {source === 'c3' ? (
                     <>
@@ -578,12 +577,12 @@ export default function ManualPostPage() {
               {source === 'paste' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Paste Row (from Canva/Sheets)</label>
+                    <label className="block text-sm font-medium bb-ink-2 mb-2">Paste Row (from Canva/Sheets)</label>
                     <textarea
                       rows={4}
                       value={rawText}
                       onChange={(e) => setRawText(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all text-white placeholder-slate-500 font-mono text-sm"
+                      className="w-full px-4 py-3 bb-surface-soft border bb-edge rounded-xl focus:ring-2 focus:bb-ring focus:bb-edge outline-none transition-all bb-ink bb-ph font-mono text-sm"
                       placeholder="Paste TSV row here..."
                     />
                   </div>
@@ -591,7 +590,7 @@ export default function ManualPostPage() {
                   <button
                     onClick={handleParse}
                     disabled={loading || !project}
-                    className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg shadow-indigo-500/25 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                    className="w-full bb-fill-accent hover: hover: bb-ink font-medium py-3 px-6 rounded-xl transition-all shadow-lg bb-lift active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
                   >
                     {loading ? 'Parsing...' : 'Parse Data'}
                   </button>
@@ -601,20 +600,20 @@ export default function ManualPostPage() {
           </div>
 
           {postPreview && (
-            <div className="p-6 rounded-2xl bg-slate-900/40 border border-white/5 backdrop-blur-md space-y-4">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="p-6 rounded-2xl bb-surface border bb-edge space-y-4">
+              <h3 className="text-lg font-semibold bb-ink flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bb-fill-accent animate-pulse" />
                 Preview &amp; Edit
               </h3>
               <div>
                 <div
-                  className="whitespace-pre-wrap font-sans text-[14px] text-slate-200 bg-slate-950/50 p-4 rounded-xl border border-white/5 leading-relaxed"
+                  className="whitespace-pre-wrap font-sans text-[14px] bb-ink-2 bb-surface-soft p-4 rounded-xl border bb-edge leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: editableTgHtml.replace(/\n/g, '<br/>') }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowTgSource(v => !v)}
-                  className="mt-2 flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                  className="mt-2 flex items-center gap-1.5 text-xs bb-ink-3 hover:bb-ink-2 transition-colors"
                 >
                   <span className="inline-block w-3 text-center">{showTgSource ? '▾' : '▸'}</span>
                   Telegram (HTML)
@@ -624,7 +623,7 @@ export default function ManualPostPage() {
                     rows={8}
                     value={editableTgHtml}
                     onChange={e => { setEditableTgHtml(e.target.value); setEditedByUser(true); }}
-                    className="mt-1.5 w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-slate-300 font-mono outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y"
+                    className="mt-1.5 w-full px-3 py-2 bb-surface-soft border bb-edge rounded-xl text-sm bb-ink-2 font-mono outline-none focus:ring-2 focus:bb-ring resize-y"
                     spellCheck={false}
                   />
                 )}
@@ -633,7 +632,7 @@ export default function ManualPostPage() {
                 <button
                   type="button"
                   onClick={() => setShowWaSource(v => !v)}
-                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                  className="flex items-center gap-1.5 text-xs bb-ink-3 hover:bb-ink-2 transition-colors"
                 >
                   <span className="inline-block w-3 text-center">{showWaSource ? '▾' : '▸'}</span>
                   WhatsApp
@@ -643,7 +642,7 @@ export default function ManualPostPage() {
                     rows={8}
                     value={editableWaText}
                     onChange={e => { setEditableWaText(e.target.value); setEditedByUser(true); }}
-                    className="mt-1.5 w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-slate-300 font-mono outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y"
+                    className="mt-1.5 w-full px-3 py-2 bb-surface-soft border bb-edge rounded-xl text-sm bb-ink-2 font-mono outline-none focus:ring-2 focus:bb-ring resize-y"
                     spellCheck={false}
                   />
                 )}
@@ -654,13 +653,13 @@ export default function ManualPostPage() {
 
         {/* Right Column: Parsed Data Editor */}
         {parsedData && (
-          <div className="p-6 rounded-2xl bg-slate-900/40 border border-white/5 backdrop-blur-md space-y-6 h-fit">
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-indigo-500" />
+          <div className="p-6 rounded-2xl bb-surface border bb-edge space-y-6 h-fit">
+            <div className="flex items-center justify-between border-b bb-edge pb-4">
+              <h3 className="text-lg font-semibold bb-ink flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bb-fill-accent" />
                 Edit Parsed Data
               </h3>
-              <span className="text-xs font-medium px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-wider">
+              <span className="text-xs font-medium px-2.5 py-1 rounded-md bb-tint-accent bb-accent border bb-edge uppercase tracking-wider">
                 {parsedData.objectType} Format
               </span>
             </div>
@@ -668,25 +667,25 @@ export default function ManualPostPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Unit / Code</label>
-                  <input type="text" value={parsedData.code || parsedData.unit} onChange={(e) => updateField('code', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                  <label className="block text-xs bb-ink-3 mb-1">Unit / Code</label>
+                  <input type="text" value={parsedData.code || parsedData.unit} onChange={(e) => updateField('code', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink outline-none focus:ring-2 focus:bb-ring" />
                 </div>
                 {postType !== 'PRICE_CHANGE' && (
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Type</label>
-                    <input type="text" value={parsedData.type} onChange={(e) => updateField('type', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                    <label className="block text-xs bb-ink-3 mb-1">Type</label>
+                    <input type="text" value={parsedData.type} onChange={(e) => updateField('type', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink outline-none focus:ring-2 focus:bb-ring" />
                   </div>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Selling Price (AED)</label>
-                  <input type="text" value={parsedData.sellingPrice} onChange={(e) => updateField('sellingPrice', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-emerald-400 font-medium outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                  <label className="block text-xs bb-ink-3 mb-1">Selling Price (AED)</label>
+                  <input type="text" value={parsedData.sellingPrice} onChange={(e) => updateField('sellingPrice', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ok font-medium outline-none focus:ring-2 focus:bb-ring" />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Original Price (AED)</label>
-                  <input type="text" value={parsedData.originalPrice || ''} onChange={(e) => updateField('originalPrice', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                  <label className="block text-xs bb-ink-3 mb-1">Original Price (AED)</label>
+                  <input type="text" value={parsedData.originalPrice || ''} onChange={(e) => updateField('originalPrice', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink-2 outline-none focus:ring-2 focus:bb-ring" />
                 </div>
               </div>
 
@@ -694,32 +693,32 @@ export default function ManualPostPage() {
                 {(postType === 'NEW_PRICE' || postType === 'PRICE_CHANGE') ? (
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs text-slate-400">Old Price (AED)</label>
+                      <label className="block text-xs bb-ink-3">Old Price (AED)</label>
                       <button 
                         onClick={() => handleSearchOldPrice()}
                         disabled={searchingOldPrice}
-                        className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
+                        className="text-xs bb-accent hover:bb-accent font-medium"
                       >
                         {searchingOldPrice ? 'Searching...' : '🔍 Find in Channel'}
                       </button>
                     </div>
-                    <input type="text" value={parsedData.oldPrice || ''} onChange={(e) => updateField('oldPrice', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-rose-400 outline-none focus:ring-2 focus:ring-indigo-500/50" placeholder="Required" />
+                    <input type="text" value={parsedData.oldPrice || ''} onChange={(e) => updateField('oldPrice', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-bad outline-none focus:ring-2 focus:bb-ring" placeholder="Required" />
                     
                     {oldPostsResult && (
-                      <div className="mt-3 p-3 bg-slate-950/50 border border-white/5 rounded-lg max-h-60 overflow-y-auto custom-scrollbar">
-                        <div className="text-xs text-slate-400 mb-2">Original Price: <strong className="text-white">{oldPostsResult.originalPrice || 'Not found'}</strong></div>
+                      <div className="mt-3 p-3 bb-surface-soft border bb-edge rounded-lg max-h-60 overflow-y-auto custom-scrollbar">
+                        <div className="text-xs bb-ink-3 mb-2">Original Price: <strong className="bb-ink">{oldPostsResult.originalPrice || 'Not found'}</strong></div>
                         {oldPostsResult.posts?.length > 0 ? (
                           <div className="space-y-2">
                             {oldPostsResult.posts.map((post: any) => (
-                              <div key={post.id} className="p-2 bg-slate-900 border border-white/5 rounded relative">
-                                {post.date && <div className="absolute top-2 right-2 text-[9px] text-slate-500/70">{post.date}</div>}
-                                <p className="text-[10px] text-slate-400 line-clamp-3 mb-2 pr-12">{post.text}</p>
+                              <div key={post.id} className="p-2 bb-surface border bb-edge rounded relative">
+                                {post.date && <div className="absolute top-2 right-2 text-[9px] bb-ink-4/70">{post.date}</div>}
+                                <p className="text-[10px] bb-ink-3 line-clamp-3 mb-2 pr-12">{post.text}</p>
                                 <div className="flex items-center justify-between">
-                                  <a href={post.url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-400 hover:underline">View Post</a>
+                                  <a href={post.url} target="_blank" rel="noreferrer" className="text-[10px] bb-accent hover:underline">View Post</a>
                                   <button onClick={() => {
                                     updateField('oldPrice', post.extractedSellingPrice || oldPostsResult.originalPrice);
                                     updateField('oldPostUrl', post.url);
-                                  }} className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded hover:bg-indigo-500/40">
+                                  }} className="text-[10px] bb-tint-accent bb-accent px-2 py-0.5 rounded hover:bb-tint-accent">
                                     Use Price {post.extractedSellingPrice ? `(${post.extractedSellingPrice})` : ''}
                                   </button>
                                 </div>
@@ -727,7 +726,7 @@ export default function ManualPostPage() {
                             ))}
                           </div>
                         ) : (
-                          <div className="text-[10px] text-rose-400">No posts found.</div>
+                          <div className="text-[10px] bb-bad">No posts found.</div>
                         )}
                       </div>
                     )}
@@ -738,40 +737,40 @@ export default function ManualPostPage() {
 
                 {postType !== 'PRICE_CHANGE' && (
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Approx. Rental Rate</label>
-                    <input type="text" value={parsedData.approxRentalRate || ''} onChange={(e) => updateField('approxRentalRate', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/50" placeholder="e.g. 10%" />
+                    <label className="block text-xs bb-ink-3 mb-1">Approx. Rental Rate</label>
+                    <input type="text" value={parsedData.approxRentalRate || ''} onChange={(e) => updateField('approxRentalRate', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink-2 outline-none focus:ring-2 focus:bb-ring" placeholder="e.g. 10%" />
                   </div>
                 )}
               </div>
 
               {postType !== 'PRICE_CHANGE' && (
-                <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
+                <div className="grid grid-cols-2 gap-4 border-t bb-edge pt-4">
                   {!isVilla && (
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">Area (sqm)</label>
-                      <input type="text" value={parsedData.areaM2 || ''} onChange={(e) => updateField('areaM2', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                      <label className="block text-xs bb-ink-3 mb-1">Area (sqm)</label>
+                      <input type="text" value={parsedData.areaM2 || ''} onChange={(e) => updateField('areaM2', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink outline-none focus:ring-2 focus:bb-ring" />
                     </div>
                   )}
                   {isVilla && (
                     <>
                       <div>
-                        <label className="block text-xs text-slate-400 mb-1">Gross Area (sqm)</label>
-                        <input type="text" value={parsedData.grossAreaM2 || ''} onChange={(e) => updateField('grossAreaM2', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                        <label className="block text-xs bb-ink-3 mb-1">Gross Area (sqm)</label>
+                        <input type="text" value={parsedData.grossAreaM2 || ''} onChange={(e) => updateField('grossAreaM2', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink outline-none focus:ring-2 focus:bb-ring" />
                       </div>
                       <div>
-                        <label className="block text-xs text-slate-400 mb-1">Plot Area (sqm)</label>
-                        <input type="text" value={parsedData.plotAreaM2 || ''} onChange={(e) => updateField('plotAreaM2', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                        <label className="block text-xs bb-ink-3 mb-1">Plot Area (sqm)</label>
+                        <input type="text" value={parsedData.plotAreaM2 || ''} onChange={(e) => updateField('plotAreaM2', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink outline-none focus:ring-2 focus:bb-ring" />
                       </div>
                     </>
                   )}
                   {!isVilla && (
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">Floor</label>
+                      <label className="block text-xs bb-ink-3 mb-1">Floor</label>
                       {floors.length > 0 ? (
                         <select
                           value={parsedData.floor || ''}
                           onChange={(e) => updateField('floor', e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50 appearance-none cursor-pointer"
+                          className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink outline-none focus:ring-2 focus:bb-ring appearance-none cursor-pointer"
                         >
                           <option value="">Select floor...</option>
                           {/* value from the DB may not be in the sheet list — keep it selectable */}
@@ -783,7 +782,7 @@ export default function ManualPostPage() {
                           ))}
                         </select>
                       ) : (
-                        <input type="text" value={parsedData.floor || ''} onChange={(e) => updateField('floor', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                        <input type="text" value={parsedData.floor || ''} onChange={(e) => updateField('floor', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink outline-none focus:ring-2 focus:bb-ring" />
                       )}
                     </div>
                   )}
@@ -794,52 +793,52 @@ export default function ManualPostPage() {
                 <div className="grid grid-cols-2 gap-4">
                   {!isVilla && (
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">View</label>
-                      <input type="text" value={parsedData.view || ''} onChange={(e) => updateField('view', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                      <label className="block text-xs bb-ink-3 mb-1">View</label>
+                      <input type="text" value={parsedData.view || ''} onChange={(e) => updateField('view', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink outline-none focus:ring-2 focus:bb-ring" />
                     </div>
                   )}
                   <div className={isVilla ? "col-span-2" : ""}>
-                    <label className="block text-xs text-slate-400 mb-1">Handover</label>
-                    <input type="text" value={parsedData.handover || ''} onChange={(e) => updateField('handover', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                    <label className="block text-xs bb-ink-3 mb-1">Handover</label>
+                    <input type="text" value={parsedData.handover || ''} onChange={(e) => updateField('handover', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink outline-none focus:ring-2 focus:bb-ring" />
                   </div>
                 </div>
               )}
 
               {isVilla && (
-                <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
+                <div className="grid grid-cols-2 gap-4 border-t bb-edge pt-4">
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Row Name</label>
-                    <input type="text" value={parsedData.rowName || ''} onChange={(e) => updateField('rowName', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                    <label className="block text-xs bb-ink-3 mb-1">Row Name</label>
+                    <input type="text" value={parsedData.rowName || ''} onChange={(e) => updateField('rowName', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink outline-none focus:ring-2 focus:bb-ring" />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Unit</label>
-                    <input type="text" value={parsedData.unit || ''} onChange={(e) => updateField('unit', e.target.value)} className="w-full px-3 py-2 bg-slate-950/50 border border-white/10 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                    <label className="block text-xs bb-ink-3 mb-1">Unit</label>
+                    <input type="text" value={parsedData.unit || ''} onChange={(e) => updateField('unit', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink outline-none focus:ring-2 focus:bb-ring" />
                   </div>
                 </div>
               )}
 
               {postType !== 'PRICE_CHANGE' && (
-                <div className="pt-4 border-t border-white/5">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Slide Image</label>
+                <div className="pt-4 border-t bb-edge">
+                  <label className="block text-sm font-medium bb-ink-2 mb-2">Slide Image</label>
                   
                   {parsedData.slideDataUrl ? (
-                    <div className="relative w-full rounded-xl overflow-hidden border border-white/10 mb-3 group">
+                    <div className="relative w-full rounded-xl overflow-hidden border bb-edge mb-3 group">
                       <img src={parsedData.slideDataUrl} alt="Slide preview" className="w-full h-auto block max-h-72 object-contain" />
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="absolute inset-0 bb-surface opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <button 
                           onClick={() => updateField('slideDataUrl', '')}
-                          className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                          className="bb-fill-ink hover:bb-fill-ink text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                         >
                           Remove Image
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all cursor-pointer">
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed bb-edge rounded-xl hover:bb-edge hover:bb-tint-accent transition-all cursor-pointer">
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <svg className="w-8 h-8 mb-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                        <p className="mb-2 text-sm text-slate-400"><span className="font-semibold text-indigo-400">Click to upload</span> or drag and drop</p>
-                        <p className="text-xs text-slate-500">JPG, PNG or WEBP (Canva slide)</p>
+                        <svg className="w-8 h-8 mb-3 bb-ink-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p className="mb-2 text-sm bb-ink-3"><span className="font-semibold bb-accent">Click to upload</span> or drag and drop</p>
+                        <p className="text-xs bb-ink-4">JPG, PNG or WEBP (Canva slide)</p>
                       </div>
                       <input 
                         type="file" 
@@ -872,7 +871,7 @@ export default function ManualPostPage() {
             <button
               onClick={handleSend}
               disabled={sending}
-              className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg shadow-emerald-500/25 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none mt-6"
+              className="w-full bb-fill-accent hover: hover: bb-ink font-medium py-3 px-6 rounded-xl transition-all shadow-lg bb-lift active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none mt-6"
             >
               {sending ? 'Sending to Review Group...' : 'Send to Telegram'}
             </button>

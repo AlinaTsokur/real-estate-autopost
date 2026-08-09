@@ -52,13 +52,13 @@ export default function ScheduledPage() {
   const isReady = state === 'authorized';
 
   const stateInfo: Record<string, { dot: string; label: string; cls: string }> = {
-    authorized: { dot: '🟢', label: 'Авторизован — можно отправлять', cls: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' },
-    yellowCard: { dot: '🟡', label: 'Жёлтая карточка — WhatsApp ограничил номер, отправка заблокирована', cls: 'bg-amber-500/10 border-amber-500/30 text-amber-300' },
-    blocked: { dot: '🔴', label: 'Заблокирован — номер забанен', cls: 'bg-rose-500/10 border-rose-500/30 text-rose-300' },
-    notAuthorized: { dot: '🔴', label: 'Не авторизован — переподключи WhatsApp в Green API', cls: 'bg-rose-500/10 border-rose-500/30 text-rose-300' },
-    sleepMode: { dot: '🟡', label: 'Спящий режим — телефон офлайн', cls: 'bg-amber-500/10 border-amber-500/30 text-amber-300' },
-    starting: { dot: '⚪', label: 'Запускается...', cls: 'bg-slate-500/10 border-slate-500/30 text-slate-300' },
-    unknown: { dot: '⚪', label: 'Статус неизвестен', cls: 'bg-slate-500/10 border-slate-500/30 text-slate-400' },
+    authorized: { dot: '🟢', label: 'Авторизован — можно отправлять', cls: 'bb-tint-ok bb-edge bb-ok' },
+    yellowCard: { dot: '🟡', label: 'Жёлтая карточка — WhatsApp ограничил номер, отправка заблокирована', cls: 'bb-tint-warn bb-edge bb-warn' },
+    blocked: { dot: '🔴', label: 'Заблокирован — номер забанен', cls: 'bb-tint-bad bb-edge bb-bad' },
+    notAuthorized: { dot: '🔴', label: 'Не авторизован — переподключи WhatsApp в Green API', cls: 'bb-tint-bad bb-edge bb-bad' },
+    sleepMode: { dot: '🟡', label: 'Спящий режим — телефон офлайн', cls: 'bb-tint-warn bb-edge bb-warn' },
+    starting: { dot: '⚪', label: 'Запускается...', cls: 'bb-surface-soft bb-ink-2' },
+    unknown: { dot: '⚪', label: 'Статус неизвестен', cls: 'bb-surface-soft bb-ink-3' },
   };
   const si = stateInfo[state] || stateInfo.unknown;
 
@@ -169,7 +169,7 @@ export default function ScheduledPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 bb-spin rounded-full animate-spin" />
       </div>
     );
   }
@@ -177,8 +177,8 @@ export default function ScheduledPage() {
   return (
     <div className="max-w-3xl mx-auto w-full space-y-8">
       <div>
-        <h1 className="text-3xl font-bold  tracking-tight mb-1" style={{ color: 'var(--ink-900)' }}>WA Schedule</h1>
-        <p className="text-slate-400 text-sm">
+        <h1 className="text-3xl font-bold tracking-tight mb-1" style={{ color: 'var(--ink-900)' }}>Расписание WA</h1>
+        <p className="bb-ink-3 text-sm">
           Посты попадают сюда после «Send to Telegram». Задай время по Дубаю — пост уйдёт сам. Или отправь/удали вручную.
         </p>
       </div>
@@ -190,58 +190,58 @@ export default function ScheduledPage() {
         <button
           onClick={refreshState}
           disabled={refreshingState}
-          className="text-xs px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-all disabled:opacity-50"
+          className="text-xs px-2.5 py-1 rounded-lg bb-surface-soft hover:bb-surface-soft transition-all disabled:opacity-50"
         >
           {refreshingState ? '...' : '↻ Обновить'}
         </button>
       </div>
 
       {!isReady && (
-        <div className="px-4 py-3 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-amber-200/90 text-xs leading-relaxed">
+        <div className="px-4 py-3 rounded-2xl bb-tint-warn border bb-edge bb-warn/90 text-xs leading-relaxed">
           ⚠️ Пока WhatsApp не в статусе 🟢 «Авторизован», отправка заблокирована (и ручная, и автоматическая) — чтобы не усугублять блокировку. Переждите ограничение и не шлите тесты.
         </div>
       )}
 
       {errorMsg && (
-        <div className="px-4 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-start gap-3">
+        <div className="px-4 py-3 rounded-2xl bb-tint-bad border bb-edge bb-bad text-sm flex items-start gap-3">
           <span className="flex-1">{errorMsg}</span>
-          <button onClick={() => setErrorMsg(null)} className="text-rose-400 hover:text-white text-lg leading-none">×</button>
+          <button onClick={() => setErrorMsg(null)} className="bb-bad hover:bb-ink text-lg leading-none">×</button>
         </div>
       )}
 
       {/* Chat ID */}
-      <div className="p-5 rounded-2xl bg-slate-900/60 border border-white/5 space-y-3">
-        <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">⚙️ WhatsApp Chat ID</h2>
+      <div className="p-5 rounded-2xl bb-surface border bb-edge space-y-3">
+        <h2 className="text-sm font-semibold bb-ink-2 uppercase tracking-wider">⚙️ WhatsApp Chat ID</h2>
         <div className="flex gap-2">
           <input
             type="text"
             value={chatId}
             onChange={e => setChatId(e.target.value)}
             placeholder="37257957905@c.us или 120363...@g.us"
-            className="flex-1 px-3 py-2 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50 font-mono"
+            className="flex-1 px-3 py-2 bb-surface-soft border bb-edge rounded-xl text-sm bb-ink outline-none focus:ring-2 focus:bb-ring font-mono"
           />
           <button
             onClick={saveChatId}
             disabled={savingConfig}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-xl transition-all disabled:opacity-50 whitespace-nowrap"
+            className="px-4 py-2 bb-surface-soft hover:bb-surface-soft bb-ink text-sm font-medium rounded-xl transition-all disabled:opacity-50 whitespace-nowrap"
           >
             {savingConfig ? '...' : 'Сохранить'}
           </button>
         </div>
-        <p className="text-[11px] text-slate-500">
-          Личный чат: <code className="text-slate-400">номер@c.us</code> · Группа: <code className="text-slate-400">id@g.us</code>
+        <p className="text-[11px] bb-ink-4">
+          Личный чат: <code className="bb-ink-3">номер@c.us</code> · Группа: <code className="bb-ink-3">id@g.us</code>
         </p>
       </div>
 
       {/* Queue */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">📋 Очередь ({waiting.length})</h2>
+          <h2 className="text-sm font-semibold bb-ink-2 uppercase tracking-wider">📋 Очередь ({waiting.length})</h2>
           {waiting.length > 0 && (
             <button
               onClick={clearAll}
               disabled={clearing}
-              className="text-xs px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 rounded-lg transition-all disabled:opacity-50"
+              className="text-xs px-3 py-1.5 bb-tint-bad hover:bb-tint-bad border bb-edge bb-bad hover:bb-bad rounded-lg transition-all disabled:opacity-50"
             >
               {clearing ? 'Очищаю…' : '🗑 Очистить всё'}
             </button>
@@ -249,60 +249,60 @@ export default function ScheduledPage() {
         </div>
 
         {waiting.length === 0 ? (
-          <div className="p-8 rounded-2xl border border-white/5 bg-slate-900/30 text-center text-slate-500 text-sm">
+          <div className="p-8 rounded-2xl border bb-edge bb-surface text-center bb-ink-4 text-sm">
             Очередь пуста. Посты появятся здесь после нажатия «Send to Telegram» на странице Manual Post.
           </div>
         ) : (
           <div className="space-y-3">
             {waiting.map(item => (
-              <div key={item.id} className="rounded-2xl border border-white/5 bg-slate-900/40 p-4 space-y-3">
+              <div key={item.id} className="rounded-2xl border bb-edge bb-surface p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-sm font-medium text-white truncate">{item.label}</span>
+                      <span className="text-sm font-medium bb-ink truncate">{item.label}</span>
                       {item.drive_file_id && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 shrink-0">📷 фото</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bb-tint-accent bb-accent shrink-0">📷 фото</span>
                       )}
                     </div>
-                    <span className="text-[11px] text-slate-500">создан {formatCreated(item.created_at)}</span>
+                    <span className="text-[11px] bb-ink-4">создан {formatCreated(item.created_at)}</span>
                   </div>
 
                   <button
                     onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
-                    className="text-[11px] text-indigo-400 hover:text-indigo-300 shrink-0"
+                    className="text-[11px] bb-accent hover:bb-accent shrink-0"
                   >
                     {expandedId === item.id ? 'скрыть ▲' : 'текст ▼'}
                   </button>
                 </div>
 
                 {expandedId === item.id && (
-                  <pre className="text-[11px] text-slate-300 whitespace-pre-wrap font-sans bg-slate-950/50 p-3 rounded-xl border border-white/5 max-h-48 overflow-y-auto">
+                  <pre className="text-[11px] bb-ink-2 whitespace-pre-wrap font-sans bb-surface-soft p-3 rounded-xl border bb-edge max-h-48 overflow-y-auto">
                     {item.wa_text}
                   </pre>
                 )}
 
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-slate-400">⏰ Время (Дубай):</span>
+                    <span className="text-[11px] bb-ink-3">⏰ Время (Дубай):</span>
                     <input
                       type="datetime-local"
                       value={toInput(item.scheduled_at)}
                       onChange={e => setSchedule(item, e.target.value)}
-                      className="px-2 py-1.5 bg-slate-950/50 border border-white/10 rounded-lg text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500/50 [color-scheme:dark]"
+                      className="px-2 py-1.5 bb-surface-soft border bb-edge rounded-lg text-xs bb-ink outline-none focus:ring-2 focus:bb-ring"
                     />
                   </div>
 
                   <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
                     {busyId === item.id ? (
-                      <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-                        <div className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                      <div className="flex items-center gap-1.5 bb-ink-3 text-xs">
+                        <div className="w-3 h-3 border-2 bb-spin rounded-full animate-spin" />
                         Обработка...
                       </div>
                     ) : confirmSendId === item.id ? (
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-amber-300">Отправить сейчас?</span>
-                        <button onClick={() => sendOne(item)} className="text-xs px-2.5 py-1 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-all">Да</button>
-                        <button onClick={() => setConfirmSendId(null)} className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all">Нет</button>
+                        <span className="text-xs bb-warn">Отправить сейчас?</span>
+                        <button onClick={() => sendOne(item)} className="text-xs px-2.5 py-1 bb-fill-accent hover:bb-fill-accent text-white rounded-lg transition-all">Да</button>
+                        <button onClick={() => setConfirmSendId(null)} className="text-xs px-2.5 py-1 bb-surface-soft hover:bb-surface-soft bb-ink rounded-lg transition-all">Нет</button>
                       </div>
                     ) : (
                       <>
@@ -310,14 +310,14 @@ export default function ScheduledPage() {
                           onClick={() => setConfirmSendId(item.id)}
                           disabled={!isReady}
                           title={!isReady ? 'Отправка заблокирована: WhatsApp не авторизован' : ''}
-                          className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="flex items-center gap-1.5 bb-fill-accent hover:bb-fill-accent text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           📤 Отправить
                         </button>
                         <button
                           onClick={() => deleteOne(item)}
                           disabled={busyId !== null}
-                          className="flex items-center gap-1.5 bg-rose-600/80 hover:bg-rose-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-all disabled:opacity-50"
+                          className="flex items-center gap-1.5 bb-tint-bad text-xs font-medium py-1.5 px-3 rounded-lg transition-all disabled:opacity-50 hover:brightness-95"
                         >
                           🗑 Удалить
                         </button>
@@ -327,7 +327,7 @@ export default function ScheduledPage() {
                 </div>
 
                 {item.scheduled_at && (
-                  <p className="text-[10px] text-emerald-400/80">
+                  <p className="text-[10px] bb-ok/80">
                     Уйдёт автоматически: <strong>{item.scheduled_at}</strong> (по Дубаю)
                   </p>
                 )}

@@ -126,19 +126,18 @@ function calcDealTag(orig: string, sell: string): { label: string; color: 'red' 
 
 // ─── Shared CSS ───────────────────────────────────────────────────────────────
 
-const BASE_INPUT = 'w-full px-3 py-2.5 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all placeholder-slate-500';
+const BASE_INPUT = 'w-full px-3 py-2.5 bb-surface-soft border bb-edge rounded-xl text-sm bb-ink outline-none focus:ring-2 focus:bb-ring focus:bb-edge transition-all bb-ph';
 const SELECT_INPUT = BASE_INPUT + ' appearance-none cursor-pointer';
-const LABEL = 'block text-xs font-medium text-slate-400 mb-1.5';
+const LABEL = 'block text-xs font-medium bb-ink-3 mb-1.5';
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 function SectionCard({ title, dot, children }: { title: string; dot: string; children: React.ReactNode }) {
   return (
-    <div className="p-5 rounded-2xl bg-slate-900/60 border border-white/5 relative overflow-hidden">
-      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
+    <div className="p-5 rounded-2xl bb-surface border bb-edge relative overflow-hidden">
       <div className="flex items-center gap-2 mb-4">
         <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
-        <span className="text-sm font-semibold text-slate-200">{title}</span>
+        <span className="text-sm font-semibold bb-ink-2">{title}</span>
       </div>
       <div className="grid grid-cols-2 gap-4">
         {children}
@@ -161,11 +160,11 @@ function PriceInput({ label, value, onChange, accent }: {
         value={value}
         onChange={onChange}
         placeholder="1 500 000 / 1,500,000 / 1.5M"
-        className={BASE_INPUT + (accent ? ' text-emerald-400 font-medium' : '')}
+        className={BASE_INPUT + (accent ? 'bb-ok font-medium' : '')}
       />
       {preview && (
-        <p className="mt-1 text-[11px] text-slate-500">
-          → <span className="text-slate-300 font-medium">{preview}</span>
+        <p className="mt-1 text-[11px] bb-ink-4">
+          → <span className="bb-ink-2 font-medium">{preview}</span>
         </p>
       )}
     </div>
@@ -188,8 +187,8 @@ function DateInput({ label, value, onChange }: {
         className={BASE_INPUT}
       />
       {hint && (
-        <p className="mt-1 text-[11px] text-slate-500">
-          → <span className="text-slate-300">{hint}</span>
+        <p className="mt-1 text-[11px] bb-ink-4">
+          → <span className="bb-ink-2">{hint}</span>
         </p>
       )}
     </div>
@@ -418,8 +417,8 @@ export default function NewUnitPage() {
       {/* Header */}
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold  tracking-tight mb-2" style={{ color: 'var(--ink-900)' }}>New Unit</h1>
-          <p className="text-slate-400 text-sm">
+          <h1 className="text-3xl font-bold tracking-tight mb-2" style={{ color: 'var(--ink-900)' }}>Новый юнит</h1>
+          <p className="bb-ink-3 text-sm">
             Заполни поля — цены и площади принимаются в любом формате.
             Черновик сохраняется автоматически.
           </p>
@@ -427,14 +426,14 @@ export default function NewUnitPage() {
         <button
           type="button"
           onClick={clearForm}
-          className="shrink-0 mt-1 px-4 py-2 rounded-xl border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-all text-sm font-medium"
+          className="shrink-0 mt-1 px-4 py-2 rounded-xl border bb-edge bb-ink-3 hover:bb-ink hover:bb-surface-soft transition-all text-sm font-medium"
         >
           Сбросить форму
         </button>
       </div>
 
       {/* ── Загрузить из рабочей таблицы ── */}
-      <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 mb-6 flex gap-3 items-center">
+      <div className="p-4 rounded-2xl bb-surface border bb-edge mb-6 flex gap-3 items-center">
         <input
           type="text"
           value={loadCode}
@@ -447,22 +446,22 @@ export default function NewUnitPage() {
           type="button"
           onClick={handleLoadRow}
           disabled={loadStatus === 'loading'}
-          className="shrink-0 px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition-colors disabled:opacity-50"
+          className="shrink-0 bb-btn bb-btn-primary py-2.5"
         >
           {loadStatus === 'loading' ? '...' : 'Загрузить'}
         </button>
-        {loadStatus === 'found' && <span className="text-emerald-400 text-sm shrink-0">✓ Данные подтянуты</span>}
-        {loadStatus === 'notfound' && <span className="text-rose-400 text-sm shrink-0">Не найдено</span>}
+        {loadStatus === 'found' && <span className="bb-ok text-sm shrink-0">✓ Данные подтянуты</span>}
+        {loadStatus === 'notfound' && <span className="bb-bad text-sm shrink-0">Не найдено</span>}
       </div>
 
       {optLoading && (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-900/60 border border-white/5 mb-6 text-sm text-slate-400">
-          <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin shrink-0" />
+        <div className="flex items-center gap-3 p-4 rounded-xl bb-surface border bb-edge mb-6 text-sm bb-ink-3">
+          <div className="w-4 h-4 border-2 bb-spin rounded-full animate-spin shrink-0" />
           Загружаю справочники...
         </div>
       )}
       {optError && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm mb-6">
+        <div className="p-4 rounded-xl bb-tint-bad border bb-edge bb-bad text-sm mb-6">
           Ошибка загрузки справочников: {optError}
         </div>
       )}
@@ -471,8 +470,8 @@ export default function NewUnitPage() {
       {saveResult && (
         <div className={`p-4 rounded-xl border text-sm mb-6 ${
           saveResult.ok
-            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-            : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+            ? 'bb-tint-ok bb-edge bb-ok'
+            : 'bb-tint-bad bb-edge bb-bad'
         }`}>
           <div className="flex items-start gap-2">
             {saveResult.ok
@@ -488,7 +487,7 @@ export default function NewUnitPage() {
                   href={saveResult.folderUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 transition-colors"
+                  className="inline-flex items-center gap-1.5 bb-accent hover:bb-accent transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
                   Открыть папку в Drive
@@ -499,7 +498,7 @@ export default function NewUnitPage() {
                   href={saveResult.paymentSheetUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 transition-colors"
+                  className="inline-flex items-center gap-1.5 bb-ok hover:bb-ok transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H9L5 8v10a2 2 0 002 2z"/></svg>
                   Открыть Payment Plan
@@ -508,7 +507,7 @@ export default function NewUnitPage() {
             </div>
           )}
           {saveResult.paymentError && (
-            <div className="mt-2 pl-7 text-xs text-amber-400">
+            <div className="mt-2 pl-7 text-xs bb-warn">
               Внимание: ошибка создания Payment Plan — {saveResult.paymentError}
             </div>
           )}
@@ -518,7 +517,7 @@ export default function NewUnitPage() {
       <div className="space-y-5">
 
         {/* ── Section 1: Объект ── */}
-        <SectionCard title="Объект" dot="bg-indigo-500">
+        <SectionCard title="Объект" dot="bb-dot-accent">
 
           {/* Project — full width */}
           <div className="col-span-2">
@@ -534,15 +533,15 @@ export default function NewUnitPage() {
                 className={BASE_INPUT}
               />
               {dropdownOpen && filteredProjects.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-white/10 rounded-xl shadow-2xl shadow-black/60 max-h-52 overflow-y-auto p-1">
+                <div className="absolute z-50 w-full mt-1 bb-surface border bb-edge rounded-xl shadow-2xl bb-lift max-h-52 overflow-y-auto p-1">
                   {filteredProjects.map(p => (
                     <div
                       key={p}
                       onMouseDown={() => selectProject(p)}
                       className={`px-3 py-2.5 rounded-lg text-sm cursor-pointer transition-colors ${
                         form.projectName === p
-                          ? 'bg-indigo-500/20 text-indigo-300 font-medium'
-                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                          ? 'bb-tint-accent bb-accent font-medium'
+                          : 'bb-ink-2 hover:bb-surface-soft hover:bb-ink'
                       }`}
                     >{p}</div>
                   ))}
@@ -550,7 +549,7 @@ export default function NewUnitPage() {
               )}
             </div>
             {isVilla && (
-              <p className="text-xs text-amber-400 mt-1.5 flex items-center gap-1">
+              <p className="text-xs bb-warn mt-1.5 flex items-center gap-1">
                 <span>🏡</span> Villa / Townhouse проект — дополнительные поля показаны ниже
               </p>
             )}
@@ -615,7 +614,7 @@ export default function NewUnitPage() {
 
         {/* ── Section 2: Villa fields (conditional) ── */}
         {isVilla && (
-          <SectionCard title="Villa — площадь и характеристики" dot="bg-amber-500">
+          <SectionCard title="Villa — площадь и характеристики" dot="bb-dot-warn">
             <div>
               <label className={LABEL}>Gross Area, m²</label>
               <input value={form.grossAreaM2} onChange={up('grossAreaM2')} placeholder="350.50" className={BASE_INPUT} />
@@ -648,7 +647,7 @@ export default function NewUnitPage() {
         )}
 
         {/* ── Section 3: Цены ── */}
-        <SectionCard title="Цены" dot="bg-emerald-500">
+        <SectionCard title="Цены" dot="bb-dot-ok">
           <PriceInput label="Original Price, AED" value={form.originalPrice} onChange={up('originalPrice')} />
 
           <div>
@@ -656,8 +655,8 @@ export default function NewUnitPage() {
             {dealTag && (
               <div className={`mt-2 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg ${
                 dealTag.color === 'red'
-                  ? 'bg-red-500/15 text-red-400 border border-red-500/20'
-                  : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
+                  ? 'bb-tint-bad bb-bad border bb-edge'
+                  : 'bb-tint-warn bb-warn border bb-edge'
               }`}>
                 {dealTag.color === 'red' ? '⚡' : '🔥'} {dealTag.label}
               </div>
@@ -673,7 +672,7 @@ export default function NewUnitPage() {
         </SectionCard>
 
         {/* ── Section 4: Сделка ── */}
-        <SectionCard title="Сделка" dot="bg-blue-400">
+        <SectionCard title="Сделка" dot="bb-dot-accent">
           <div className="col-span-2">
             <label className={LABEL}>Payment Plan</label>
             <SelOrInput value={form.paymentPlan} onChange={up('paymentPlan')} options={options?.paymentPlans} placeholder="30/70, 50/50..." />
@@ -681,19 +680,19 @@ export default function NewUnitPage() {
         </SectionCard>
 
         {/* ── Section 5: График платежей (collapsible) ── */}
-        <div className="rounded-2xl bg-slate-900/60 border border-white/5 overflow-hidden">
+        <div className="rounded-2xl bb-surface border bb-edge overflow-hidden">
           <button
             type="button"
             onClick={() => setShowPayments(v => !v)}
-            className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-white/[0.02] transition-colors"
+            className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-[var(--sky-50)] transition-colors"
           >
             <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-              <span className="text-sm font-semibold text-slate-200">График платежей</span>
-              <span className="text-xs text-slate-500 ml-1">Handover + Payment 6 → 2</span>
+              <span className="w-1.5 h-1.5 rounded-full bb-fill-accent" />
+              <span className="text-sm font-semibold bb-ink-2">График платежей</span>
+              <span className="text-xs bb-ink-4 ml-1">Handover + Payment 6 → 2</span>
             </div>
             <svg
-              className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${showPayments ? 'rotate-180' : ''}`}
+              className={`w-4 h-4 bb-ink-3 transition-transform duration-200 ${showPayments ? 'rotate-180' : ''}`}
               fill="none" stroke="currentColor" viewBox="0 0 24 24"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -701,19 +700,19 @@ export default function NewUnitPage() {
           </button>
 
           {showPayments && (
-            <div className="px-5 pb-5 space-y-4 border-t border-white/5 pt-4">
+            <div className="px-5 pb-5 space-y-4 border-t bb-edge pt-4">
               {/* Handover first */}
               <div>
-                <p className="text-xs font-semibold text-purple-300 mb-3 uppercase tracking-wide">Handover</p>
+                <p className="text-xs font-semibold bb-accent mb-3 uppercase tracking-wide">Handover</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1.5">
                       <label className={LABEL.replace('mb-1.5', '')}>Handover Date</label>
                       {handoverAuto && !handoverReadyToMove && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-medium">авто</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bb-tint-accent bb-accent font-medium">авто</span>
                       )}
                       {handoverReadyToMove && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">Ready to move</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bb-tint-ok bb-ok font-medium">Ready to move</span>
                       )}
                     </div>
 
@@ -727,8 +726,8 @@ export default function NewUnitPage() {
                             onClick={() => { setForm(prev => ({ ...prev, handoverDate: o.date })); setHandoverAuto(true); setSelectedHandoverBuilding(o.building + o.date); }}
                             className={`text-[11px] px-2 py-1 rounded-lg border transition-colors ${
                               selectedHandoverBuilding === o.building + o.date
-                                ? 'bg-indigo-500/25 border-indigo-500/50 text-indigo-300'
-                                : 'border-white/10 text-slate-400 hover:text-white hover:bg-white/5'
+                                ? 'bb-tint-accent bb-edge bb-accent'
+                                : 'bb-edge bb-ink-3 hover:bb-ink hover:bb-surface-soft'
                             }`}
                           >
                             {o.building ? `${o.building} — ` : ''}{o.date}
@@ -768,7 +767,7 @@ export default function NewUnitPage() {
         </div>
 
         {/* ── Section 6: Прочее ── */}
-        <SectionCard title="Прочее" dot="bg-slate-400">
+        <SectionCard title="Прочее" dot="bb-dot-mute">
           <div className="col-span-2">
             <label className={LABEL}>Менеджер *</label>
             <input value={form.manager} onChange={up('manager')} placeholder="Nataly" className={BASE_INPUT} />
@@ -780,11 +779,11 @@ export default function NewUnitPage() {
           <button
             onClick={handleSave}
             disabled={saving || optLoading}
-            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-semibold py-3.5 px-6 rounded-xl transition-all shadow-lg shadow-indigo-500/25 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+            className="flex-1 flex items-center justify-center gap-2 bb-fill-accent hover: hover: bb-ink font-semibold py-3.5 px-6 rounded-xl transition-all shadow-lg bb-lift active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
           >
             {saving ? (
               <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 bb-spin rounded-full animate-spin" />
                 Сохраняю...
               </>
             ) : '💾 Сохранить в OBJECTS'}
@@ -792,7 +791,7 @@ export default function NewUnitPage() {
           <button
             type="button"
             onClick={clearForm}
-            className="px-5 py-3.5 rounded-xl border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-all text-sm font-medium shrink-0"
+            className="px-5 py-3.5 rounded-xl border bb-edge bb-ink-3 hover:bb-ink hover:bb-surface-soft transition-all text-sm font-medium shrink-0"
           >
             Очистить
           </button>

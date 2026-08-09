@@ -159,7 +159,7 @@
   --ink-900: #0f2b3d;
   --ink-700: #35566b;
   --ink-500: #6b8b9e;
-  --ink-300: #a9c1cf;
+  --ink-300: #8ba8bb;
 
   /* Тени — широкие и мягкие, как под парящей карточкой */
   --lift-1: 0 2px 8px rgba(15, 43, 61, .06);
@@ -270,5 +270,75 @@
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
+  }
+}
+
+/* ── Словарь для переноса старых тёмных страниц ────────────────────
+   Одно к одному заменяет тёмные утилиты: bg-slate-900 → bb-surface и т.д.
+   ───────────────────────────────────────────────────────────────── */
+@layer components {
+  .bb-surface      { background: #fff; border-radius: var(--r-lg); box-shadow: var(--lift-2); }
+  .bb-surface-soft { background: var(--sky-50); }
+  .bb-edge         { border: 1px solid transparent; }
+
+  .bb-ink   { color: var(--ink-900); }
+  .bb-ink-2 { color: var(--ink-700); }
+  .bb-ink-3 { color: var(--ink-500); }
+  .bb-ink-4 { color: var(--ink-500); }
+  .bb-ph::placeholder { color: var(--ink-300); }
+
+  .bb-ok     { color: #059669; }
+  .bb-bad    { color: #e11d48; }
+  .bb-warn   { color: #b45309; }
+  .bb-accent { color: var(--aqua-600); }
+
+  .bb-tint-ok     { background: var(--mint);   color: #075f3d; }
+  .bb-tint-bad    { background: var(--peach);  color: #9f1239; }
+  .bb-tint-warn   { background: var(--lemon);  color: #854d0e; }
+  .bb-tint-accent { background: var(--sky-100); color: #075985; }
+
+  .bb-fill-accent {
+    background: var(--aqua-500); color: #fff; box-shadow: var(--glow-aqua);
+    transition: background-color .2s var(--swift), transform .18s var(--spring);
+  }
+  .bb-fill-accent:hover:not(:disabled) { background: var(--aqua-400); transform: translateY(-2px); }
+  .bb-fill-accent:active:not(:disabled) { transform: scale(.97); }
+
+  .bb-fill-ink { background: var(--ink-900); color: #fff; box-shadow: var(--lift-2); }
+  .bb-fill-ink:hover:not(:disabled) { transform: translateY(-2px); }
+
+  .bb-lift { box-shadow: var(--lift-2); }
+  .bb-ring:focus { border-color: var(--aqua-300); box-shadow: 0 0 0 4px rgba(45,212,191,.18); }
+
+  .custom-scrollbar::-webkit-scrollbar { width: 10px; height: 10px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--sky-200); border-radius: 999px; border: 3px solid #fff;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--sky-300); }
+}
+
+@layer components {
+  /* Точка-маркер у заголовков секций */
+  .bb-dot-accent { background: var(--aqua-400); }
+  .bb-dot-ok     { background: #34d399; }
+  .bb-dot-warn   { background: #fbbf24; }
+  .bb-dot-mute   { background: var(--sky-200); }
+}
+
+@layer components {
+  /* Крутилка: бирюзовый сектор на светлом кольце.
+     Раньше цвет рамки задавался утилитой, после перехода на светлую тему
+     она стала прозрачной — держим цвет здесь. */
+  .bb-spin {
+    border-color: var(--sky-200);
+    border-top-color: var(--aqua-500);
+    border-style: solid;
+  }
+  /* На плотной заливке — белый сектор */
+  .bb-spin-on-fill {
+    border-color: rgba(255, 255, 255, .35);
+    border-top-color: #fff;
+    border-style: solid;
   }
 }

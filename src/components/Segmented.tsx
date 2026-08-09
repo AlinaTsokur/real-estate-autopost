@@ -55,7 +55,9 @@ export default function Segmented<T extends string>({
     <div
       role="tablist"
       className={`relative inline-flex p-1.5 rounded-full shrink-0 ${full ? 'w-full' : ''} ${className}`}
-      style={{ background: 'var(--sky-100)' }}
+      // sky-200, а не 100: фон страницы сам светло-голубой, и на нём дорожка
+      // цвета sky-100 пропадает. Внутри белых карточек она тоже читается.
+      style={{ background: 'var(--sky-200)' }}
     >
       {/* Едущая плашка. Прячем до первого замера, чтобы не прыгала из угла. */}
       <span
