@@ -10,8 +10,8 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const projects = await listAllAbuDhabiProjects();
-    const added = await syncProjectStubs(projects);
-    return NextResponse.json({ ok: true, total: projects.length, added });
+    const stats = await syncProjectStubs(projects);
+    return NextResponse.json({ ok: true, total: projects.length, ...stats, ranAt: new Date().toISOString() });
   } catch (e: any) {
     console.error('project-sync error:', e);
     return NextResponse.json({ error: e.message }, { status: 500 });

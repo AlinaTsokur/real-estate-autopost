@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
-import { listProjectMeta, setProjectEmoji } from '@/lib/post-meta/emoji';
+import { listProjectMeta, listActiveProjectNames, setProjectEmoji } from '@/lib/post-meta/emoji';
 
 export const dynamic = 'force-dynamic';
 
-// GET → all project emoji rows (for the management page)
-export async function GET() {
+// GET            → all project emoji rows (for the management page)
+// GET ?names=1   → just the active project names, for the broadcast tracker
+export async function GET(request: Request) {
   try {
+    if (new URL(request.url).searchParams.get('names')) {
+      return NextResponse.json({ names: await listActiveProjectNames() });
+    }
     return NextResponse.json({ projects: await listProjectMeta() });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

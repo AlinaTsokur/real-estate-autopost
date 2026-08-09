@@ -88,16 +88,13 @@ export default function BudgetPage() {
       .catch(() => {})
       .finally(() => setProjectsLoading(false));
 
-    // Трекер — из базы, чтобы отметки шли по проектам, а не по зданиям.
-    // Если база недоступна, ниже подставится список из таблицы.
-    fetch('/api/unit-from-db?allProjects=1')
+    // Трекер — из нашей базы: отметки идут по проектам, а не по зданиям.
+    // Наполняется ночной синхронизацией. Если не ответит — ниже подставится
+    // список из таблицы.
+    fetch('/api/project-emoji?names=1')
       .then(r => r.json())
       .then(d => {
-        // В базе у части названий висят хвостовые пробелы — без trim отметка
-        // сохранится под другим ключом и слетит после перезагрузки.
-        const names: string[] = (d.projects || [])
-          .map((p: { name: string }) => (p.name || '').trim())
-          .filter(Boolean);
+        const names: string[] = (d.names || []).map((n: string) => (n || '').trim()).filter(Boolean);
         if (names.length) setDbProjects(names);
       })
       .catch(() => {})
