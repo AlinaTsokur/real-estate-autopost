@@ -37,7 +37,7 @@ export default function ProjectEmojiPage() {
   return (
     <div className="max-w-3xl mx-auto w-full">
       <div className="mb-4 flex items-center gap-3">
-        <h1 className="text-xl font-bold text-white tracking-tight">🎨 Смайлики проектов</h1>
+        <h1 className="text-xl font-bold  tracking-tight" style={{ color: 'var(--ink-900)' }}>🎨 Смайлики проектов</h1>
         <span className="text-xs text-slate-500">{rows.length} проектов</span>
         {!loading && missing > 0 && (
           <span className="bg-amber-500/20 text-amber-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-amber-500/30">{missing} без смайлика</span>

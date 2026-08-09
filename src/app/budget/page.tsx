@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import QuickSalesPage from '../quick-sales/page';
+import Segmented from '@/components/Segmented';
 
 const WA_GROUPS = [
   { id: '120363213058937905@g.us', name: 'Abu Dhabi & Dubai properties', defaultOn: true },
@@ -66,6 +67,7 @@ async function persistChecked(c: Record<string, boolean>) {
 
 export default function BudgetPage() {
   const [mode, setMode] = useState<'budget' | 'quick'>('budget');
+  const [copied, setCopied] = useState(false);
   const [projects, setProjects] = useState<string[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectSearch, setProjectSearch] = useState('');
@@ -153,254 +155,276 @@ export default function BudgetPage() {
   };
 
   const isSunday = new Date().getDay() === 0;
+  const activeGroups = WA_GROUPS.filter(g => enabledGroups[g.id]).length;
 
   return (
-    <div className="max-w-6xl mx-auto w-full space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+    <div className="max-w-6xl mx-auto w-full space-y-5">
+      {/* ── Шапка ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bb-rise">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight mb-1">Рассылки</h1>
-          <p className="text-slate-400 text-sm">Две утренние рассылки: список Budget Units и Quick Sales.</p>
+          <h1 className="bb-title text-[34px] leading-tight mb-1">Рассылки</h1>
+          <p className="bb-sub text-sm">Две утренние рассылки: список Budget Units и Quick Sales.</p>
         </div>
-        {/* ── MODE TOGGLE ── */}
-        <div className="inline-flex p-1 rounded-xl bg-slate-900/60 border border-white/10 shrink-0">
-          <button
-            onClick={() => setMode('budget')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
-              ${mode === 'budget' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'text-slate-400 hover:text-white border border-transparent'}`}
-          >
-            💰 Budget Units
-          </button>
-          <button
-            onClick={() => setMode('quick')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
-              ${mode === 'quick' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' : 'text-slate-400 hover:text-white border border-transparent'}`}
-          >
-            ⚡ Quick Sales
-          </button>
-        </div>
+        <Segmented
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'budget', label: 'Budget Units', icon: '💰' },
+            { value: 'quick', label: 'Quick Sales', icon: '⚡' },
+          ] as const}
+        />
       </div>
 
       {mode === 'quick' ? (
         <QuickSalesPage />
       ) : (
         <>
-      {/* ── TRACKER ── */}
-      <div className="p-5 rounded-2xl bg-slate-900/60 border border-white/5 backdrop-blur-xl relative overflow-visible">
-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent rounded-t-2xl" />
+          {/* ── Трекер проектов ── */}
+          <div className="bb-card p-6 bb-rise" style={{ animationDelay: '60ms' }}>
+            <div className="flex items-center gap-3 mb-4 flex-wrap">
+              <span className="bb-title text-[17px]">Расписание рассылки</span>
+              <span className="bb-chip bb-chip-sky">{formatDateRu()}</span>
+              {isSunday && <span className="bb-chip bb-chip-lemon">выходной</span>}
+            </div>
 
-        <div className="flex items-center gap-3 mb-4">
-          <span className="w-2 h-2 rounded-full bg-violet-400 flex-shrink-0" />
-          <span className="text-sm font-semibold text-white">Расписание рассылки</span>
-          <span className="text-slate-500 text-sm">{formatDateRu()}</span>
-          {isSunday && (
-            <span className="text-xs bg-amber-500/15 text-amber-400 border border-amber-500/25 rounded-full px-2 py-0.5">
-              выходной
-            </span>
-          )}
-        </div>
-
-        {projectsLoading ? (
-          <div className="flex items-center gap-2 text-sm text-slate-500 py-2">
-            <div className="w-3.5 h-3.5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
-            Загрузка проектов...
+            {projectsLoading ? (
+              <div className="flex items-center gap-2 text-sm py-2" style={{ color: 'var(--ink-500)' }}>
+                <div
+                  className="w-4 h-4 border-[3px] rounded-full animate-spin"
+                  style={{ borderColor: 'var(--sky-200)', borderTopColor: 'var(--aqua-500)' }}
+                />
+                Загружаю проекты...
+              </div>
+            ) : projects.length === 0 ? (
+              <p className="text-sm py-2" style={{ color: 'var(--ink-500)' }}>Проекты не найдены</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {projects.map((p, i) => {
+                  const done = !!checked[p];
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => toggleCheck(p, projects)}
+                      className="bb-pop group flex items-center gap-2 pl-2 pr-3.5 py-2 rounded-full
+                                 text-[13px] font-bold select-none cursor-pointer
+                                 transition-all duration-200 hover:-translate-y-0.5 active:scale-[.96]"
+                      style={{
+                        animationDelay: `${Math.min(i * 18, 400)}ms`,
+                        background: done ? 'var(--mint)' : '#fff',
+                        color: done ? '#075f3d' : 'var(--ink-700)',
+                        boxShadow: done ? 'var(--lift-1)' : 'var(--lift-1)',
+                      }}
+                    >
+                      <span
+                        className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center transition-all duration-200"
+                        style={{
+                          background: done ? '#10b981' : 'var(--sky-100)',
+                          transform: done ? 'scale(1)' : 'scale(.9)',
+                        }}
+                      >
+                        {done && (
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </span>
+                      <span className={done ? 'line-through decoration-2' : ''}>{p}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        ) : projects.length === 0 ? (
-          <p className="text-sm text-slate-500 py-2">Проекты не найдены</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {projects.map(p => {
-              const done = !!checked[p];
-              return (
-                <button
-                  key={p}
-                  onClick={() => toggleCheck(p, projects)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all select-none
-                    ${done
-                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
-                      : 'bg-slate-950/50 border-white/8 text-slate-300 hover:border-white/20 hover:text-white'
-                    }`}
-                >
-                  <span className={`w-4 h-4 rounded flex-shrink-0 border-2 flex items-center justify-center transition-all
-                    ${done ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600'}`}
-                  >
-                    {done && (
-                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </span>
-                  <span className={done ? 'line-through decoration-emerald-600' : ''}>{p}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
-      {/* ── MAIN FORM ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        <div className="space-y-8">
-          <div className="p-6 rounded-2xl bg-slate-900/60 border border-white/5 backdrop-blur-xl relative overflow-hidden">
-            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent" />
-
-            <div className="space-y-6">
+          {/* ── Форма и превью ── */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+            <div className="bb-card p-6 space-y-5 bb-rise" style={{ animationDelay: '120ms' }}>
               <div className="relative">
-                <label className="block text-sm font-medium text-slate-300 mb-2">Project Name</label>
+                <label className="bb-label block mb-2">Проект</label>
                 {projectsLoading ? (
-                  <div className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl text-slate-500 flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
-                    Loading projects...
+                  <div className="bb-input flex items-center gap-2" style={{ color: 'var(--ink-500)' }}>
+                    <div
+                      className="w-4 h-4 border-[3px] rounded-full animate-spin"
+                      style={{ borderColor: 'var(--sky-200)', borderTopColor: 'var(--aqua-500)' }}
+                    />
+                    Загружаю проекты...
                   </div>
                 ) : projects.length > 0 ? (
                   <div className="relative">
                     <input
                       type="text"
                       value={projectSearch}
-                      onChange={(e) => {
-                        setProjectSearch(convertRuToEn(e.target.value));
-                        setIsDropdownOpen(true);
-                      }}
+                      onChange={e => { setProjectSearch(convertRuToEn(e.target.value)); setIsDropdownOpen(true); }}
                       onFocus={() => setIsDropdownOpen(true)}
                       onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
-                      placeholder="Search project..."
-                      className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 outline-none transition-all text-white placeholder-slate-500"
+                      placeholder="Начни вводить название..."
+                      className="bb-input pr-11"
                     />
                     <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      <svg
+                        className="w-4 h-4 transition-transform duration-200"
+                        style={{ color: 'var(--ink-300)', transform: isDropdownOpen ? 'rotate(180deg)' : 'none' }}
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
                     {isDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl shadow-black/50 max-h-60 overflow-y-auto p-1 custom-scrollbar">
+                      <div
+                        className="bb-pop absolute z-50 w-full mt-2 max-h-60 overflow-y-auto p-1.5"
+                        style={{ background: '#fff', borderRadius: 'var(--r-md)', boxShadow: 'var(--lift-3)' }}
+                      >
                         {filteredProjects.length > 0 ? filteredProjects.map(p => (
                           <div
                             key={p}
                             onClick={() => { setProject(p); setProjectSearch(p); setIsDropdownOpen(false); }}
-                            className={`px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors
-                              ${project === p ? 'bg-emerald-500/20 text-emerald-300 font-medium' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}
+                            className="px-3 py-2.5 rounded-xl cursor-pointer text-sm font-semibold transition-colors duration-150"
+                            style={{
+                              background: project === p ? 'var(--sky-100)' : 'transparent',
+                              color: project === p ? 'var(--aqua-600)' : 'var(--ink-700)',
+                            }}
+                            onMouseEnter={e => { if (project !== p) e.currentTarget.style.background = 'var(--sky-50)'; }}
+                            onMouseLeave={e => { if (project !== p) e.currentTarget.style.background = 'transparent'; }}
                           >
                             {p}
                           </div>
                         )) : (
-                          <div className="px-4 py-3 text-sm text-slate-500 text-center">No projects found</div>
+                          <div className="px-4 py-3 text-sm text-center" style={{ color: 'var(--ink-300)' }}>
+                            Ничего не нашлось
+                          </div>
                         )}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="w-full px-4 py-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-sm">
-                    Failed to load projects.
+                  <div className="bb-input" style={{ background: 'var(--peach)', color: '#9f1239' }}>
+                    Не удалось загрузить проекты
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Paste Full Table (TSV)</label>
+                <label className="bb-label block mb-2">Таблица целиком (TSV)</label>
                 <textarea
                   rows={6}
                   value={rawText}
                   onChange={e => setRawText(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 outline-none transition-all text-white placeholder-slate-500 font-mono text-sm"
-                  placeholder="Paste table data here..."
+                  className="bb-input font-mono text-sm resize-y"
+                  placeholder="Вставь сюда данные из таблицы..."
                 />
               </div>
 
               <button
                 onClick={handleParse}
                 disabled={loading || !project}
-                className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg shadow-emerald-500/25 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                className="bb-btn bb-btn-primary w-full"
               >
-                {loading ? 'Calculating...' : 'Generate Budget'}
+                {loading ? 'Считаю...' : '✨ Собрать рассылку'}
               </button>
             </div>
-          </div>
-        </div>
 
-        {parsedData && (
-          <div className="p-6 rounded-2xl bg-slate-900/40 border border-white/5 backdrop-blur-md h-fit">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                WhatsApp text preview
-              </h3>
-              <button
-                onClick={() => { navigator.clipboard.writeText(parsedData.text || ''); alert('Copied!'); }}
-                className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg transition-colors border border-white/10"
-              >
-                Copy text
-              </button>
-            </div>
-            <div className="bg-[#f0fdf4] p-5 rounded-xl border border-emerald-100 text-sm font-sans whitespace-pre-wrap text-[#166534] overflow-auto max-h-[600px] custom-scrollbar shadow-inner">
-              {parsedData.text}
-            </div>
-            <div className="mt-4 text-xs text-slate-500 text-right">
-              Selected {parsedData.selectedRows} units out of {parsedData.totalRows} parsed.
-            </div>
+            {parsedData && (
+              <div className="bb-card p-6 bb-rise">
+                <div className="flex items-center justify-between mb-4 gap-3">
+                  <h3 className="bb-title text-[17px]">Текст для WhatsApp</h3>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(parsedData.text || '');
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1600);
+                    }}
+                    className="bb-btn bb-btn-ghost py-2 px-4 text-[13px]"
+                    style={copied ? { background: 'var(--mint)', color: '#075f3d' } : undefined}
+                  >
+                    {copied ? '✓ Скопировано' : 'Копировать'}
+                  </button>
+                </div>
 
-            {/* ── WA BROADCAST ── */}
-            <div className="mt-5 pt-5 border-t border-white/5 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-white">📤 Рассылка по группам</span>
-                <span className="text-xs text-slate-500">{WA_GROUPS.filter(g => enabledGroups[g.id]).length} из {WA_GROUPS.length}</span>
-              </div>
+                <div
+                  className="p-5 text-sm whitespace-pre-wrap overflow-auto max-h-[520px]"
+                  style={{ background: 'var(--sky-50)', borderRadius: 'var(--r-md)', color: 'var(--ink-900)' }}
+                >
+                  {parsedData.text}
+                </div>
 
-              <div className="flex flex-wrap gap-2">
-                {WA_GROUPS.map(g => {
-                  const on = !!enabledGroups[g.id];
-                  return (
-                    <button
-                      key={g.id}
-                      onClick={() => toggleGroup(g.id)}
-                      disabled={broadcasting || broadcastQueued}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all select-none
-                        ${on
-                          ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-300'
-                          : 'bg-slate-950/50 border-white/8 text-slate-500 hover:text-slate-300'}`}
+                <div className="mt-3 text-xs text-right" style={{ color: 'var(--ink-300)' }}>
+                  Выбрано {parsedData.selectedRows} юнитов из {parsedData.totalRows}
+                </div>
+
+                {/* ── Рассылка по группам ── */}
+                <div className="mt-5 pt-5 space-y-3" style={{ borderTop: '2px solid var(--sky-50)' }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="bb-title text-[15px]">📤 Рассылка по группам</span>
+                    <span className="bb-chip bb-chip-sky">{activeGroups} из {WA_GROUPS.length}</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {WA_GROUPS.map(g => {
+                      const on = !!enabledGroups[g.id];
+                      return (
+                        <button
+                          key={g.id}
+                          onClick={() => toggleGroup(g.id)}
+                          disabled={broadcasting || broadcastQueued}
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold
+                                     select-none cursor-pointer transition-all duration-200
+                                     hover:-translate-y-0.5 active:scale-[.96] disabled:opacity-50 disabled:pointer-events-none"
+                          style={{
+                            background: on ? 'var(--lilac)' : 'var(--sky-50)',
+                            color: on ? '#5b21b6' : 'var(--ink-300)',
+                          }}
+                        >
+                          {on ? '✓' : '○'} {g.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="bb-label shrink-0">⏰ Старт (Дубай)</span>
+                    <input
+                      type="datetime-local"
+                      value={broadcastTime}
+                      onChange={e => { setBroadcastTime(e.target.value); setBroadcastQueued(false); }}
+                      className="bb-input w-auto py-2 text-[13px] font-semibold"
+                    />
+                  </div>
+
+                  {broadcastError && (
+                    <div
+                      className="bb-pop px-4 py-2.5 text-xs font-semibold"
+                      style={{ background: 'var(--peach)', color: '#9f1239', borderRadius: 'var(--r-md)' }}
                     >
-                      {on ? '✓' : '○'} {g.name}
-                    </button>
-                  );
-                })}
-              </div>
+                      {broadcastError}
+                    </div>
+                  )}
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 shrink-0">⏰ Время старта (Дубай):</span>
-                <input
-                  type="datetime-local"
-                  value={broadcastTime}
-                  onChange={e => { setBroadcastTime(e.target.value); setBroadcastQueued(false); }}
-                  className="px-2 py-1.5 bg-slate-950/50 border border-white/10 rounded-lg text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500/50 [color-scheme:dark]"
-                />
-              </div>
+                  {broadcastQueued && (
+                    <div
+                      className="bb-pop px-4 py-2.5 text-xs font-semibold"
+                      style={{ background: 'var(--mint)', color: '#075f3d', borderRadius: 'var(--r-md)' }}
+                    >
+                      ✓ Добавлено в очередь. Группы получат сообщения с {broadcastTime.replace('T', ' ')} с интервалом 2 мин.
+                      Смотри на странице <a href="/scheduled" className="underline">Расписание WA</a>.
+                    </div>
+                  )}
 
-              {broadcastError && (
-                <div className="px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
-                  {broadcastError}
+                  <button
+                    onClick={sendBroadcast}
+                    disabled={broadcasting || broadcastQueued || !broadcastTime || activeGroups === 0}
+                    className="bb-btn bb-btn-ink w-full"
+                  >
+                    {broadcasting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Добавляю в очередь...
+                      </>
+                    ) : '📲 Добавить в очередь'}
+                  </button>
                 </div>
-              )}
-
-              {broadcastQueued && (
-                <div className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs">
-                  ✓ Добавлено в очередь. Группы получат сообщения начиная с {broadcastTime.replace('T', ' ')} с интервалом 2 мин. Смотри на странице <a href="/scheduled" className="underline">WA Schedule</a>.
-                </div>
-              )}
-
-              <button
-                onClick={sendBroadcast}
-                disabled={broadcasting || broadcastQueued || !broadcastTime || WA_GROUPS.filter(g => enabledGroups[g.id]).length === 0}
-                className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-xl transition-all flex items-center justify-center gap-2"
-              >
-                {broadcasting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Добавляю в очередь...
-                  </>
-                ) : '📲 Добавить в очередь'}
-              </button>
-            </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
         </>
       )}
     </div>

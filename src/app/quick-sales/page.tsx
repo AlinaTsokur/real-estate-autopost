@@ -54,7 +54,7 @@ export default function QuickSalesPage() {
       <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <h1 className="text-2xl font-bold text-white tracking-tight">⚡ Quick Sales</h1>
+            <h1 className="text-2xl font-bold  tracking-tight" style={{ color: 'var(--ink-900)' }}>⚡ Quick Sales</h1>
             {!loading && items.length > 0 && (
               <span className="bg-indigo-500/20 text-indigo-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-indigo-500/30">
                 {items.length} {items.length === 1 ? 'item' : 'items'}

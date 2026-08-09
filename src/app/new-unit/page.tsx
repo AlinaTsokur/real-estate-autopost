@@ -418,7 +418,7 @@ export default function NewUnitPage() {
       {/* Header */}
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight mb-2">New Unit</h1>
+          <h1 className="text-3xl font-bold  tracking-tight mb-2" style={{ color: 'var(--ink-900)' }}>New Unit</h1>
           <p className="text-slate-400 text-sm">
             Заполни поля — цены и площади принимаются в любом формате.
             Черновик сохраняется автоматически.

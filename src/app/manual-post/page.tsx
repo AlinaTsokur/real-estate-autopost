@@ -321,7 +321,7 @@ export default function ManualPostPage() {
   return (
     <div className="max-w-6xl mx-auto w-full">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white tracking-tight mb-2">Manual Post Builder</h1>
+        <h1 className="text-3xl font-bold  tracking-tight mb-2" style={{ color: 'var(--ink-900)' }}>Manual Post Builder</h1>
         <p className="text-slate-400">Parse a single row and prepare it for Telegram.</p>
       </div>
 

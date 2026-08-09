@@ -177,7 +177,7 @@ export default function ScheduledPage() {
   return (
     <div className="max-w-3xl mx-auto w-full space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight mb-1">WA Schedule</h1>
+        <h1 className="text-3xl font-bold  tracking-tight mb-1" style={{ color: 'var(--ink-900)' }}>WA Schedule</h1>
         <p className="text-slate-400 text-sm">
           Посты попадают сюда после «Send to Telegram». Задай время по Дубаю — пост уйдёт сам. Или отправь/удали вручную.
         </p>

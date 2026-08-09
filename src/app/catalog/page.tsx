@@ -232,7 +232,7 @@ export default function CatalogPage() {
   return (
     <div className="max-w-6xl mx-auto w-full space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight mb-1">Catalog Builder</h1>
+        <h1 className="text-3xl font-bold  tracking-tight mb-1" style={{ color: 'var(--ink-900)' }}>Catalog Builder</h1>
         <p className="text-slate-400 text-sm">Build your WhatsApp catalog for Meta Commerce Manager.</p>
       </div>
 

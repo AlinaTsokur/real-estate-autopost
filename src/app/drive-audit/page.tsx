@@ -62,7 +62,7 @@ export default function DriveAuditPage() {
   return (
     <div className="max-w-5xl mx-auto w-full">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white tracking-tight mb-2">Drive Folder Audit</h1>
+        <h1 className="text-3xl font-bold  tracking-tight mb-2" style={{ color: 'var(--ink-900)' }}>Drive Folder Audit</h1>
         <p className="text-slate-400 text-sm">
           Проверяет что все папки юнитов находятся в правильном месте согласно статусу в Abu Dhabi.
         </p>

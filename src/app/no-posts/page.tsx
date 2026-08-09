@@ -25,7 +25,7 @@ export default function NoPostsPage() {
   return (
     <div className="max-w-3xl mx-auto w-full">
       <div className="mb-4 flex items-center gap-3">
-        <h1 className="text-xl font-bold text-white tracking-tight">📝 Юниты без постов</h1>
+        <h1 className="text-xl font-bold  tracking-tight" style={{ color: 'var(--ink-900)' }}>📝 Юниты без постов</h1>
         {!loading && <span className="bg-rose-500/20 text-rose-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-rose-500/30">{units.length}</span>}
         <button onClick={load} className="ml-auto bg-slate-800 hover:bg-slate-700 text-white text-xs py-1 px-2.5 rounded-lg border border-white/10">🔄</button>
       </div>

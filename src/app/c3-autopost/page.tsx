@@ -91,7 +91,7 @@ export default function C3AutopostPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-white tracking-tight">🏢 C3 Autopost</h1>
+        <h1 className="text-2xl font-semibold  tracking-tight" style={{ color: 'var(--ink-900)' }}>🏢 C3 Autopost</h1>
       </div>
       
       <p className="text-slate-400">Automated post builder for C3 Garden Residence. Select a unit to automatically fetch data and Google Drive slide image.</p>

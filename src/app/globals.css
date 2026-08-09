@@ -128,3 +128,147 @@
     @apply font-sans;
   }
 }
+/* ══════════════════════════════════════════════════════════════════
+   Bubble — светлая «мультяшная» тема.
+   Токены и готовые классы. Страницы собираются из них, а не из
+   сырых утилит slate и indigo, чтобы палитра правилась в одном месте.
+   ══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Небо: фон приложения */
+  --sky-50:  #f0f9ff;
+  --sky-100: #dff2fe;
+  --sky-200: #b8e6fe;
+  --sky-300: #7cd4fd;
+  --sky-400: #38bdf8;
+
+  /* Бирюза: основной акцент */
+  --aqua-300: #5eead4;
+  --aqua-400: #2dd4bf;
+  --aqua-500: #14b8a6;
+  --aqua-600: #0d9488;
+
+  /* Пастельные плашки */
+  --mint:   #b9f8cf;
+  --lemon:  #fde68a;
+  --peach:  #fecdd3;
+  --lilac:  #ddd6fe;
+  --coral:  #fb7185;
+
+  /* Чернила: текст */
+  --ink-900: #0f2b3d;
+  --ink-700: #35566b;
+  --ink-500: #6b8b9e;
+  --ink-300: #a9c1cf;
+
+  /* Тени — широкие и мягкие, как под парящей карточкой */
+  --lift-1: 0 2px 8px rgba(15, 43, 61, .06);
+  --lift-2: 0 8px 24px rgba(15, 43, 61, .08);
+  --lift-3: 0 18px 44px rgba(15, 43, 61, .12);
+  --glow-aqua: 0 8px 24px rgba(20, 184, 166, .35);
+
+  --r-sm: 12px;
+  --r-md: 18px;
+  --r-lg: 26px;
+  --r-xl: 34px;
+
+  /* Пружина: лёгкий перелёт, от него интерфейс кажется живым */
+  --spring: cubic-bezier(.34, 1.56, .64, 1);
+  --swift:  cubic-bezier(.22, 1, .36, 1);
+}
+
+@layer components {
+
+  /* ── Карточка ── */
+  .bb-card {
+    background: #fff;
+    border-radius: var(--r-lg);
+    box-shadow: var(--lift-2);
+    transition: box-shadow .3s var(--swift), transform .3s var(--swift);
+  }
+  .bb-card-hover:hover { box-shadow: var(--lift-3); transform: translateY(-2px); }
+
+  /* ── Текст ── */
+  .bb-title { color: var(--ink-900); font-weight: 800; letter-spacing: -.02em; }
+  .bb-sub   { color: var(--ink-500); }
+  .bb-label { color: var(--ink-700); font-weight: 600; font-size: 13px; }
+
+  /* ── Кнопки ── */
+  .bb-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 22px;
+    border-radius: 999px;
+    font-weight: 700; font-size: 14px;
+    cursor: pointer; user-select: none;
+    transition: transform .18s var(--spring), box-shadow .25s var(--swift),
+                background-color .2s var(--swift);
+  }
+  .bb-btn:active { transform: scale(.96); }
+  .bb-btn:disabled { opacity: .45; pointer-events: none; }
+
+  .bb-btn-primary {
+    background: var(--aqua-500); color: #fff; box-shadow: var(--glow-aqua);
+  }
+  .bb-btn-primary:hover { background: var(--aqua-400); transform: translateY(-2px); }
+
+  .bb-btn-ink { background: var(--ink-900); color: #fff; box-shadow: var(--lift-2); }
+  .bb-btn-ink:hover { transform: translateY(-2px); box-shadow: var(--lift-3); }
+
+  .bb-btn-ghost {
+    background: #fff; color: var(--ink-700); box-shadow: var(--lift-1);
+  }
+  .bb-btn-ghost:hover { color: var(--ink-900); box-shadow: var(--lift-2); transform: translateY(-2px); }
+
+  /* ── Поля ── */
+  .bb-input {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: var(--r-md);
+    background: var(--sky-50);
+    border: 2px solid transparent;
+    color: var(--ink-900);
+    outline: none;
+    transition: border-color .2s var(--swift), background-color .2s var(--swift),
+                box-shadow .2s var(--swift);
+  }
+  .bb-input::placeholder { color: var(--ink-300); }
+  .bb-input:focus {
+    background: #fff;
+    border-color: var(--aqua-300);
+    box-shadow: 0 0 0 4px rgba(45, 212, 191, .18);
+  }
+
+  /* ── Пастельная плашка ── */
+  .bb-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 700; line-height: 1.4;
+  }
+  .bb-chip-mint  { background: var(--mint);  color: #075f3d; }
+  .bb-chip-sky   { background: var(--sky-100); color: #075985; }
+  .bb-chip-lemon { background: var(--lemon); color: #854d0e; }
+  .bb-chip-peach { background: var(--peach); color: #9f1239; }
+  .bb-chip-lilac { background: var(--lilac); color: #5b21b6; }
+
+  /* ── Появление ── */
+  .bb-rise { animation: bb-rise .45s var(--swift) both; }
+  .bb-pop  { animation: bb-pop .35s var(--spring) both; }
+}
+
+@keyframes bb-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes bb-pop {
+  from { opacity: 0; transform: scale(.9); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Кому укачивает — системная настройка выключает движение */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
