@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listAbuDhabiProjects, searchUnits, getRawUnit, listUnitsWithoutPost } from '@/lib/units-db/units';
+import { listAbuDhabiProjects, listAllAbuDhabiProjects, searchUnits, getRawUnit, listUnitsWithoutPost } from '@/lib/units-db/units';
 import { mapRawUnitToPostData } from '@/lib/units-db/map';
 import { getProjectMeta } from '@/lib/post-meta/emoji';
 
@@ -12,6 +12,13 @@ export async function GET(request: Request) {
     // ?projects=1 → project dropdown (Abu Dhabi, live)
     if (url.searchParams.get('projects')) {
       return NextResponse.json({ projects: await listAbuDhabiProjects() });
+    }
+
+    // ?allProjects=1 → every active Abu Dhabi project, units or not. This is the
+    // list the platform shows, so the broadcast tracker matches it one to one
+    // instead of the sheet's building-level split (The Source / II / Terraces).
+    if (url.searchParams.get('allProjects')) {
+      return NextResponse.json({ projects: await listAllAbuDhabiProjects() });
     }
 
     // ?nopost=1 → available units that have never been posted

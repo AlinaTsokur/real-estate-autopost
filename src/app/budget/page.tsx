@@ -68,6 +68,9 @@ async function persistChecked(c: Record<string, boolean>) {
 export default function BudgetPage() {
   const [mode, setMode] = useState<'budget' | 'quick'>('budget');
   const [copied, setCopied] = useState(false);
+  // Проекты из базы — только для трекера отметок.
+  const [dbProjects, setDbProjects] = useState<string[]>([]);
+  const [dbProjectsLoading, setDbProjectsLoading] = useState(true);
   const [projects, setProjects] = useState<string[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectSearch, setProjectSearch] = useState('');
@@ -89,11 +92,29 @@ export default function BudgetPage() {
   useEffect(() => {
     setChecked(loadLocal());
     fetchChecked().then(c => { setChecked(c); saveLocal(c); });
+
+    // Список для формы — из таблицы: по этим названиям /api/parse-budget
+    // разбирает вставленный TSV, менять их нельзя.
     fetch('/api/projects')
       .then(r => r.json())
       .then(d => { if (d.projects?.length) setProjects(d.projects); })
       .catch(() => {})
       .finally(() => setProjectsLoading(false));
+
+    // Трекер — из базы, чтобы отметки шли по проектам, а не по зданиям.
+    // Если база недоступна, ниже подставится список из таблицы.
+    fetch('/api/unit-from-db?allProjects=1')
+      .then(r => r.json())
+      .then(d => {
+        // В базе у части названий висят хвостовые пробелы — без trim отметка
+        // сохранится под другим ключом и слетит после перезагрузки.
+        const names: string[] = (d.projects || [])
+          .map((p: { name: string }) => (p.name || '').trim())
+          .filter(Boolean);
+        if (names.length) setDbProjects(names);
+      })
+      .catch(() => {})
+      .finally(() => setDbProjectsLoading(false));
   }, []);
 
   const toggleCheck = (p: string, allProjects: string[]) => {
@@ -157,6 +178,11 @@ export default function BudgetPage() {
   const isSunday = new Date().getDay() === 0;
   const activeGroups = WA_GROUPS.filter(g => enabledGroups[g.id]).length;
 
+  // База — источник правды; таблица остаётся запасным вариантом.
+  const trackerProjects = dbProjects.length ? dbProjects : projects;
+  const trackerLoading = dbProjectsLoading && projectsLoading;
+  const doneCount = trackerProjects.filter(p => checked[p]).length;
+
   return (
     <div className="max-w-6xl mx-auto w-full space-y-5">
       {/* ── Шапка ── */}
@@ -180,14 +206,19 @@ export default function BudgetPage() {
       ) : (
         <>
           {/* ── Трекер проектов ── */}
-          <div className="bb-card p-6 bb-rise" style={{ animationDelay: '60ms' }}>
-            <div className="flex items-center gap-3 mb-4 flex-wrap">
-              <span className="bb-title text-[17px]">Расписание рассылки</span>
+          <div className="bb-card p-5 bb-rise" style={{ animationDelay: '60ms' }}>
+            <div className="flex items-center gap-2.5 mb-3.5 flex-wrap">
+              <span className="bb-title text-[16px]">Расписание рассылки</span>
               <span className="bb-chip bb-chip-sky">{formatDateRu()}</span>
               {isSunday && <span className="bb-chip bb-chip-lemon">выходной</span>}
+              {trackerProjects.length > 0 && (
+                <span className="bb-chip bb-chip-mint ml-auto">
+                  {doneCount} из {trackerProjects.length}
+                </span>
+              )}
             </div>
 
-            {projectsLoading ? (
+            {trackerLoading ? (
               <div className="flex items-center gap-2 text-sm py-2" style={{ color: 'var(--ink-500)' }}>
                 <div
                   className="w-4 h-4 border-[3px] rounded-full animate-spin"
@@ -195,36 +226,36 @@ export default function BudgetPage() {
                 />
                 Загружаю проекты...
               </div>
-            ) : projects.length === 0 ? (
+            ) : trackerProjects.length === 0 ? (
               <p className="text-sm py-2" style={{ color: 'var(--ink-500)' }}>Проекты не найдены</p>
             ) : (
-              <div className="flex flex-wrap gap-2">
-                {projects.map((p, i) => {
+              <div className="flex flex-wrap gap-1.5">
+                {trackerProjects.map((p, i) => {
                   const done = !!checked[p];
                   return (
                     <button
                       key={p}
-                      onClick={() => toggleCheck(p, projects)}
-                      className="bb-pop group flex items-center gap-2 pl-2 pr-3.5 py-2 rounded-full
-                                 text-[13px] font-bold select-none cursor-pointer
+                      onClick={() => toggleCheck(p, trackerProjects)}
+                      className="bb-pop flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full
+                                 text-[12px] font-bold leading-none select-none cursor-pointer
                                  transition-all duration-200 hover:-translate-y-0.5 active:scale-[.96]"
                       style={{
-                        animationDelay: `${Math.min(i * 18, 400)}ms`,
+                        animationDelay: `${Math.min(i * 14, 350)}ms`,
                         background: done ? 'var(--mint)' : '#fff',
                         color: done ? '#075f3d' : 'var(--ink-700)',
-                        boxShadow: done ? 'var(--lift-1)' : 'var(--lift-1)',
+                        boxShadow: 'var(--lift-1)',
                       }}
                     >
                       <span
-                        className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center transition-all duration-200"
+                        className="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center transition-all duration-200"
                         style={{
                           background: done ? '#10b981' : 'var(--sky-100)',
-                          transform: done ? 'scale(1)' : 'scale(.9)',
+                          transform: done ? 'scale(1)' : 'scale(.85)',
                         }}
                       >
                         {done && (
-                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M5 13l4 4L19 7" />
+                          <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
                           </svg>
                         )}
                       </span>
