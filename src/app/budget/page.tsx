@@ -17,17 +17,6 @@ const WA_GROUPS = [
   { id: '120363425347743544@g.us', name: 'Abu Dhabi Off-Plan/Resale', defaultOn: true },
 ];
 
-const convertRuToEn = (str: string) => {
-  const ru = 'йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,';
-  const en = 'qwertyuiop[]asdfghjkl;\'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL:"ZXCVBNM<>?';
-  let res = '';
-  for (let i = 0; i < str.length; i++) {
-    const idx = ru.indexOf(str[i]);
-    res += idx !== -1 ? en[idx] : str[i];
-  }
-  return res;
-};
-
 function formatDateRu() {
   const now = new Date();
   const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
@@ -73,8 +62,6 @@ export default function BudgetPage() {
   const [dbProjectsLoading, setDbProjectsLoading] = useState(true);
   const [projects, setProjects] = useState<string[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
-  const [projectSearch, setProjectSearch] = useState('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [project, setProject] = useState('');
   const [rawText, setRawText] = useState('');
   const [parsedData, setParsedData] = useState<any>(null);
@@ -125,9 +112,6 @@ export default function BudgetPage() {
     persistChecked(toSave);
   };
 
-  const filteredProjects = projects.filter(p =>
-    p.toLowerCase().includes(projectSearch.toLowerCase())
-  );
 
   const handleParse = async () => {
     if (!project || !rawText) return alert('Select project and paste table');
@@ -235,7 +219,8 @@ export default function BudgetPage() {
                   return (
                     <button
                       key={p}
-                      onClick={() => toggleCheck(p, trackerProjects)}
+                      onClick={() => setProject(p)}
+                      title="Выбрать проект — кружок слева отмечает, что рассылка ушла"
                       className="bb-pop flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full
                                  text-[12px] font-bold leading-none select-none cursor-pointer
                                  transition-all duration-200 hover:-translate-y-0.5 active:scale-[.96]"
@@ -243,11 +228,26 @@ export default function BudgetPage() {
                         animationDelay: `${Math.min(i * 14, 350)}ms`,
                         background: done ? 'var(--mint)' : '#fff',
                         color: done ? '#075f3d' : 'var(--ink-700)',
-                        boxShadow: 'var(--lift-1)',
+                        // Выбранный проект обводим — видно, для чего сейчас собирается рассылка.
+                        boxShadow: project === p
+                          ? '0 0 0 2.5px var(--aqua-400), var(--lift-2)'
+                          : 'var(--lift-1)',
                       }}
                     >
+                      {/* Кружок — отдельная кнопка: отметка «отправлено» не должна
+                          срабатывать от простого выбора проекта. */}
                       <span
-                        className="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center transition-all duration-200"
+                        role="checkbox"
+                        aria-checked={done}
+                        tabIndex={0}
+                        onClick={e => { e.stopPropagation(); toggleCheck(p, trackerProjects); }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault(); e.stopPropagation(); toggleCheck(p, trackerProjects);
+                          }
+                        }}
+                        className="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center
+                                   transition-all duration-200 hover:scale-110 cursor-pointer"
                         style={{
                           background: done ? '#10b981' : 'var(--sky-100)',
                           transform: done ? 'scale(1)' : 'scale(.85)',
@@ -270,66 +270,31 @@ export default function BudgetPage() {
           {/* ── Форма и превью ── */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
             <div className="bb-card p-6 space-y-5 bb-rise" style={{ animationDelay: '120ms' }}>
-              <div className="relative">
+              {/* Проект берётся из плашки в трекере — отдельный список тут не нужен */}
+              <div>
                 <label className="bb-label block mb-2">Проект</label>
-                {projectsLoading ? (
-                  <div className="bb-input flex items-center gap-2" style={{ color: 'var(--ink-500)' }}>
-                    <div
-                      className="w-4 h-4 border-[3px] rounded-full animate-spin"
-                      style={{ borderColor: 'var(--sky-200)', borderTopColor: 'var(--aqua-500)' }}
-                    />
-                    Загружаю проекты...
-                  </div>
-                ) : projects.length > 0 ? (
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={projectSearch}
-                      onChange={e => { setProjectSearch(convertRuToEn(e.target.value)); setIsDropdownOpen(true); }}
-                      onFocus={() => setIsDropdownOpen(true)}
-                      onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
-                      placeholder="Начни вводить название..."
-                      className="bb-input pr-11"
-                    />
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <svg
-                        className="w-4 h-4 transition-transform duration-200"
-                        style={{ color: 'var(--ink-300)', transform: isDropdownOpen ? 'rotate(180deg)' : 'none' }}
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                    {isDropdownOpen && (
-                      <div
-                        className="bb-pop absolute z-50 w-full mt-2 max-h-60 overflow-y-auto p-1.5"
-                        style={{ background: '#fff', borderRadius: 'var(--r-md)', boxShadow: 'var(--lift-3)' }}
-                      >
-                        {filteredProjects.length > 0 ? filteredProjects.map(p => (
-                          <div
-                            key={p}
-                            onClick={() => { setProject(p); setProjectSearch(p); setIsDropdownOpen(false); }}
-                            className="px-3 py-2.5 rounded-xl cursor-pointer text-sm font-semibold transition-colors duration-150"
-                            style={{
-                              background: project === p ? 'var(--sky-100)' : 'transparent',
-                              color: project === p ? 'var(--aqua-600)' : 'var(--ink-700)',
-                            }}
-                            onMouseEnter={e => { if (project !== p) e.currentTarget.style.background = 'var(--sky-50)'; }}
-                            onMouseLeave={e => { if (project !== p) e.currentTarget.style.background = 'transparent'; }}
-                          >
-                            {p}
-                          </div>
-                        )) : (
-                          <div className="px-4 py-3 text-sm text-center" style={{ color: 'var(--ink-300)' }}>
-                            Ничего не нашлось
-                          </div>
-                        )}
-                      </div>
-                    )}
+                {project ? (
+                  <div
+                    className="bb-pop flex items-center gap-2 px-4 py-3 font-bold text-sm"
+                    style={{ background: 'var(--sky-50)', borderRadius: 'var(--r-md)', color: 'var(--aqua-600)' }}
+                  >
+                    <span className="text-base leading-none">📌</span>
+                    {project}
+                    <button
+                      onClick={() => setProject('')}
+                      className="ml-auto text-xs font-bold transition-colors"
+                      style={{ color: 'var(--ink-300)' }}
+                      title="Снять выбор"
+                    >
+                      ✕
+                    </button>
                   </div>
                 ) : (
-                  <div className="bb-input" style={{ background: 'var(--peach)', color: '#9f1239' }}>
-                    Не удалось загрузить проекты
+                  <div
+                    className="px-4 py-3 text-sm font-semibold"
+                    style={{ background: 'var(--sky-50)', borderRadius: 'var(--r-md)', color: 'var(--ink-300)' }}
+                  >
+                    Выбери проект в расписании выше
                   </div>
                 )}
               </div>
