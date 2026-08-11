@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { saveWaRequest, getConfig, getRemindDelayMinutes } from '@/lib/wa-monitor/sheets';
+import { markReply } from '@/lib/broker-check/store';
 
 // Config as a { triggers[], instances: map } shape for the webhook.
 async function loadConfig() {
@@ -77,6 +78,22 @@ export async function POST(request: Request) {
     // (they'd create noise, e.g. brokers posting "🔥request:" listings in group chats).
     const isOutgoing = body.typeWebhook === 'outgoingMessageReceived';
     console.log('WA webhook type:', body.typeWebhook, 'instance:', body.instanceData?.idInstance);
+
+    // Входящее из личного чата — возможный ответ на сверку листингов.
+    // Отмечаем его и выходим: для напоминаний входящие по-прежнему не годятся.
+    if (body.typeWebhook === 'incomingMessageReceived') {
+      const from = String(body.senderData?.chatId || '');
+      if (from.endsWith('@c.us')) {
+        const phone = from.replace('@c.us', '').replace(/\D/g, '');
+        const text = extractText(body.messageData).trim();
+        if (phone && text) {
+          const marked = await markReply(phone, text.slice(0, 2000)).catch(() => false);
+          if (marked) console.log('Сверка брокеров: засчитан ответ от', phone);
+        }
+      }
+      return NextResponse.json({ ok: true, skipped: 'incoming message' });
+    }
+
     if (!isOutgoing) {
       return NextResponse.json({ ok: true, skipped: 'not an outgoing message', type: body.typeWebhook });
     }

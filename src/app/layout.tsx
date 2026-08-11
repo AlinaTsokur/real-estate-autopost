@@ -24,6 +24,7 @@ const navItems = [
   { href: '/wa-monitor', label: 'WA Монитор', icon: '📌' },
   { href: '/project-emoji', label: 'Смайлики проектов', icon: '🎨' },
   { href: '/no-posts', label: 'Юниты без постов', icon: '📝' },
+  { href: '/broker-check', label: 'Сверка брокеров', icon: '🤝' },
 ];
 
 export default function RootLayout({
