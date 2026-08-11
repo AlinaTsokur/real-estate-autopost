@@ -89,19 +89,28 @@ export default function BrokerCheckPage() {
     }
   };
 
-  const toggleExcluded = async (it: Item) => {
-    const excluded = !it.excluded;
-    setItems(prev => prev.map(x => x.phone === it.phone ? { ...x, excluded } : x));
-    if (excluded) setPicked(p => ({ ...p, [it.phone]: false }));
+  // Выделенные карточки — над ними и работают все действия.
+  const marked = items.filter(i => picked[i.phone]);
+  const selected = marked.filter(i => !i.excluded);          // кому можно писать
+  const markedExcluded = marked.filter(i => i.excluded);     // выделенные из исключённых
+
+  const setExcluded = async (list: Item[], excluded: boolean) => {
+    if (!list.length) return;
+    const phones = new Set(list.map(i => i.phone));
+    setItems(prev => prev.map(x => phones.has(x.phone) ? { ...x, excluded } : x));
+    setPicked({});
     const d = await fetch('/api/broker-check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'optout', phone: it.phone, name: it.name, excluded }),
+      body: JSON.stringify({
+        action: 'optout',
+        items: list.map(i => ({ phone: i.phone, name: i.name })),
+        excluded,
+      }),
     }).then(r => r.json());
     if (d.error) setMsg({ ok: false, text: d.error });
+    else setMsg({ ok: true, text: excluded ? `Исключено: ${list.length}` : `Возвращено в рассылку: ${list.length}` });
   };
-
-  const selected = items.filter(i => picked[i.phone] && !i.excluded);
 
   const sendSelected = async () => {
     if (!settings?.sendingEnabled) {
@@ -164,11 +173,11 @@ export default function BrokerCheckPage() {
         <button
           onClick={() => { setLoading(true); load().finally(() => setLoading(false)); }}
           title="Перечитать данные из базы"
-          className="ml-auto bb-surface-soft hover:bb-surface-soft bb-ink text-xs py-1 px-2.5 rounded-lg border bb-edge"
+          className="ml-auto bb-surface-soft bb-hover-soft bb-ink text-xs py-1 px-2.5 rounded-lg border bb-edge"
         >🔄</button>
         <button
           onClick={() => setShowSettings(v => !v)}
-          className="bb-surface-soft hover:bb-surface-soft bb-ink text-xs py-1 px-2.5 rounded-lg border bb-edge"
+          className="bb-surface-soft bb-hover-soft bb-ink text-xs py-1 px-2.5 rounded-lg border bb-edge"
         >⚙️ Настройки</button>
       </div>
       <p className="bb-ink-3 text-xs mb-4">
@@ -282,24 +291,38 @@ export default function BrokerCheckPage() {
         </div>
       )}
 
-      {/* Панель выбора */}
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+      {/* Панель действий над выделенными. Прилипает к верху — список длинный,
+          а действовать нужно из любого места. */}
+      <div className="sticky top-0 z-20 -mx-1 px-1 py-2 mb-2 flex flex-wrap items-center gap-1.5 text-xs backdrop-blur-sm">
         <button
-          onClick={() => setPicked(Object.fromEntries(items.filter(i => !i.excluded).map(i => [i.phone, true])))}
-          className="px-3 py-1.5 bb-surface-soft hover:bb-surface-soft border bb-edge rounded-lg bb-ink transition-all">
-          Выбрать всех ({items.filter(i => !i.excluded).length})
+          onClick={() => setPicked(Object.fromEntries(items.map(i => [i.phone, true])))}
+          className="px-2.5 py-1 bb-surface-soft bb-hover-soft border bb-edge rounded-lg bb-ink">
+          Выбрать всех ({items.length})
         </button>
         <button
           onClick={() => setPicked({})}
-          className="px-3 py-1.5 bb-surface-soft hover:bb-surface-soft border bb-edge rounded-lg bb-ink-3 transition-all">
-          Снять выбор
+          disabled={!marked.length}
+          className="px-2.5 py-1 bb-surface-soft bb-hover-soft border bb-edge rounded-lg bb-ink-3 disabled:opacity-40">
+          Снять выделение
         </button>
-        <span className="bb-ink-4">
-          выбрано {selected.length} · сегодня отправлено {sentToday}
-        </span>
-        <div className="ml-auto flex items-center gap-2">
+        <button
+          onClick={() => setExcluded(selected, true)}
+          disabled={!selected.length}
+          title="Больше не писать этим брокерам"
+          className="px-2.5 py-1 bb-tint-bad bb-bad font-medium rounded-lg transition-all hover:brightness-95 disabled:opacity-40">
+          🚫 Исключить ({selected.length})
+        </button>
+        {markedExcluded.length > 0 && (
+          <button
+            onClick={() => setExcluded(markedExcluded, false)}
+            className="px-2.5 py-1 bb-surface-soft bb-hover-soft border bb-edge rounded-lg bb-ink">
+            ↩︎ Вернуть ({markedExcluded.length})
+          </button>
+        )}
+        <span className="bb-ink-4">сегодня отправлено {sentToday}</span>
+        <div className="ml-auto flex items-center gap-1.5">
           {sending && (
-            <button onClick={() => { stopRef.current = true; }} className="px-3 py-1.5 bb-tint-bad bb-bad text-xs font-medium rounded-lg transition-all hover:brightness-95">
+            <button onClick={() => { stopRef.current = true; }} className="px-2.5 py-1 bb-tint-bad bb-bad font-medium rounded-lg transition-all hover:brightness-95">
               Стоп
             </button>
           )}
@@ -307,11 +330,11 @@ export default function BrokerCheckPage() {
             onClick={sendSelected}
             disabled={sending || !selected.length}
             title={selected.length ? `Отправить ${selected.length} сообщений с паузой ${settings?.throttleSeconds}с` : 'Сначала отметь галочками, кому писать'}
-            className="px-4 py-1.5 bb-fill-accent hover:bb-fill-accent text-white text-xs font-medium rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 py-1 bb-fill-accent hover:bb-fill-accent text-white font-medium rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {sending
               ? `Отправляю ${progress?.done ?? 0}/${progress?.total ?? 0}…`
-              : `Отправить выбранным (${selected.length})`}
+              : `Отправить выделенным (${selected.length})`}
           </button>
         </div>
       </div>
@@ -320,64 +343,48 @@ export default function BrokerCheckPage() {
         <div className="mb-3 text-xs bb-ink-3">Сейчас: {progress.current}. Пауза между сообщениями {settings?.throttleSeconds}с — не закрывай вкладку.</div>
       )}
 
-      {/* Список брокеров */}
-      <div className="space-y-2">
+      {/* Список брокеров: две колонки, карточка в две строки */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5 items-start">
         {items.map(it => {
           const draft = drafts[it.phone] ?? it.message;
           const open = openPhone === it.phone;
           return (
             <div
               key={it.phone}
-              className={`group rounded-2xl border bb-edge p-3 transition-all bb-card-hover ${picked[it.phone] && !it.excluded ? 'bb-tint-accent' : 'bb-surface'} ${it.excluded ? 'opacity-50' : ''}`}
+              className={`group rounded-xl border bb-edge px-2.5 py-1.5 transition-all bb-card-hover ${open ? 'lg:col-span-2' : ''} ${picked[it.phone] ? 'bb-tint-accent' : 'bb-surface'} ${it.excluded ? 'opacity-45' : ''}`}
             >
-              <div className="flex items-start gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={!!picked[it.phone] && !it.excluded}
-                  disabled={it.excluded}
+                  checked={!!picked[it.phone]}
                   onChange={e => setPicked(p => ({ ...p, [it.phone]: e.target.checked }))}
-                  className="w-4 h-4 mt-0.5 cursor-pointer disabled:cursor-not-allowed"
+                  className="w-3.5 h-3.5 shrink-0 cursor-pointer"
                 />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium bb-ink">{it.name || '(без имени)'}</span>
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bb-tint-accent bb-accent">{it.language}</span>
-                    <span className="text-[11px] bb-ink-4 font-mono">+{it.phone}</span>
-                    <span className="text-[11px] bb-ink-4">· {it.units.length} юнит(ов)</span>
-                  </div>
-                  <div className="text-[11px] mt-0.5">
-                    {it.last ? (
-                      it.last.repliedAt ? (
-                        <span className="bb-ok">✓ ответил {whenLabel(it.last.repliedAt)}</span>
-                      ) : it.last.status === 'failed' ? (
-                        <span className="bb-bad">⚠️ не ушло {whenLabel(it.last.sentAt)}: {it.last.error?.slice(0, 60)}</span>
-                      ) : (
-                        <span className="bb-ink-3">отправлено {whenLabel(it.last.sentAt)} · ответа нет</span>
-                      )
-                    ) : (
-                      <span className="bb-ink-4">ещё не писали</span>
-                    )}
-                  </div>
-                </div>
+                <span className="text-xs font-medium bb-ink truncate" title={it.name}>
+                  {it.excluded && '🚫 '}{it.name || '(без имени)'}
+                </span>
+                <span className="text-[10px] px-1 rounded bb-tint-accent bb-accent shrink-0">{it.language}</span>
+                <span className="text-[10px] bb-ink-4 shrink-0">{it.units.length} юн.</span>
 
+                <span className="ml-auto text-[10px] shrink-0">
+                  {it.last ? (
+                    it.last.repliedAt ? <span className="bb-ok">✓ ответил</span>
+                    : it.last.status === 'failed' ? <span className="bb-bad">⚠️ не ушло</span>
+                    : <span className="bb-ink-3">→ {whenLabel(it.last.sentAt)}</span>
+                  ) : null}
+                </span>
                 <button
-                  onClick={() => setOpenPhone(open ? null : it.phone)}
+                  onClick={e => { e.preventDefault(); setOpenPhone(open ? null : it.phone); }}
                   title={open ? 'Свернуть текст' : 'Показать и отредактировать текст'}
-                  className="text-[11px] bb-accent hover:bb-accent shrink-0"
+                  className="text-[10px] bb-accent hover:bb-accent shrink-0"
                 >
                   текст {open ? '▲' : '▼'}
                 </button>
-                <button
-                  onClick={() => toggleExcluded(it)}
-                  title={it.excluded ? 'Вернуть в рассылку' : 'Исключить из рассылки'}
-                  className="text-[11px] font-medium py-1 px-2.5 rounded-lg shrink-0 transition-all bb-tint-bad bb-bad hover:brightness-95"
-                >
-                  {it.excluded ? '↩︎ вернуть' : '🚫 исключить'}
-                </button>
-              </div>
+              </label>
 
               {open && (
-                <div className="mt-3 space-y-2">
+                <div className="mt-2 space-y-2">
+                  <div className="text-[10px] bb-ink-4 font-mono">+{it.phone}</div>
                   <div className="text-[11px] bb-ink-4">
                     {it.units.map(u => `${u.unitNumber || u.code} — ${u.price} (${u.project})`).join(' · ')}
                   </div>

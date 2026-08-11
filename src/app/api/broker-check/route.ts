@@ -85,9 +85,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, settings: await getSettings() });
     }
 
+    // Исключить/вернуть — сразу пачкой: действия идут над выделенными карточками.
     if (body.action === 'optout') {
-      await setOptOut(String(body.phone), String(body.name ?? ''), !!body.excluded);
-      return NextResponse.json({ ok: true });
+      const list: { phone: string; name?: string }[] = body.items?.length
+        ? body.items
+        : [{ phone: body.phone, name: body.name }];
+      for (const it of list) {
+        await setOptOut(String(it.phone), String(it.name ?? ''), !!body.excluded);
+      }
+      return NextResponse.json({ ok: true, count: list.length });
     }
 
     // Отправка выбранным. targets: [{ phone, name, message, unitsCount }]

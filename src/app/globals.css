@@ -292,6 +292,21 @@
   .bb-warn   { color: #b45309; }
   .bb-accent { color: var(--aqua-600); }
 
+  /* Ховер для мелких кнопок-«таблеток».
+     Писать `hover:bb-surface-soft` бесполезно: bb-* — обычные классы из
+     @layer components, а не утилиты Tailwind, поэтому hover-вариант для них
+     не собирается и кнопка не реагирует на наведение. Реальный ховер живёт
+     только в написанном руками правиле, как у .bb-card-hover. */
+  .bb-hover-soft {
+    transition: background-color .2s var(--swift), color .2s var(--swift),
+                box-shadow .25s var(--swift);
+  }
+  .bb-hover-soft:hover:not(:disabled) {
+    background: var(--sky-100);
+    color: var(--ink-900);
+    box-shadow: var(--lift-1);
+  }
+
   .bb-tint-ok     { background: var(--mint);   color: #075f3d; }
   .bb-tint-bad    { background: var(--peach);  color: #9f1239; }
   .bb-tint-warn   { background: var(--lemon);  color: #854d0e; }
