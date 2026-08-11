@@ -90,17 +90,17 @@ export async function getDriveImages(folderId: string, limit = 5): Promise<Buffe
   const files = res.data.files || [];
   if (files.length === 0) return [];
 
-  const buffers: Buffer[] = [];
-  
-  for (const file of files) {
-    if (!file.id) continue;
-    const fileRes = await drive.files.get(
-      { fileId: file.id, alt: 'media' },
-      { responseType: 'arraybuffer' }
-    );
-    const raw = Buffer.from(fileRes.data as ArrayBuffer);
-    buffers.push(await compressImageBuffer(raw));
-  }
+  // Параллельно: последовательное скачивание пяти фото съедало секунды из
+  // 60-секундного лимита функции отправки.
+  const buffers = await Promise.all(
+    files.filter(f => f.id).map(async file => {
+      const fileRes = await drive.files.get(
+        { fileId: file.id!, alt: 'media' },
+        { responseType: 'arraybuffer' }
+      );
+      return compressImageBuffer(Buffer.from(fileRes.data as ArrayBuffer));
+    })
+  );
 
   return buffers;
 }

@@ -2,23 +2,30 @@ import { NextResponse } from 'next/server';
 import { getBot, sendMediaGroupWithCaption, sendTextMessage, sendPlainTextMessage, sendPhoto, updateReviewMessage } from '@/lib/telegram/bot';
 
 // Heavy flow: downloads Drive photos + uploads a media group to Telegram + writes
-// to Sheets. The 10s Hobby default is too short — give it room.
-export const maxDuration = 60;
+// to Sheets. 60 с не хватало — отправка падала с 504 (Task timed out).
+export const maxDuration = 300;
 import { getDriveImages, getProjectPhotoFolderId, uploadToWaQueue, compressImageBuffer } from '@/lib/google/drive';
 import { getConfig2, addWaQueueItem } from '@/lib/google/sheets';
 import { buildTelegramHtmlPost, buildWhatsAppMarkdown, PostData } from '@/lib/posts/templates';
 import { validatePostData } from '@/lib/posts/validators';
 
 export async function POST(request: Request) {
+  // Отправка упирается в 60 с (тариф Hobby). Без потактовых замеров в логах
+  // остаётся только «Task timed out» — непонятно, какой шаг съел время.
+  const t0 = Date.now();
+  const mark = (stage: string) => console.log(`send-telegram +${((Date.now() - t0) / 1000).toFixed(1)}s ${stage}`);
   try {
     const body = await request.json();
     const data: PostData = body.data;
 
     validatePostData(data);
+    mark('body + validate');
 
     const cfg = await getConfig2(data.project);
+    mark('getConfig2');
     const telegramHtml = body.telegramHtmlOverride || await buildTelegramHtmlPost(data);
     const whatsappText = body.whatsappTextOverride || await buildWhatsAppMarkdown(data);
+    mark('шаблоны');
 
     const chatId = process.env.TELEGRAM_REVIEW_CHAT_ID;
     if (!chatId) throw new Error('TELEGRAM_REVIEW_CHAT_ID not configured');
@@ -57,6 +64,7 @@ export async function POST(request: Request) {
 
     const slideRaw = Buffer.from(data.slideDataUrl.split(',')[1], 'base64');
     const slideBuffer = await compressImageBuffer(slideRaw);
+    mark(`сжатие слайда (${(slideBuffer.length / 1048576).toFixed(2)} МБ)`);
 
     // Media group
     const media: { type: 'photo'; media: any }[] = [
@@ -65,7 +73,9 @@ export async function POST(request: Request) {
 
     try {
       const folderId = await getProjectPhotoFolderId(data.project);
+      mark('getProjectPhotoFolderId');
       const images = await getDriveImages(folderId, 5); // Get up to 5 to make 6 total with slide
+      mark(`getDriveImages (${images.length})`);
 
       images.forEach((img, i) => {
         media.push({ type: 'photo', media: { source: img, filename: `img_${i}.jpg` } });
@@ -80,9 +90,11 @@ export async function POST(request: Request) {
     console.log(`Sending telegram media group with ${media.length} items`);
 
     const r1 = await sendMediaGroupWithCaption(chatId, media, telegramHtml, data.code || data.unit || 'Unknown');
+    mark('sendMediaGroup');
     const allIds: number[] = [...r1.ids];
 
     const r2 = await sendPhoto(chatId, slideBuffer, whatsappText);
+    mark('sendPhoto');
     allIds.push(...r2.ids);
 
     // Queue first: the WA button needs the queue item's id to be unambiguous.
@@ -92,11 +104,13 @@ export async function POST(request: Request) {
       const filename = `wa_${Date.now()}.jpg`;
       const driveFileId = await uploadToWaQueue(slideBuffer, filename);
       waQueueId = await addWaQueueItem(label, whatsappText, driveFileId);
+      mark('очередь WA');
     } catch (e) {
       console.error('WA queue save error:', e);
     }
 
     await updateReviewMessage(chatId, r1.reviewMsgId, data.code || data.unit || 'Unknown', allIds, r1.mainIds, waQueueId).catch(() => {});
+    mark('ГОТОВО');
 
     return NextResponse.json({ ok: true, whatsappText, messageIds: allIds, chatId });
   } catch (error: any) {
