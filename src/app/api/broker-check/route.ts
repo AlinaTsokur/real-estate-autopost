@@ -41,6 +41,16 @@ export async function GET(request: Request) {
       last: lastSent[b.phone] ?? null,
     }));
 
+    // Номер по умолчанию — Даша: сверку ведёт она, а приложение в остальных
+    // местах пишет с номера Наташи. Запоминаем, чтобы не подставлять каждый раз.
+    if (!settings.instanceId) {
+      const dasha = (waConfig.instances || []).find(i => /даша|daria|dasha/i.test(i.name));
+      if (dasha) {
+        await saveSettings({ instanceId: dasha.id });
+        settings.instanceId = dasha.id;
+      }
+    }
+
     return NextResponse.json({
       items,
       withoutPhone,
@@ -113,24 +123,11 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `WhatsApp «${inst.name}» не готов (статус: ${state})` }, { status: 409 });
       }
 
-      const already = await countSentToday();
-      const room = Math.max(0, settings.dailyLimit - already);
-      if (room === 0) {
-        return NextResponse.json(
-          { error: `Дневной лимит исчерпан: сегодня уже ушло ${already} из ${settings.dailyLimit}.` },
-          { status: 409 },
-        );
-      }
-
       const optOut = await getOptOut();
       const results: { phone: string; name: string; ok: boolean; error?: string }[] = [];
       let sent = 0;
 
       for (const t of targets) {
-        if (sent >= room) {
-          results.push({ phone: t.phone, name: t.name, ok: false, error: 'не уместился в дневной лимит' });
-          continue;
-        }
         if (t.phone in optOut) {
           results.push({ phone: t.phone, name: t.name, ok: false, error: 'исключён из рассылки' });
           continue;
@@ -158,7 +155,7 @@ export async function POST(request: Request) {
         // видно прогресс. Здесь запрос всегда короткий.
       }
 
-      return NextResponse.json({ ok: true, sent, results, limitLeft: Math.max(0, room - sent) });
+      return NextResponse.json({ ok: true, sent, results });
     }
 
     return NextResponse.json({ error: 'Неизвестное действие' }, { status: 400 });

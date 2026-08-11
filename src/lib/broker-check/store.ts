@@ -47,8 +47,6 @@ function ensureTables() {
 export interface Settings extends Templates {
   /** Главный рубильник. Пока 'off' — отправка физически невозможна. */
   sendingEnabled: boolean;
-  /** Сколько сообщений в сутки максимум. */
-  dailyLimit: number;
   /** Пауза между сообщениями в «отправить выбранным», секунды. */
   throttleSeconds: number;
   /** Инстанс Green API, от чьего имени пишем. */
@@ -57,19 +55,15 @@ export interface Settings extends Templates {
   assistant: string;
   /** Дополнительный фильтр по старшему менеджеру (contacted_by); пусто — все. */
   manager: string;
-  /** Не писать брокеру, если ему уже писали меньше стольких дней назад. */
-  cooldownDays: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   ...DEFAULT_TEMPLATES,
   sendingEnabled: false,   // намеренно выключено: включает только человек
-  dailyLimit: 40,
   throttleSeconds: 60,
   instanceId: '',
   assistant: 'Daria',
   manager: '',
-  cooldownDays: 7,
 };
 
 export async function getSettings(): Promise<Settings> {
@@ -79,12 +73,10 @@ export async function getSettings(): Promise<Settings> {
   const num = (k: string, d: number) => (Number.isFinite(Number(map[k])) && map[k] !== undefined ? Number(map[k]) : d);
   return {
     sendingEnabled: map.sendingEnabled === 'true',
-    dailyLimit: num('dailyLimit', DEFAULT_SETTINGS.dailyLimit),
     throttleSeconds: num('throttleSeconds', DEFAULT_SETTINGS.throttleSeconds),
     instanceId: map.instanceId ?? DEFAULT_SETTINGS.instanceId,
     assistant: map.assistant ?? DEFAULT_SETTINGS.assistant,
     manager: map.manager ?? DEFAULT_SETTINGS.manager,
-    cooldownDays: num('cooldownDays', DEFAULT_SETTINGS.cooldownDays),
     templateRu: map.templateRu || DEFAULT_SETTINGS.templateRu,
     templateEn: map.templateEn || DEFAULT_SETTINGS.templateEn,
     questionRuOne: map.questionRuOne || DEFAULT_SETTINGS.questionRuOne,
@@ -94,10 +86,14 @@ export async function getSettings(): Promise<Settings> {
   };
 }
 
+// Пишем только известные ключи: иначе в таблице настроек копится мусор от
+// прежних версий формы, и потом непонятно, что из этого живое.
+const SETTING_KEYS = new Set(Object.keys(DEFAULT_SETTINGS));
+
 export async function saveSettings(patch: Partial<Settings>): Promise<void> {
   await ensureTables();
   for (const [key, value] of Object.entries(patch)) {
-    if (value === undefined) continue;
+    if (value === undefined || !SETTING_KEYS.has(key)) continue;
     await sql`
       INSERT INTO broker_check_settings (key, value) VALUES (${key}, ${String(value)})
       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
@@ -159,7 +155,7 @@ export async function getLastSentByPhone(): Promise<Record<string, LastSent>> {
   );
 }
 
-/** Сколько сообщений уже ушло за сегодня — для дневного лимита. */
+/** Сколько сообщений ушло за сегодня — просто счётчик на странице. */
 export async function countSentToday(): Promise<number> {
   await ensureTables();
   const rows = (await sql`

@@ -13,8 +13,8 @@ interface Item {
   units: Unit[]; message: string; excluded: boolean; last: Last | null;
 }
 interface Settings {
-  sendingEnabled: boolean; dailyLimit: number; throttleSeconds: number;
-  instanceId: string; assistant: string; manager: string; cooldownDays: number;
+  sendingEnabled: boolean; throttleSeconds: number;
+  instanceId: string; assistant: string; manager: string;
   templateRu: string; templateEn: string;
   questionRuOne: string; questionRuMany: string;
   questionEnOne: string; questionEnMany: string;
@@ -101,12 +101,7 @@ export default function BrokerCheckPage() {
     if (d.error) setMsg({ ok: false, text: d.error });
   };
 
-  // Кому имеет смысл писать: не исключён и не писали недавно.
-  const isFresh = (it: Item) =>
-    !it.excluded && (!it.last || daysAgo(it.last.sentAt) >= (settings?.cooldownDays ?? 7));
-
   const selected = items.filter(i => picked[i.phone] && !i.excluded);
-  const limitLeft = Math.max(0, (settings?.dailyLimit ?? 0) - sentToday);
 
   const sendSelected = async () => {
     if (!settings?.sendingEnabled) {
@@ -242,15 +237,6 @@ export default function BrokerCheckPage() {
             </label>
 
             <label className="block">
-              <span className="text-xs bb-ink-2 block mb-1">Лимит в сутки</span>
-              <input
-                type="number" min={1} max={500} defaultValue={settings.dailyLimit}
-                onBlur={e => patchSettings({ dailyLimit: Number(e.target.value) })}
-                className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm outline-none focus:ring-2 focus:bb-ring"
-              />
-            </label>
-
-            <label className="block">
               <span className="text-xs bb-ink-2 block mb-1">Пауза между сообщениями, сек</span>
               <input
                 type="number" min={0} max={600} defaultValue={settings.throttleSeconds}
@@ -259,16 +245,7 @@ export default function BrokerCheckPage() {
               />
             </label>
 
-            <label className="block">
-              <span className="text-xs bb-ink-2 block mb-1">Не писать повторно, дней</span>
-              <input
-                type="number" min={0} max={90} defaultValue={settings.cooldownDays}
-                onBlur={e => patchSettings({ cooldownDays: Number(e.target.value) })}
-                className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm outline-none focus:ring-2 focus:bb-ring"
-              />
-            </label>
-
-            <label className="flex items-center gap-2 pt-5 cursor-pointer">
+            <label className="flex items-center gap-2 sm:pt-5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={settings.sendingEnabled}
@@ -307,15 +284,18 @@ export default function BrokerCheckPage() {
 
       {/* Панель выбора */}
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-        <button onClick={() => setPicked(Object.fromEntries(items.filter(isFresh).map(i => [i.phone, true])))}
+        <button
+          onClick={() => setPicked(Object.fromEntries(items.filter(i => !i.excluded).map(i => [i.phone, true])))}
           className="px-3 py-1.5 bb-surface-soft hover:bb-surface-soft border bb-edge rounded-lg bb-ink transition-all">
-          Выбрать всех, кому пора ({items.filter(isFresh).length})
+          Выбрать всех ({items.filter(i => !i.excluded).length})
         </button>
-        <button onClick={() => setPicked({})} className="px-3 py-1.5 bb-ink-4 hover:bb-ink-2 rounded-lg transition-all">
+        <button
+          onClick={() => setPicked({})}
+          className="px-3 py-1.5 bb-surface-soft hover:bb-surface-soft border bb-edge rounded-lg bb-ink-3 transition-all">
           Снять выбор
         </button>
         <span className="bb-ink-4">
-          выбрано {selected.length} · сегодня ушло {sentToday} из {settings?.dailyLimit ?? 0} · остаток {limitLeft}
+          выбрано {selected.length} · сегодня отправлено {sentToday}
         </span>
         <div className="ml-auto flex items-center gap-2">
           {sending && (
@@ -345,7 +325,6 @@ export default function BrokerCheckPage() {
         {items.map(it => {
           const draft = drafts[it.phone] ?? it.message;
           const open = openPhone === it.phone;
-          const fresh = isFresh(it);
           return (
             <div
               key={it.phone}
@@ -377,9 +356,6 @@ export default function BrokerCheckPage() {
                       )
                     ) : (
                       <span className="bb-ink-4">ещё не писали</span>
-                    )}
-                    {!fresh && !it.excluded && it.last && !it.last.repliedAt && (
-                      <span className="bb-ink-4"> · в паузе</span>
                     )}
                   </div>
                 </div>
