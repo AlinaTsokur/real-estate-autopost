@@ -115,8 +115,12 @@ export default function ScheduledPage() {
   };
 
   const [clearing, setClearing] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  // Никаких confirm()/alert() на этой странице: Chrome после нескольких
+  // диалогов подряд предлагает «не показывать больше», и дальше confirm()
+  // молча возвращает false — кнопка выглядит мёртвой, запрос не уходит.
   const clearAll = async () => {
-    if (!confirm('Удалить ВСЕ посты из очереди? Это не отменить.')) return;
+    setConfirmClear(false);
     setClearing(true);
     setErrorMsg(null);
     try {
@@ -141,15 +145,17 @@ export default function ScheduledPage() {
     }
   };
 
+  const [configMsg, setConfigMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const saveChatId = async () => {
-    if (!chatId.trim()) return alert('Введи Chat ID');
+    if (!chatId.trim()) return setConfigMsg({ ok: false, text: 'Введи Chat ID' });
     setSavingConfig(true);
+    setConfigMsg(null);
     try {
       await postAction({ action: 'config', configRowIndex: config.configRowIndex, waChatId: chatId.trim() });
       setConfig(prev => ({ ...prev, wa_chatid: chatId.trim() }));
-      alert('Сохранено');
+      setConfigMsg({ ok: true, text: 'Сохранено' });
     } catch (e: any) {
-      alert('Ошибка: ' + e.message);
+      setConfigMsg({ ok: false, text: 'Ошибка: ' + e.message });
     } finally {
       setSavingConfig(false);
     }
@@ -229,6 +235,11 @@ export default function ScheduledPage() {
         <p className="text-[11px] bb-ink-4">
           Личный чат: <code className="bb-ink-3">номер@c.us</code> · Группа: <code className="bb-ink-3">id@g.us</code>
         </p>
+        {configMsg && (
+          <p className={`text-[11px] ${configMsg.ok ? 'bb-ok' : 'bb-bad'}`}>
+            {configMsg.ok ? '✓ ' : '⚠️ '}{configMsg.text}
+          </p>
+        )}
       </div>
 
       {/* Queue */}
@@ -236,13 +247,32 @@ export default function ScheduledPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold bb-ink-2 uppercase tracking-wider">📋 Очередь ({waiting.length})</h2>
           {waiting.length > 0 && (
-            <button
-              onClick={clearAll}
-              disabled={clearing}
-              className="text-xs px-3 py-1.5 bb-tint-bad hover:bb-tint-bad border bb-edge bb-bad hover:bb-bad rounded-lg transition-all disabled:opacity-50"
-            >
-              {clearing ? 'Очищаю…' : '🗑 Очистить всё'}
-            </button>
+            clearing ? (
+              <span className="text-xs px-3 py-1.5 bb-ink-3">Очищаю…</span>
+            ) : confirmClear ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs bb-ink-3">Удалить все {waiting.length}? Это не отменить.</span>
+                <button
+                  onClick={clearAll}
+                  className="text-xs px-3 py-1.5 bb-tint-bad border bb-edge bb-bad rounded-lg font-medium"
+                >
+                  Да, удалить
+                </button>
+                <button
+                  onClick={() => setConfirmClear(false)}
+                  className="text-xs px-3 py-1.5 bb-ink-4 hover:bb-ink-2"
+                >
+                  Отмена
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setErrorMsg(null); setConfirmClear(true); }}
+                className="text-xs px-3 py-1.5 bb-tint-bad hover:bb-tint-bad border bb-edge bb-bad hover:bb-bad rounded-lg transition-all"
+              >
+                🗑 Очистить всё
+              </button>
+            )
           )}
         </div>
 
