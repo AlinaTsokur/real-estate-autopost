@@ -4,9 +4,14 @@ import {
   updateWaQueueItemSchedule,
   updateWaQueueConfig,
   deleteWaQueueRow,
+  deleteWaQueueRows,
 } from '@/lib/google/sheets';
 import { dispatchWaItem } from '@/lib/whatsapp/dispatch';
 import { getInstanceState } from '@/lib/whatsapp/green-api';
+
+// Отправка одного поста тянет фото из Drive и грузит его в Green API —
+// дефолтных секунд на это не хватает.
+export const maxDuration = 120;
 
 export async function GET() {
   try {
@@ -64,9 +69,8 @@ export async function POST(req: Request) {
     // Delete highest rowIndex first so earlier deletions don't shift the rest.
     if (body.action === 'clear-all') {
       const { items } = await getWaQueue();
-      const sorted = [...items].sort((a, b) => b.rowIndex - a.rowIndex);
-      for (const it of sorted) await deleteWaQueueRow(it.rowIndex);
-      return NextResponse.json({ ok: true, cleared: sorted.length });
+      const cleared = await deleteWaQueueRows(items.map(i => i.rowIndex));
+      return NextResponse.json({ ok: true, cleared });
     }
 
     // Save the WhatsApp chat id

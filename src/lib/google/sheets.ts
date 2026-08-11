@@ -637,6 +637,33 @@ export async function deleteWaQueueRow(rowIndex: number) {
   });
 }
 
+// Удалить несколько строк очереди одним запросом. Построчный вызов
+// deleteWaQueueRow стоил по два обращения к Google на строку, и очистка всей
+// очереди успевала упереться в лимит времени функции.
+export async function deleteWaQueueRows(rowIndexes: number[]) {
+  if (!rowIndexes.length) return 0;
+  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
+  const sheets = await getGoogleSheetsClient();
+  const sheetId = await getSheetIdByTitle(sheets, spreadsheetId, WA_QUEUE_SHEET);
+
+  // Сверху вниз: удаление строки сдвигает все, что ниже неё.
+  const ordered = [...new Set(rowIndexes)].sort((a, b) => b - a);
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: ordered.map(rowIndex => ({
+        deleteDimension: {
+          range: { sheetId, dimension: 'ROWS', startIndex: rowIndex - 1, endIndex: rowIndex },
+        },
+      })),
+    },
+  });
+
+  return ordered.length;
+}
+
 export async function updateWaQueueConfig(configRowIndex: number, waChatId: string) {
   const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
   if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');

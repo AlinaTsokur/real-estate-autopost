@@ -31,6 +31,27 @@ export default function ScheduledPage() {
   const [state, setState] = useState<string>('');
   const [refreshingState, setRefreshingState] = useState(false);
 
+  // Роут при таймауте/падении отдаёт не JSON, а HTML-страницу ошибки — тогда
+  // res.json() бросал невнятное «Unexpected token», и на кнопку это выглядело
+  // как «ничего не происходит». Показываем настоящий код ответа.
+  const postAction = async (body: Record<string, unknown>) => {
+    const res = await fetch('/api/wa-schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const raw = await res.text();
+    let data: any = null;
+    try { data = JSON.parse(raw); } catch { /* не JSON — ниже */ }
+
+    if (!data) {
+      const hint = res.status === 504 ? 'сервер не уложился во время' : `код ${res.status}`;
+      throw new Error(`${hint}. Ответ: ${raw.slice(0, 120) || '(пусто)'}`);
+    }
+    if (data.error) throw new Error(data.error);
+    return data;
+  };
+
   const load = async () => {
     const data = await fetch('/api/wa-schedule').then(r => r.json());
     setConfig(data.config);
@@ -84,13 +105,7 @@ export default function ScheduledPage() {
     setConfirmSendId(null);
     setBusyId(item.id);
     try {
-      const res = await fetch('/api/wa-schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send-one', rowIndex: item.rowIndex }),
-      });
-      const d = await res.json();
-      if (d.error) throw new Error(d.error);
+      await postAction({ action: 'send-one', rowIndex: item.rowIndex });
       await load();
     } catch (e: any) {
       setErrorMsg('Ошибка отправки: ' + e.message);
@@ -103,14 +118,9 @@ export default function ScheduledPage() {
   const clearAll = async () => {
     if (!confirm('Удалить ВСЕ посты из очереди? Это не отменить.')) return;
     setClearing(true);
+    setErrorMsg(null);
     try {
-      const res = await fetch('/api/wa-schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'clear-all' }),
-      });
-      const d = await res.json();
-      if (d.error) throw new Error(d.error);
+      await postAction({ action: 'clear-all' });
       await load();
     } catch (e: any) {
       setErrorMsg('Ошибка очистки: ' + e.message);
@@ -122,13 +132,7 @@ export default function ScheduledPage() {
   const deleteOne = async (item: WaItem) => {
     setBusyId(item.id);
     try {
-      const res = await fetch('/api/wa-schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete', rowIndex: item.rowIndex }),
-      });
-      const d = await res.json();
-      if (d.error) throw new Error(d.error);
+      await postAction({ action: 'delete', rowIndex: item.rowIndex });
       await load();
     } catch (e: any) {
       setErrorMsg('Ошибка удаления: ' + e.message);
@@ -141,13 +145,7 @@ export default function ScheduledPage() {
     if (!chatId.trim()) return alert('Введи Chat ID');
     setSavingConfig(true);
     try {
-      const res = await fetch('/api/wa-schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'config', configRowIndex: config.configRowIndex, waChatId: chatId.trim() }),
-      });
-      const d = await res.json();
-      if (d.error) throw new Error(d.error);
+      await postAction({ action: 'config', configRowIndex: config.configRowIndex, waChatId: chatId.trim() });
       setConfig(prev => ({ ...prev, wa_chatid: chatId.trim() }));
       alert('Сохранено');
     } catch (e: any) {
