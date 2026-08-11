@@ -9,11 +9,12 @@ interface Last {
 }
 interface Item {
   phone: string; phoneRaw: string; name: string; language: 'RU' | 'EN';
+  assistant: string; manager: string;
   units: Unit[]; message: string; excluded: boolean; last: Last | null;
 }
 interface Settings {
   sendingEnabled: boolean; dailyLimit: number; throttleSeconds: number;
-  instanceId: string; contactedBy: string; cooldownDays: number;
+  instanceId: string; assistant: string; manager: string; cooldownDays: number;
   templateRu: string; templateEn: string;
   questionRuOne: string; questionRuMany: string;
   questionEnOne: string; questionEnMany: string;
@@ -31,7 +32,8 @@ const whenLabel = (iso: string) => {
 export default function BrokerCheckPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [withoutPhone, setWithoutPhone] = useState<any[]>([]);
-  const [owners, setOwners] = useState<{ name: string; units: number }[]>([]);
+  const [assistants, setAssistants] = useState<{ name: string; units: number }[]>([]);
+  const [managers, setManagers] = useState<{ name: string; units: number }[]>([]);
   const [instances, setInstances] = useState<{ id: string; name: string }[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [sentToday, setSentToday] = useState(0);
@@ -50,13 +52,16 @@ export default function BrokerCheckPage() {
   // кнопка «Стоп» тогда бы не работала.
   const stopRef = useRef(false);
 
-  const load = async (contactedBy?: string) => {
-    const q = contactedBy !== undefined ? `?contactedBy=${encodeURIComponent(contactedBy)}` : '';
-    const d = await fetch(`/api/broker-check${q}`).then(r => r.json());
+  const load = async (over?: { assistant?: string; manager?: string }) => {
+    const q = new URLSearchParams();
+    if (over?.assistant !== undefined) q.set('assistant', over.assistant);
+    if (over?.manager !== undefined) q.set('manager', over.manager);
+    const d = await fetch(`/api/broker-check${q.toString() ? '?' + q : ''}`).then(r => r.json());
     if (d.error) { setMsg({ ok: false, text: d.error }); return; }
     setItems(d.items || []);
     setWithoutPhone(d.withoutPhone || []);
-    setOwners(d.owners || []);
+    setAssistants(d.assistants || []);
+    setManagers(d.managers || []);
     setInstances(d.instances || []);
     setSettings(d.settings);
     setSentToday(d.sentToday || 0);
@@ -73,11 +78,14 @@ export default function BrokerCheckPage() {
     if (d.error) return setMsg({ ok: false, text: d.error });
     setSettings(d.settings);
     setMsg({ ok: true, text: 'Настройки сохранены' });
-    if (patch.contactedBy !== undefined || patch.templateRu !== undefined || patch.templateEn !== undefined
+    const reload = patch.assistant !== undefined || patch.manager !== undefined
+      || patch.templateRu !== undefined || patch.templateEn !== undefined
       || patch.questionRuOne !== undefined || patch.questionRuMany !== undefined
-      || patch.questionEnOne !== undefined || patch.questionEnMany !== undefined) {
+      || patch.questionEnOne !== undefined || patch.questionEnMany !== undefined;
+    if (reload) {
       setDrafts({});
-      await load(d.settings.contactedBy);
+      setPicked({});
+      await load({ assistant: d.settings.assistant, manager: d.settings.manager });
     }
   };
 
@@ -160,11 +168,12 @@ export default function BrokerCheckPage() {
         <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--ink-900)' }}>🤝 Сверка брокеров</h1>
         <button
           onClick={() => { setLoading(true); load().finally(() => setLoading(false)); }}
-          className="ml-auto bb-surface-soft bb-ink text-xs py-1 px-2.5 rounded-lg border bb-edge"
+          title="Перечитать данные из базы"
+          className="ml-auto bb-surface-soft bb-ink text-xs py-1 px-2.5 rounded-lg border bb-edge cursor-pointer hover:bb-tint-accent hover:bb-accent transition-colors"
         >🔄</button>
         <button
           onClick={() => setShowSettings(v => !v)}
-          className="bb-surface-soft bb-ink text-xs py-1 px-2.5 rounded-lg border bb-edge"
+          className="bb-surface-soft bb-ink text-xs py-1 px-2.5 rounded-lg border bb-edge cursor-pointer hover:bb-tint-accent hover:bb-accent transition-colors"
         >⚙️ Настройки</button>
       </div>
       <p className="bb-ink-3 text-xs mb-4">
@@ -189,14 +198,34 @@ export default function BrokerCheckPage() {
         <div className="mb-5 p-4 rounded-2xl bb-surface border bb-edge space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="block">
-              <span className="text-xs bb-ink-2 block mb-1">Чьи листинги</span>
+              <span className="text-xs bb-ink-2 block mb-1">Ассистент (кто ведёт листинги)</span>
               <select
-                value={settings.contactedBy}
-                onChange={e => patchSettings({ contactedBy: e.target.value })}
-                className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm outline-none"
+                value={settings.assistant}
+                onChange={e => patchSettings({ assistant: e.target.value })}
+                className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm outline-none cursor-pointer hover:bb-surface transition-colors"
               >
                 <option value="">Все</option>
-                {owners.map(o => <option key={o.name} value={o.name}>{o.name} ({o.units})</option>)}
+                {assistants.map(o => (
+                  <option key={o.name} value={o.name}>
+                    {o.name === '—' ? 'не задан' : o.name} ({o.units})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-xs bb-ink-2 block mb-1">Менеджер (дополнительно)</span>
+              <select
+                value={settings.manager}
+                onChange={e => patchSettings({ manager: e.target.value })}
+                className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm outline-none cursor-pointer hover:bb-surface transition-colors"
+              >
+                <option value="">Все</option>
+                {managers.map(o => (
+                  <option key={o.name} value={o.name}>
+                    {o.name === '—' ? 'не задан' : o.name} ({o.units})
+                  </option>
+                ))}
               </select>
             </label>
 
@@ -239,19 +268,19 @@ export default function BrokerCheckPage() {
               />
             </label>
 
-            <label className="flex items-center gap-2 pt-5">
+            <label className="flex items-center gap-2 pt-5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={settings.sendingEnabled}
                 onChange={e => patchSettings({ sendingEnabled: e.target.checked })}
-                className="w-4 h-4"
+                className="w-4 h-4 cursor-pointer accent-[color:var(--aqua-500)]"
               />
               <span className="text-xs bb-ink-2">Разрешить отправку с WhatsApp</span>
             </label>
           </div>
 
           <details className="text-xs">
-            <summary className="cursor-pointer bb-ink-3 select-none">Тексты сообщений</summary>
+            <summary className="cursor-pointer bb-ink-3 select-none hover:bb-ink transition-colors w-fit">Тексты сообщений</summary>
             <div className="mt-3 space-y-3">
               {([
                 ['templateRu', 'Шаблон RU — {name}, {question}, {list}'],
@@ -279,10 +308,10 @@ export default function BrokerCheckPage() {
       {/* Панель выбора */}
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
         <button onClick={() => setPicked(Object.fromEntries(items.filter(isFresh).map(i => [i.phone, true])))}
-          className="px-3 py-1.5 bb-surface-soft border bb-edge rounded-lg bb-ink-2">
+          className="px-3 py-1.5 bb-surface-soft border bb-edge rounded-lg bb-ink-2 cursor-pointer hover:bb-tint-accent hover:bb-accent transition-colors">
           Выбрать всех, кому пора ({items.filter(isFresh).length})
         </button>
-        <button onClick={() => setPicked({})} className="px-3 py-1.5 bb-surface-soft border bb-edge rounded-lg bb-ink-3">
+        <button onClick={() => setPicked({})} className="px-3 py-1.5 bb-surface-soft border bb-edge rounded-lg bb-ink-3 cursor-pointer hover:bb-ink transition-colors">
           Снять выбор
         </button>
         <span className="bb-ink-4">
@@ -290,14 +319,15 @@ export default function BrokerCheckPage() {
         </span>
         <div className="ml-auto flex items-center gap-2">
           {sending && (
-            <button onClick={() => { stopRef.current = true; }} className="px-3 py-1.5 bb-tint-bad border bb-edge bb-bad rounded-lg">
+            <button onClick={() => { stopRef.current = true; }} className="px-3 py-1.5 bb-tint-bad border bb-edge bb-bad rounded-lg cursor-pointer hover:opacity-80 transition-opacity">
               Стоп
             </button>
           )}
           <button
             onClick={sendSelected}
             disabled={sending || !selected.length}
-            className="px-4 py-1.5 bb-fill-accent text-white rounded-lg font-medium disabled:opacity-40"
+            title={selected.length ? `Отправить ${selected.length} сообщений с паузой ${settings?.throttleSeconds}с` : 'Сначала отметь галочками, кому писать'}
+            className="px-4 py-1.5 bb-fill-accent text-white rounded-lg font-medium transition-all cursor-pointer hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {sending
               ? `Отправляю ${progress?.done ?? 0}/${progress?.total ?? 0}…`
@@ -317,14 +347,17 @@ export default function BrokerCheckPage() {
           const open = openPhone === it.phone;
           const fresh = isFresh(it);
           return (
-            <div key={it.phone} className={`rounded-2xl border bb-edge bb-surface p-3 ${it.excluded ? 'opacity-50' : ''}`}>
+            <div
+              key={it.phone}
+              className={`rounded-2xl border bb-edge bb-surface p-3 transition-all hover:bb-lift hover:border-[color:var(--aqua-400)] ${it.excluded ? 'opacity-50' : ''} ${picked[it.phone] && !it.excluded ? 'bb-tint-accent' : ''}`}
+            >
               <div className="flex items-start gap-3">
                 <input
                   type="checkbox"
                   checked={!!picked[it.phone] && !it.excluded}
                   disabled={it.excluded}
                   onChange={e => setPicked(p => ({ ...p, [it.phone]: e.target.checked }))}
-                  className="w-4 h-4 mt-0.5"
+                  className="w-4 h-4 mt-0.5 cursor-pointer accent-[color:var(--aqua-500)] disabled:cursor-not-allowed"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -351,13 +384,17 @@ export default function BrokerCheckPage() {
                   </div>
                 </div>
 
-                <button onClick={() => setOpenPhone(open ? null : it.phone)} className="text-xs bb-accent shrink-0">
+                <button
+                  onClick={() => setOpenPhone(open ? null : it.phone)}
+                  title={open ? 'Свернуть текст' : 'Показать и отредактировать текст'}
+                  className="text-xs bb-accent shrink-0 cursor-pointer px-2 py-1 rounded-lg hover:bb-tint-accent transition-colors"
+                >
                   текст {open ? '▲' : '▼'}
                 </button>
                 <button
                   onClick={() => toggleExcluded(it)}
                   title={it.excluded ? 'Вернуть в рассылку' : 'Исключить из рассылки'}
-                  className="text-xs bb-ink-4 hover:bb-bad shrink-0"
+                  className="text-xs bb-ink-4 shrink-0 cursor-pointer px-2 py-1 rounded-lg hover:bb-tint-bad hover:bb-bad transition-colors"
                 >
                   {it.excluded ? '↩︎ вернуть' : '🚫 исключить'}
                 </button>
@@ -378,7 +415,7 @@ export default function BrokerCheckPage() {
                     {drafts[it.phone] !== undefined && (
                       <button
                         onClick={() => setDrafts(d => { const n = { ...d }; delete n[it.phone]; return n; })}
-                        className="text-[11px] bb-ink-4"
+                        className="text-[11px] bb-ink-4 cursor-pointer hover:bb-ink-2 underline decoration-dotted transition-colors"
                       >
                         вернуть шаблонный текст
                       </button>
@@ -386,7 +423,7 @@ export default function BrokerCheckPage() {
                     <a
                       href={`https://wa.me/${it.phone}?text=${encodeURIComponent(draft)}`}
                       target="_blank" rel="noopener noreferrer"
-                      className="ml-auto text-[11px] bb-accent"
+                      className="ml-auto text-[11px] bb-accent hover:underline cursor-pointer"
                     >
                       открыть в WhatsApp вручную ↗
                     </a>
@@ -412,7 +449,7 @@ export default function BrokerCheckPage() {
       {/* Юниты без телефона — чтобы никто не потерялся молча */}
       {withoutPhone.length > 0 && (
         <div className="mt-6">
-          <button onClick={() => setShowSkipped(v => !v)} className="text-xs bb-ink-3">
+          <button onClick={() => setShowSkipped(v => !v)} className="text-xs bb-ink-3 cursor-pointer hover:bb-ink transition-colors">
             ⚠️ Пропущено {withoutPhone.length} юнит(ов) без нормального телефона {showSkipped ? '▲' : '▼'}
           </button>
           {showSkipped && (

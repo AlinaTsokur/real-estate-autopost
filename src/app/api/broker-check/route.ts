@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
-import { loadBrokers, listContactedBy } from '@/lib/broker-check/brokers';
+import { loadBrokers, listPeople } from '@/lib/broker-check/brokers';
 import { buildMessage } from '@/lib/broker-check/message';
 import {
   getSettings, saveSettings, getOptOut, setOptOut,
@@ -16,14 +16,15 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const settings = await getSettings();
-    const contactedBy = url.searchParams.get('contactedBy') ?? settings.contactedBy;
+    const assistant = url.searchParams.get('assistant') ?? settings.assistant;
+    const manager = url.searchParams.get('manager') ?? settings.manager;
 
-    const [{ brokers, withoutPhone }, optOut, lastSent, sentToday, owners, waConfig] = await Promise.all([
-      loadBrokers(contactedBy || undefined),
+    const [{ brokers, withoutPhone }, optOut, lastSent, sentToday, people, waConfig] = await Promise.all([
+      loadBrokers(assistant || undefined, manager || undefined),
       getOptOut(),
       getLastSentByPhone(),
       countSentToday(),
-      listContactedBy(),
+      listPeople(),
       getConfig().catch(() => ({ instances: [] as { id: string; name: string; token: string }[] })),
     ]);
 
@@ -32,6 +33,8 @@ export async function GET(request: Request) {
       phoneRaw: b.phoneRaw,
       name: b.name,
       language: b.language,
+      assistant: b.assistant,
+      manager: b.manager,
       units: b.units,
       message: buildMessage(b, settings),
       excluded: b.phone in optOut,
@@ -41,7 +44,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       items,
       withoutPhone,
-      owners,
+      assistants: people.assistants,
+      managers: people.managers,
       settings,
       sentToday,
       instances: (waConfig.instances || []).map(i => ({ id: i.id, name: i.name })),

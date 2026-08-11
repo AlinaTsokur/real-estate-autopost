@@ -53,8 +53,10 @@ export interface Settings extends Templates {
   throttleSeconds: number;
   /** Инстанс Green API, от чьего имени пишем. */
   instanceId: string;
-  /** Чьи листинги берём (contacted_by). */
-  contactedBy: string;
+  /** Чьи листинги берём — ассистент, который их ведёт (assistant_name). */
+  assistant: string;
+  /** Дополнительный фильтр по старшему менеджеру (contacted_by); пусто — все. */
+  manager: string;
   /** Не писать брокеру, если ему уже писали меньше стольких дней назад. */
   cooldownDays: number;
 }
@@ -65,7 +67,8 @@ export const DEFAULT_SETTINGS: Settings = {
   dailyLimit: 40,
   throttleSeconds: 60,
   instanceId: '',
-  contactedBy: 'Daria',
+  assistant: 'Daria',
+  manager: '',
   cooldownDays: 7,
 };
 
@@ -79,7 +82,8 @@ export async function getSettings(): Promise<Settings> {
     dailyLimit: num('dailyLimit', DEFAULT_SETTINGS.dailyLimit),
     throttleSeconds: num('throttleSeconds', DEFAULT_SETTINGS.throttleSeconds),
     instanceId: map.instanceId ?? DEFAULT_SETTINGS.instanceId,
-    contactedBy: map.contactedBy ?? DEFAULT_SETTINGS.contactedBy,
+    assistant: map.assistant ?? DEFAULT_SETTINGS.assistant,
+    manager: map.manager ?? DEFAULT_SETTINGS.manager,
     cooldownDays: num('cooldownDays', DEFAULT_SETTINGS.cooldownDays),
     templateRu: map.templateRu || DEFAULT_SETTINGS.templateRu,
     templateEn: map.templateEn || DEFAULT_SETTINGS.templateEn,
