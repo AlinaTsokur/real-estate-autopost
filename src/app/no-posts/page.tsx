@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
-interface U { code: string; unitNumber: string; project: string; }
+interface U { id: string; code: string; unitNumber: string; project: string; }
 
 export default function NoPostsPage() {
   const [units, setUnits] = useState<U[]>([]);
@@ -45,10 +46,17 @@ export default function NoPostsPage() {
               </div>
               <div className="space-y-0.5">
                 {groups[proj].map(u => (
-                  <div key={u.code} className="flex items-center gap-2 text-xs py-0.5">
+                  // Клик ведёт в «Посты» с уже собранным постом — остаётся выбрать тип.
+                  <Link
+                    key={u.id}
+                    href={`/manual-post?unit=${u.id}`}
+                    title={`${u.unitNumber} — сделать пост`}
+                    className="flex items-center gap-2 text-xs py-0.5 px-1.5 -mx-1.5 rounded-lg hover:bb-surface-soft transition-colors group"
+                  >
                     <span className="font-mono bb-accent shrink-0">{u.code}</span>
-                    <span className="bb-ink-3 truncate" title={u.unitNumber}>{u.unitNumber}</span>
-                  </div>
+                    <span className="bb-ink-3 truncate group-hover:bb-ink">{u.unitNumber}</span>
+                    <span className="ml-auto shrink-0 bb-ink-4 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                  </Link>
                 ))}
               </div>
             </div>

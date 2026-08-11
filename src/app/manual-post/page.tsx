@@ -1,9 +1,20 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Segmented from '@/components/Segmented';
 
+// useSearchParams в пререндеренной странице требует Suspense-границы (Next 16).
 export default function ManualPostPage() {
+  return (
+    <Suspense fallback={null}>
+      <ManualPostForm />
+    </Suspense>
+  );
+}
+
+function ManualPostForm() {
+  const searchParams = useSearchParams();
   const [projects, setProjects] = useState<string[]>([]);
   const [floors, setFloors] = useState<string[]>([]);
   const [project, setProject] = useState('');
@@ -79,6 +90,17 @@ export default function ManualPostPage() {
       setDbLoading(false);
     }
   };
+
+  // Deep link из «Юнитов без постов»: /manual-post?unit=<id> — сразу собираем пост,
+  // пользователю остаётся выбрать тип. Один раз за загрузку страницы.
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    const id = searchParams.get('unit');
+    if (!id || deepLinked.current) return;
+    deepLinked.current = true;
+    setSource('db');
+    pickDbUnit(id);
+  }, [searchParams]);
 
   const saveEmoji = async () => {
     if (!emojiMissing || !emojiInput.trim()) return;
@@ -416,6 +438,14 @@ export default function ManualPostPage() {
                       </div>
                     )}
                     {dbLoading && <div className="mt-2 text-xs bb-ink-3">Загружаю юнит…</div>}
+                    {!dbLoading && parsedData?.code && (
+                      <div className="mt-2 flex items-center gap-2 text-xs bb-ink-3">
+                        <span className="bb-ok">✓ Загружен:</span>
+                        <span className="font-mono bb-accent">{parsedData.code}</span>
+                        <span className="truncate">{parsedData.unit}</span>
+                        <span className="bb-ink-4 truncate">· {parsedData.project}</span>
+                      </div>
+                    )}
                   </div>
 
                   {emojiMissing && (
