@@ -38,40 +38,26 @@ export default function ManualPostPage() {
   const [c3Units, setC3Units] = useState<string[]>([]);
   const [c3Unit, setC3Unit] = useState('');
   const [c3Loading, setC3Loading] = useState(false);
-  const [dbProjects, setDbProjects] = useState<{ id: string; name: string }[]>([]);
-  const [dbProjectId, setDbProjectId] = useState('');
-  const [dbProjectSearch, setDbProjectSearch] = useState('');
-  const [dbDropdownOpen, setDbDropdownOpen] = useState(false);
   const [unitQuery, setUnitQuery] = useState('');
   const [unitResults, setUnitResults] = useState<{ id: string; code: string; unitNumber: string; project: string }[]>([]);
   const [dbLoading, setDbLoading] = useState(false);
   const [emojiMissing, setEmojiMissing] = useState<{ projectId: string; projectName: string } | null>(null);
   const [emojiInput, setEmojiInput] = useState('');
 
-  // Load the IT team's Abu Dhabi projects when switching to "Из базы"
-  useEffect(() => {
-    if (source !== 'db' || dbProjects.length) return;
-    fetch('/api/unit-from-db?projects=1')
-      .then(r => r.json())
-      .then(d => setDbProjects(d.projects || []))
-      .catch(() => {});
-  }, [source]);
-
-  // Search units by code (dots optional) or name, scoped to the picked project
+  // Search units by code (dots optional) or name across all Abu Dhabi projects.
+  // No project picker here: the unit row already carries its project.
   useEffect(() => {
     if (source !== 'db') return;
     const t = setTimeout(async () => {
-      if (!unitQuery.trim() && !dbProjectId) { setUnitResults([]); return; }
+      if (!unitQuery.trim()) { setUnitResults([]); return; }
       try {
-        const params = new URLSearchParams();
-        if (unitQuery.trim()) params.set('q', unitQuery.trim());
-        if (dbProjectId) params.set('projectId', dbProjectId);
+        const params = new URLSearchParams({ q: unitQuery.trim() });
         const d = await fetch(`/api/unit-from-db?${params}`).then(r => r.json());
         setUnitResults(d.results || []);
       } catch { /* ignore */ }
     }, 300);
     return () => clearTimeout(t);
-  }, [unitQuery, dbProjectId, source]);
+  }, [unitQuery, source]);
 
   const pickDbUnit = async (id: string) => {
     setDbLoading(true);
@@ -405,34 +391,6 @@ export default function ManualPostPage() {
 
               {source === 'db' && (
                 <>
-                  <div className="relative">
-                    <label className="block text-sm font-medium bb-ink-2 mb-2">Проект (из базы)</label>
-                    <input
-                      type="text"
-                      value={dbProjectSearch}
-                      onChange={e => { setDbProjectSearch(convertRuToEn(e.target.value)); setDbDropdownOpen(true); setDbProjectId(''); }}
-                      onFocus={() => setDbDropdownOpen(true)}
-                      onBlur={() => setTimeout(() => setDbDropdownOpen(false), 200)}
-                      placeholder="Начни вводить (рус/англ)…"
-                      className="w-full px-4 py-3 bb-surface-soft border bb-edge rounded-xl focus:ring-2 focus:bb-ring outline-none bb-ink bb-ph"
-                    />
-                    {dbDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-2 bb-surface border bb-edge rounded-xl shadow-xl bb-lift max-h-60 overflow-y-auto p-1 custom-scrollbar">
-                        {dbProjects.filter(p => p.name.toLowerCase().includes(dbProjectSearch.toLowerCase())).map(p => (
-                          <div
-                            key={p.id}
-                            onClick={() => { setDbProjectId(p.id); setDbProjectSearch(p.name); setDbDropdownOpen(false); setUnitResults([]); }}
-                            className={`px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors ${dbProjectId === p.id ? 'bb-tint-accent bb-accent font-medium' : 'bb-ink-2 hover:bb-surface-soft hover:bb-ink'}`}
-                          >
-                            {p.name}
-                          </div>
-                        ))}
-                        {dbProjects.filter(p => p.name.toLowerCase().includes(dbProjectSearch.toLowerCase())).length === 0 && (
-                          <div className="px-4 py-3 text-sm bb-ink-4 text-center">Проект не найден</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
                   <div className="relative">
                     <label className="block text-sm font-medium bb-ink-2 mb-2">Юнит — код (с точками или без) или название</label>
                     <input
