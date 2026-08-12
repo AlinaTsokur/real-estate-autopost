@@ -45,7 +45,7 @@ interface Pt {
 
 type Shape =
   | { id: number; kind: 'arrow'; x1: number; y1: number; x2: number; y2: number; t: number }
-  | { id: number; kind: 'rect'; x: number; y: number; w: number; h: number; t: number };
+  | { id: number; kind: 'rect'; x: number; y: number; w: number; h: number; t: number; r: number };
 
 let nextShapeId = 1;
 
@@ -231,10 +231,39 @@ function newRect(fw: number, fh: number): Shape {
     w: fw * 0.35,
     h: fh * 0.32,
     t: Math.round(fw / 70),
+    r: 0,
   };
 }
 
-/** Ручки фигуры: концы стрелки или углы рамки. */
+const ROT_ARM = 26; // на сколько ручка поворота вынесена над рамкой
+
+/** Центр рамки и перевод её собственных координат в координаты кадра. */
+function rectFrame(sh: Extract<Shape, { kind: 'rect' }>) {
+  const cx = sh.x + sh.w / 2;
+  const cy = sh.y + sh.h / 2;
+  const rad = (sh.r * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return {
+    cx,
+    cy,
+    cos,
+    sin,
+    /** локальная точка (от центра) → координаты кадра */
+    out: (lx: number, ly: number): Pt => ({
+      x: cx + lx * cos - ly * sin,
+      y: cy + lx * sin + ly * cos,
+    }),
+    /** координаты кадра → локальная точка */
+    into: (p: Pt): Pt => {
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      return { x: dx * cos + dy * sin, y: -dx * sin + dy * cos };
+    },
+  };
+}
+
+/** Ручки фигуры: концы стрелки либо углы рамки и её поворот. */
 function handlesOf(sh: Shape): [string, Pt][] {
   if (sh.kind === 'arrow') {
     return [
@@ -242,11 +271,15 @@ function handlesOf(sh: Shape): [string, Pt][] {
       ['h1', { x: sh.x2, y: sh.y2 }],
     ];
   }
+  const f = rectFrame(sh);
+  const hw = sh.w / 2;
+  const hh = sh.h / 2;
   return [
-    ['nw', { x: sh.x, y: sh.y }],
-    ['ne', { x: sh.x + sh.w, y: sh.y }],
-    ['sw', { x: sh.x, y: sh.y + sh.h }],
-    ['se', { x: sh.x + sh.w, y: sh.y + sh.h }],
+    ['nw', f.out(-hw, -hh)],
+    ['ne', f.out(hw, -hh)],
+    ['sw', f.out(-hw, hh)],
+    ['se', f.out(hw, hh)],
+    ['rot', f.out(0, -Math.abs(hh) - ROT_ARM)],
   ];
 }
 
@@ -274,11 +307,10 @@ function hitTest(shapes: Shape[], p: Pt, selectedId: number | null) {
   for (let i = shapes.length - 1; i >= 0; i--) {
     const sh = shapes[i];
     if (sh.kind === 'rect') {
-      const x1 = Math.min(sh.x, sh.x + sh.w);
-      const x2 = Math.max(sh.x, sh.x + sh.w);
-      const y1 = Math.min(sh.y, sh.y + sh.h);
-      const y2 = Math.max(sh.y, sh.y + sh.h);
-      if (p.x >= x1 && p.x <= x2 && p.y >= y1 && p.y <= y2) return { id: sh.id, mode: 'move' };
+      const l = rectFrame(sh).into(p);
+      if (Math.abs(l.x) <= Math.abs(sh.w) / 2 && Math.abs(l.y) <= Math.abs(sh.h) / 2) {
+        return { id: sh.id, mode: 'move' };
+      }
     } else if (
       distToSegment(p, { x: sh.x1, y: sh.y1 }, { x: sh.x2, y: sh.y2 }) <= Math.max(12, sh.t)
     ) {
@@ -327,13 +359,32 @@ function drawShapes(
     if (sh.kind === 'arrow') {
       drawArrow(ctx, sh, k);
     } else {
+      const f = rectFrame(sh);
+      ctx.save();
+      ctx.translate(f.cx * k, f.cy * k);
+      ctx.rotate((sh.r * Math.PI) / 180);
       ctx.strokeStyle = MARK_RED;
       ctx.lineWidth = sh.t * k;
       ctx.lineJoin = 'miter';
-      ctx.strokeRect(sh.x * k, sh.y * k, sh.w * k, sh.h * k);
+      ctx.strokeRect((-sh.w / 2) * k, (-sh.h / 2) * k, sh.w * k, sh.h * k);
+      ctx.restore();
     }
 
     if (sh.id !== selectedId) continue;
+
+    // Поводок к ручке поворота, чтобы её было видно как ручку, а не точку.
+    if (sh.kind === 'rect') {
+      const f = rectFrame(sh);
+      const top = f.out(0, -Math.abs(sh.h) / 2);
+      const arm = f.out(0, -Math.abs(sh.h) / 2 - ROT_ARM);
+      ctx.beginPath();
+      ctx.moveTo(top.x * k, top.y * k);
+      ctx.lineTo(arm.x * k, arm.y * k);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#0f172a';
+      ctx.stroke();
+    }
+
     for (const [, hp] of handlesOf(sh)) {
       ctx.beginPath();
       ctx.arc(hp.x * k, hp.y * k, 5, 0, Math.PI * 2);
@@ -346,8 +397,11 @@ function drawShapes(
   }
 }
 
-/** Двигает или тянет фигуру: dx/dy — сдвиг курсора в координатах кадра. */
-function moveShape(orig: Shape, mode: string, dx: number, dy: number): Shape {
+/** Двигает или тянет фигуру: from — где нажали, to — где курсор сейчас. */
+function moveShape(orig: Shape, mode: string, from: Pt, to: Pt, snap: boolean): Shape {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+
   if (orig.kind === 'arrow') {
     if (mode === 'h0') return { ...orig, x1: orig.x1 + dx, y1: orig.y1 + dy };
     if (mode === 'h1') return { ...orig, x2: orig.x2 + dx, y2: orig.y2 + dy };
@@ -355,12 +409,32 @@ function moveShape(orig: Shape, mode: string, dx: number, dy: number): Shape {
   }
   if (mode === 'move') return { ...orig, x: orig.x + dx, y: orig.y + dy };
 
-  // Тянем угол — противоположный остаётся на месте.
+  const f = rectFrame(orig);
+
+  if (mode === 'rot') {
+    const ang = (p: Pt) => (Math.atan2(p.y - f.cy, p.x - f.cx) * 180) / Math.PI;
+    let r = orig.r + ang(to) - ang(from);
+    if (snap) r = Math.round(r / 15) * 15;   // с Shift — по 15°
+    return { ...orig, r: Math.round(r * 10) / 10 };
+  }
+
+  // Тянем угол — противоположный остаётся на месте. Считаем в осях самой рамки.
+  const l = f.into(to);
+  const l0 = f.into(from);
+  const ldx = l.x - l0.x;
+  const ldy = l.y - l0.y;
   let { x, y, w, h } = orig;
-  if (mode === 'nw') { x += dx; y += dy; w -= dx; h -= dy; }
-  if (mode === 'ne') { y += dy; w += dx; h -= dy; }
-  if (mode === 'sw') { x += dx; w -= dx; h += dy; }
-  if (mode === 'se') { w += dx; h += dy; }
+  if (mode === 'nw') { x += ldx; y += ldy; w -= ldx; h -= ldy; }
+  if (mode === 'ne') { y += ldy; w += ldx; h -= ldy; }
+  if (mode === 'sw') { x += ldx; w -= ldx; h += ldy; }
+  if (mode === 'se') { w += ldx; h += ldy; }
+
+  // Центр сместился в осях рамки — переносим его туда же, но уже повёрнуто,
+  // иначе противоположный угол уедет.
+  const mx = x + w / 2 - f.cx;
+  const my = y + h / 2 - f.cy;
+  x += f.cx + mx * f.cos - my * f.sin - (x + w / 2);
+  y += f.cy + mx * f.sin + my * f.cos - (y + h / 2);
   return { ...orig, x, y, w, h };
 }
 
@@ -1095,8 +1169,7 @@ function Frame({
           }
           if (shapeDrag.current) {
             const { id, mode, from, orig } = shapeDrag.current;
-            const f = toFrame(e.clientX, e.clientY);
-            const next = moveShape(orig, mode, f.x - from.x, f.y - from.y);
+            const next = moveShape(orig, mode, from, toFrame(e.clientX, e.clientY), e.shiftKey);
             onChange(index, s => ({ ...s, shapes: s.shapes.map(sh => (sh.id === id ? next : sh)) }));
             return;
           }
@@ -1310,6 +1383,13 @@ function Frame({
                 Убрать
               </button>
             )}
+            <span className="bb-sub text-[11px] flex-1 text-right leading-tight">
+              {current?.kind === 'rect'
+                ? `поворот ${current.r.toFixed(1)}° — верхняя ручка, с Shift по 15°`
+                : current
+                  ? 'тяните за белые точки'
+                  : 'кликните по фигуре, чтобы менять'}
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -1324,8 +1404,8 @@ function Frame({
               onChange={e => setThickness(Number(e.target.value))}
               className="flex-1 accent-teal-400 disabled:opacity-40"
             />
-            <span className="bb-sub text-[11px] flex-1 text-right leading-tight">
-              {current ? 'тяните за белые точки' : 'кликните по фигуре, чтобы менять'}
+            <span className="bb-sub text-[11px] tabular-nums w-6 text-right">
+              {current?.t ?? '—'}
             </span>
           </div>
         </div>
