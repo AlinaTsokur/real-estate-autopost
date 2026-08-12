@@ -10,10 +10,9 @@ const FRAME_W = 520;
 const FRAME_H = 728;
 const EXPORT_SCALE = 2;
 
-// Рамка на экране — просто уменьшенное превью (пропорции те же, 520:728).
-// На качество не влияет: кадр считается в координатах 520×728 и пишется в 2×.
-const VIEW_W = 300;
-const VIEW_H = (VIEW_W * FRAME_H) / FRAME_W; // 420
+// Рамка на экране — один к одному, 520×728. Файл пишется в 2× от неё.
+const VIEW_W = FRAME_W;
+const VIEW_H = FRAME_H;
 const D = VIEW_W / FRAME_W;                  // экранные px → координаты рамки
 
 const JPEG_QUALITY = 0.92;
@@ -462,7 +461,7 @@ export default function PlanCropPage() {
   const ready = shots.filter(Boolean).length;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 bb-rise">
+    <div className="max-w-[1160px] mx-auto space-y-6 bb-rise">
       <div className="bb-card p-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="bb-title text-2xl">Кадрирование планировок</h1>
