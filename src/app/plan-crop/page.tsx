@@ -35,6 +35,7 @@ const DEFAULT_BRUSH = 40; // диаметр кисти в экранных px
 
 const MARK_RED = '#ee2b20';
 const HANDLE = 9;         // радиус ручки в координатах кадра
+const MARK_T = 7;         // толщина линии пометок по умолчанию
 
 type Tool = 'move' | 'pick' | 'erase' | 'restore';
 
@@ -218,7 +219,7 @@ function newArrow(fw: number, fh: number): Shape {
     y1: fh * 0.18,
     x2: fw * 0.45,
     y2: fh * 0.55,
-    t: Math.round(fw / 45),
+    t: MARK_T,
   };
 }
 
@@ -230,7 +231,7 @@ function newRect(fw: number, fh: number): Shape {
     y: fh * 0.3,
     w: fw * 0.35,
     h: fh * 0.32,
-    t: Math.round(fw / 70),
+    t: MARK_T,
     r: 0,
   };
 }
@@ -1399,7 +1400,7 @@ function Frame({
               min={2}
               max={30}
               step={1}
-              value={current?.t ?? 10}
+              value={current?.t ?? MARK_T}
               disabled={!current}
               onChange={e => setThickness(Number(e.target.value))}
               className="flex-1 accent-teal-400 disabled:opacity-40"
