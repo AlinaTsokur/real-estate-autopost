@@ -2,17 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-/* Кадрирование планировок под пост: две картинки рядом, каждая обрезается
-   под 520×728 и скачивается отдельным JPG в двойном размере (1040×1456).
-   Плюс чистка фона: заливка от краёв, пипетка и две кисти — стереть и вернуть. */
+/* Кадрирование картинок под пост.
+   Две планировки 520×728 (файл в 2×) и карта превью 520×272 (файл в 1.5×).
+   Чистка фона: заливка от краёв, пипетка, ластик и кисть «вернуть».
+   На карте сверху ещё красные пометки — стрелка и рамка. */
 
-const FRAME_W = 520;
-const FRAME_H = 728;
-const EXPORT_SCALE = 2;
+interface SlotSpec {
+  title: string;
+  fw: number;      // ширина кадра в его собственных координатах
+  fh: number;      // высота кадра
+  ex: number;      // во сколько раз файл крупнее кадра
+  annotate: boolean;
+}
 
-// Ширина рамки на экране подстраивается под окно, чтобы обе стояли в два
-// столбца. На результат не влияет: кадр считается в координатах 520×728.
-const VIEW_MAX = FRAME_W;
+const SLOTS: SlotSpec[] = [
+  { title: 'Планировка 1', fw: 520, fh: 728, ex: 2, annotate: false },
+  { title: 'Планировка 2', fw: 520, fh: 728, ex: 2, annotate: false },
+  { title: 'Карта превью', fw: 520, fh: 272, ex: 1.5, annotate: true },
+];
+
+// Ширина рамки на экране подстраивается под окно, чтобы планировки стояли в два
+// столбца. На результат не влияет: кадр считается в своих координатах.
+const VIEW_MAX = 520;
 const VIEW_MIN = 220;
 const GAP = 24;       // расстояние между карточками (gap-6)
 const CARD_PAD = 32;  // внутренние поля карточки (p-4)
@@ -22,7 +33,21 @@ const MIN_OVERLAP = 60;   // сколько картинки обязано ос
 const DEFAULT_TOL = 24;   // допуск по цвету фона, 0…100
 const DEFAULT_BRUSH = 40; // диаметр кисти в экранных px
 
+const MARK_RED = '#ee2b20';
+const HANDLE = 9;         // радиус ручки в координатах кадра
+
 type Tool = 'move' | 'pick' | 'erase' | 'restore';
+
+interface Pt {
+  x: number;
+  y: number;
+}
+
+type Shape =
+  | { id: number; kind: 'arrow'; x1: number; y1: number; x2: number; y2: number; t: number }
+  | { id: number; kind: 'rect'; x: number; y: number; w: number; h: number; t: number };
+
+let nextShapeId = 1;
 
 /** Что именно считаем фоном. Правки применяются всегда к оригиналу. */
 interface BgSpec {
@@ -37,7 +62,10 @@ interface Shot {
   base: string;                       // имя файла без расширения
   nw: number;                         // натуральный размер
   nh: number;
-  s: number;                          // масштаб: 1 = натуральный размер в координатах рамки
+  fw: number;                         // размеры кадра, в котором живут tx/ty/s
+  fh: number;
+  ex: number;                         // множитель экспорта
+  s: number;                          // масштаб: 1 = натуральный размер в координатах кадра
   tx: number;                         // левый верхний угол неповёрнутой картинки
   ty: number;
   rot: number;                        // поворот вокруг центра картинки, градусы
@@ -46,37 +74,23 @@ interface Shot {
   eraseMask: HTMLCanvasElement | null;// где прошлись ластиком
   keepMask: HTMLCanvasElement | null; // где вернули исходник кистью
   composed: HTMLCanvasElement;        // итог: из него рисуем превью и экспорт
+  shapes: Shape[];                    // красные пометки поверх кадра
   busy: boolean;
   rev: number;                        // счётчик правок — холсты мутабельные
 }
 
 type Updater = (s: Shot) => Shot;
 
-const coverScale = (nw: number, nh: number) => Math.max(FRAME_W / nw, FRAME_H / nh);
-const containScale = (nw: number, nh: number) => Math.min(FRAME_W / nw, FRAME_H / nh);
+const coverScale = (nw: number, nh: number, fw: number, fh: number) =>
+  Math.max(fw / nw, fh / nh);
+const containScale = (nw: number, nh: number, fw: number, fh: number) =>
+  Math.min(fw / nw, fh / nh);
 
-/** Центр картинки в координатах рамки — вокруг него идёт поворот. */
+/** Центр картинки в координатах кадра — вокруг него идёт поворот. */
 const centerOf = (shot: Shot): Pt => ({
   x: shot.tx + (shot.nw * shot.s) / 2,
   y: shot.ty + (shot.nh * shot.s) / 2,
 });
-
-/** Общий приём отрисовки: и превью, и экспорт кладут картинку одинаково. */
-function drawShot(
-  ctx: CanvasRenderingContext2D,
-  shot: Shot,
-  source: CanvasImageSource,
-  k: number, // множитель координат рамки: превью — D, экспорт — 2
-) {
-  const c = centerOf(shot);
-  const w = shot.nw * shot.s * k;
-  const h = shot.nh * shot.s * k;
-  ctx.save();
-  ctx.translate(c.x * k, c.y * k);
-  ctx.rotate((shot.rot * Math.PI) / 180);
-  ctx.drawImage(source, -w / 2, -h / 2, w, h);
-  ctx.restore();
-}
 
 function makeCanvas(w: number, h: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
@@ -88,29 +102,46 @@ function makeCanvas(w: number, h: number): HTMLCanvasElement {
 const ctx2d = (c: HTMLCanvasElement, opts?: CanvasRenderingContext2DSettings) =>
   c.getContext('2d', opts) as CanvasRenderingContext2D;
 
-/** Ставит картинку по центру рамки с заданным масштабом. */
+/** Общий приём отрисовки: и превью, и экспорт кладут картинку одинаково. */
+function drawShot(
+  ctx: CanvasRenderingContext2D,
+  shot: Shot,
+  source: CanvasImageSource,
+  k: number, // множитель координат кадра: превью — D, экспорт — ex
+) {
+  const c = centerOf(shot);
+  const w = shot.nw * shot.s * k;
+  const h = shot.nh * shot.s * k;
+  ctx.save();
+  ctx.translate(c.x * k, c.y * k);
+  ctx.rotate((shot.rot * Math.PI) / 180);
+  ctx.drawImage(source, -w / 2, -h / 2, w, h);
+  ctx.restore();
+}
+
+/** Ставит картинку по центру кадра с заданным масштабом. */
 function centered(shot: Shot, s: number): Shot {
   return {
     ...shot,
     s,
-    tx: (FRAME_W - shot.nw * s) / 2,
-    ty: (FRAME_H - shot.nh * s) / 2,
+    tx: (shot.fw - shot.nw * s) / 2,
+    ty: (shot.fh - shot.nh * s) / 2,
   };
 }
 
-/** Не даём утащить картинку целиком за пределы рамки. */
+/** Не даём утащить картинку целиком за пределы кадра. */
 function clampPos(shot: Shot): Shot {
   const w = shot.nw * shot.s;
   const h = shot.nh * shot.s;
   return {
     ...shot,
-    tx: Math.min(FRAME_W - MIN_OVERLAP, Math.max(MIN_OVERLAP - w, shot.tx)),
-    ty: Math.min(FRAME_H - MIN_OVERLAP, Math.max(MIN_OVERLAP - h, shot.ty)),
+    tx: Math.min(shot.fw - MIN_OVERLAP, Math.max(MIN_OVERLAP - w, shot.tx)),
+    ty: Math.min(shot.fh - MIN_OVERLAP, Math.max(MIN_OVERLAP - h, shot.ty)),
   };
 }
 
 function clampScale(shot: Shot, s: number): number {
-  const cover = coverScale(shot.nw, shot.nh);
+  const cover = coverScale(shot.nw, shot.nh, shot.fw, shot.fh);
   return Math.min(cover * 8, Math.max(cover * 0.15, s));
 }
 
@@ -137,7 +168,7 @@ function recompose(shot: Shot) {
   }
 }
 
-async function loadFile(file: File): Promise<Shot | null> {
+async function loadFile(file: File, slot: SlotSpec): Promise<Shot | null> {
   if (!file.type.startsWith('image/')) return null;
   const src = URL.createObjectURL(file);
   const img = new Image();
@@ -157,6 +188,9 @@ async function loadFile(file: File): Promise<Shot | null> {
     base,
     nw,
     nh,
+    fw: slot.fw,
+    fh: slot.fh,
+    ex: slot.ex,
     s: 1,
     tx: 0,
     ty: 0,
@@ -166,19 +200,171 @@ async function loadFile(file: File): Promise<Shot | null> {
     eraseMask: null,
     keepMask: null,
     composed: makeCanvas(nw, nh),
+    shapes: [],
     busy: false,
     rev: 0,
   };
   recompose(shot);
-  return centered(shot, coverScale(nw, nh)); // по умолчанию — заполнить рамку
+  return centered(shot, coverScale(nw, nh, slot.fw, slot.fh)); // по умолчанию — заполнить
+}
+
+/* ── Красные пометки ───────────────────────────────────────────────────── */
+
+function newArrow(fw: number, fh: number): Shape {
+  return {
+    id: nextShapeId++,
+    kind: 'arrow',
+    x1: fw * 0.12,
+    y1: fh * 0.18,
+    x2: fw * 0.45,
+    y2: fh * 0.55,
+    t: Math.round(fw / 45),
+  };
+}
+
+function newRect(fw: number, fh: number): Shape {
+  return {
+    id: nextShapeId++,
+    kind: 'rect',
+    x: fw * 0.35,
+    y: fh * 0.3,
+    w: fw * 0.35,
+    h: fh * 0.32,
+    t: Math.round(fw / 70),
+  };
+}
+
+/** Ручки фигуры: концы стрелки или углы рамки. */
+function handlesOf(sh: Shape): [string, Pt][] {
+  if (sh.kind === 'arrow') {
+    return [
+      ['h0', { x: sh.x1, y: sh.y1 }],
+      ['h1', { x: sh.x2, y: sh.y2 }],
+    ];
+  }
+  return [
+    ['nw', { x: sh.x, y: sh.y }],
+    ['ne', { x: sh.x + sh.w, y: sh.y }],
+    ['sw', { x: sh.x, y: sh.y + sh.h }],
+    ['se', { x: sh.x + sh.w, y: sh.y + sh.h }],
+  ];
+}
+
+const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
+
+/** Расстояние от точки до отрезка — им ловим клик по древку стрелки. */
+function distToSegment(p: Pt, a: Pt, b: Pt) {
+  const vx = b.x - a.x;
+  const vy = b.y - a.y;
+  const len2 = vx * vx + vy * vy;
+  if (!len2) return dist(p, a);
+  let t = ((p.x - a.x) * vx + (p.y - a.y) * vy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return dist(p, { x: a.x + t * vx, y: a.y + t * vy });
+}
+
+/** Что под курсором: ручка выделенной фигуры или тело какой-нибудь фигуры. */
+function hitTest(shapes: Shape[], p: Pt, selectedId: number | null) {
+  for (const sh of shapes) {
+    if (sh.id !== selectedId) continue;
+    for (const [mode, hp] of handlesOf(sh)) {
+      if (dist(p, hp) <= HANDLE) return { id: sh.id, mode };
+    }
+  }
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    const sh = shapes[i];
+    if (sh.kind === 'rect') {
+      const x1 = Math.min(sh.x, sh.x + sh.w);
+      const x2 = Math.max(sh.x, sh.x + sh.w);
+      const y1 = Math.min(sh.y, sh.y + sh.h);
+      const y2 = Math.max(sh.y, sh.y + sh.h);
+      if (p.x >= x1 && p.x <= x2 && p.y >= y1 && p.y <= y2) return { id: sh.id, mode: 'move' };
+    } else if (
+      distToSegment(p, { x: sh.x1, y: sh.y1 }, { x: sh.x2, y: sh.y2 }) <= Math.max(12, sh.t)
+    ) {
+      return { id: sh.id, mode: 'move' };
+    }
+  }
+  return null;
+}
+
+function drawArrow(ctx: CanvasRenderingContext2D, sh: Extract<Shape, { kind: 'arrow' }>, k: number) {
+  const a = { x: sh.x1 * k, y: sh.y1 * k };
+  const b = { x: sh.x2 * k, y: sh.y2 * k };
+  const t = sh.t * k;
+  const head = t * 2.8;      // длина наконечника
+  const wing = t * 1.9;      // половина его ширины
+  const ang = Math.atan2(b.y - a.y, b.x - a.x);
+  const cos = Math.cos(ang);
+  const sin = Math.sin(ang);
+  const stem = { x: b.x - cos * head * 0.92, y: b.y - sin * head * 0.92 };
+
+  ctx.fillStyle = MARK_RED;
+  ctx.strokeStyle = MARK_RED;
+  ctx.lineCap = 'butt';
+  ctx.lineWidth = t;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(stem.x, stem.y);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(b.x, b.y);
+  ctx.lineTo(b.x - cos * head + -sin * wing, b.y - sin * head + cos * wing);
+  ctx.lineTo(b.x - cos * head + sin * wing, b.y - sin * head - cos * wing);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/** Рисует пометки; ручки — только в превью, в файл они не попадают. */
+function drawShapes(
+  ctx: CanvasRenderingContext2D,
+  shapes: Shape[],
+  k: number,
+  selectedId: number | null,
+) {
+  for (const sh of shapes) {
+    if (sh.kind === 'arrow') {
+      drawArrow(ctx, sh, k);
+    } else {
+      ctx.strokeStyle = MARK_RED;
+      ctx.lineWidth = sh.t * k;
+      ctx.lineJoin = 'miter';
+      ctx.strokeRect(sh.x * k, sh.y * k, sh.w * k, sh.h * k);
+    }
+
+    if (sh.id !== selectedId) continue;
+    for (const [, hp] of handlesOf(sh)) {
+      ctx.beginPath();
+      ctx.arc(hp.x * k, hp.y * k, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#0f172a';
+      ctx.stroke();
+    }
+  }
+}
+
+/** Двигает или тянет фигуру: dx/dy — сдвиг курсора в координатах кадра. */
+function moveShape(orig: Shape, mode: string, dx: number, dy: number): Shape {
+  if (orig.kind === 'arrow') {
+    if (mode === 'h0') return { ...orig, x1: orig.x1 + dx, y1: orig.y1 + dy };
+    if (mode === 'h1') return { ...orig, x2: orig.x2 + dx, y2: orig.y2 + dy };
+    return { ...orig, x1: orig.x1 + dx, y1: orig.y1 + dy, x2: orig.x2 + dx, y2: orig.y2 + dy };
+  }
+  if (mode === 'move') return { ...orig, x: orig.x + dx, y: orig.y + dy };
+
+  // Тянем угол — противоположный остаётся на месте.
+  let { x, y, w, h } = orig;
+  if (mode === 'nw') { x += dx; y += dy; w -= dx; h -= dy; }
+  if (mode === 'ne') { y += dy; w += dx; h -= dy; }
+  if (mode === 'sw') { x += dx; w -= dx; h += dy; }
+  if (mode === 'se') { w += dx; h += dy; }
+  return { ...orig, x, y, w, h };
 }
 
 /* ── Кисти ─────────────────────────────────────────────────────────────── */
-
-interface Pt {
-  x: number;
-  y: number;
-}
 
 /** Мазок от точки к точке: линия с круглыми концами плюс кружки по краям
     (нулевой отрезок сам по себе в canvas не рисуется). */
@@ -424,7 +610,7 @@ function downscaled(
 }
 
 function exportShot(shot: Shot, filename: string) {
-  const canvas = makeCanvas(FRAME_W * EXPORT_SCALE, FRAME_H * EXPORT_SCALE);
+  const canvas = makeCanvas(Math.round(shot.fw * shot.ex), Math.round(shot.fh * shot.ex));
   const ctx = ctx2d(canvas);
 
   // В JPG нет альфы — под картинку всегда кладём белый фон.
@@ -433,8 +619,9 @@ function exportShot(shot: Shot, filename: string) {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  const k = EXPORT_SCALE;
+  const k = shot.ex;
   drawShot(ctx, shot, downscaled(shot.composed, shot.nw, shot.nh, shot.s * k), k);
+  drawShapes(ctx, shot.shapes, k, null);
 
   canvas.toBlob(
     blob => {
@@ -456,7 +643,8 @@ function exportShot(shot: Shot, filename: string) {
 /* ── Страница ──────────────────────────────────────────────────────────── */
 
 export default function PlanCropPage() {
-  const [shots, setShots] = useState<(Shot | null)[]>([null, null]);
+  const [shots, setShots] = useState<(Shot | null)[]>(SLOTS.map(() => null));
+
   // Обработчики читают актуальные слоты из ref — они запускаются после отрисовки.
   const shotsRef = useRef(shots);
   useEffect(() => {
@@ -464,9 +652,9 @@ export default function PlanCropPage() {
   }, [shots]);
 
   // Метка последнего запуска обработки фона: ползунок допуска гоняет её часто.
-  const bgToken = useRef<number[]>([0, 0]);
+  const bgToken = useRef<number[]>(SLOTS.map(() => 0));
 
-  // Подгоняем размер рамок под окно так, чтобы обе влезли в два столбца.
+  // Подгоняем размер рамок под окно так, чтобы планировки влезли в два столбца.
   const rowRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState(VIEW_MAX);
   useEffect(() => {
@@ -500,18 +688,20 @@ export default function PlanCropPage() {
   /** Файлы, брошенные на слот `from` (или в пустые, если from = null). */
   const accept = useCallback(
     async (fileList: FileList | File[] | null, from: number | null) => {
-      const files = Array.from(fileList || []).filter(f => f.type.startsWith('image/')).slice(0, 2);
+      const files = Array.from(fileList || [])
+        .filter(f => f.type.startsWith('image/'))
+        .slice(0, SLOTS.length);
       if (!files.length) return;
 
       let targets: number[];
       if (from === null) {
         const free = shotsRef.current.map((s, i) => (s ? -1 : i)).filter(i => i >= 0);
-        targets = files.map((_, k) => free[k] ?? k % 2);
+        targets = files.map((_, k) => free[k] ?? k % SLOTS.length);
       } else {
-        targets = files.map((_, k) => (from + k) % 2);
+        targets = files.map((_, k) => (from + k) % SLOTS.length);
       }
 
-      const loaded = await Promise.all(files.map(loadFile));
+      const loaded = await Promise.all(files.map((f, k) => loadFile(f, SLOTS[targets[k]])));
       place(loaded, targets);
     },
     [place],
@@ -583,13 +773,12 @@ export default function PlanCropPage() {
     setShots(prev => prev.map((s, j) => (j === i && s ? { ...s, busy: false, rev: s.rev + 1 } : s)));
   }, []);
 
-  /** Одинаковые имена файлов (например, оба из буфера) разводим суффиксом. */
+  /** Одинаковые имена файлов (например, все из буфера) разводим суффиксом. */
   const filename = (i: number) => {
     const shot = shots[i];
     if (!shot) return '';
-    const other = shots[1 - i];
-    const suffix = other && other.base === shot.base ? `-${i + 1}` : '';
-    return `${shot.base}${suffix}.jpg`;
+    const clash = shots.some((s, j) => j !== i && s?.base === shot.base);
+    return `${shot.base}${clash ? `-${i + 1}` : ''}.jpg`;
   };
 
   const download = (i: number) => {
@@ -605,38 +794,42 @@ export default function PlanCropPage() {
 
   const ready = shots.filter(Boolean).length;
 
+  const frame = (i: number) => (
+    <Frame
+      key={i}
+      index={i}
+      slot={SLOTS[i]}
+      view={view}
+      shot={shots[i]}
+      onFiles={accept}
+      onChange={update}
+      onRemove={remove}
+      onDownload={download}
+      onBg={applyBg}
+      filename={filename(i)}
+    />
+  );
+
   return (
     <div className="max-w-[1160px] mx-auto space-y-6 bb-rise">
       <div className="bb-card p-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="bb-title text-2xl">Кадрирование планировок</h1>
+          <h1 className="bb-title text-2xl">Кадрирование картинок</h1>
           <p className="bb-sub text-sm mt-1">
-            Перетащите скрин в рамку или вставьте из буфера (Ctrl+V). Тяните мышкой, крутите колесо
-            для масштаба — лишнее обрежется. Рамка {FRAME_W}×{FRAME_H}, файл сохраняется в{' '}
-            {EXPORT_SCALE}× — {FRAME_W * EXPORT_SCALE}×{FRAME_H * EXPORT_SCALE}.
+            Перетащите скрин в рамку или вставьте из буфера (Ctrl+V), затем подгоните — лишнее
+            обрежется. Планировки 520×728 (файл 1040×1456), карта превью 520×272 (файл 780×408).
           </p>
         </div>
         <button className="bb-btn bb-btn-primary" onClick={downloadAll} disabled={!ready}>
-          ⬇ Скачать {ready === 2 ? 'обе' : 'картинку'}
+          ⬇ Скачать всё ({ready})
         </button>
       </div>
 
       <div ref={rowRef} className="flex flex-wrap gap-6 justify-center">
-        {[0, 1].map(i => (
-          <Frame
-            key={i}
-            index={i}
-            view={view}
-            shot={shots[i]}
-            onFiles={accept}
-            onChange={update}
-            onRemove={remove}
-            onDownload={download}
-            onBg={applyBg}
-            filename={filename(i)}
-          />
-        ))}
+        {[0, 1].map(frame)}
       </div>
+
+      <div className="flex justify-center">{frame(2)}</div>
     </div>
   );
 }
@@ -645,6 +838,7 @@ export default function PlanCropPage() {
 
 interface FrameProps {
   index: number;
+  slot: SlotSpec;
   view: number;         // ширина рамки на экране
   shot: Shot | null;
   onFiles: (files: FileList | File[] | null, from: number | null) => void;
@@ -657,6 +851,7 @@ interface FrameProps {
 
 function Frame({
   index,
+  slot,
   view,
   shot,
   onFiles,
@@ -666,24 +861,26 @@ function Frame({
   onBg,
   filename,
 }: FrameProps) {
-  const viewH = (view * FRAME_H) / FRAME_W;
-  const D = view / FRAME_W; // экранные px → координаты рамки
+  const viewH = (view * slot.fh) / slot.fw;
+  const D = view / slot.fw; // экранные px → координаты кадра
 
   const boxRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const paint = useRef<Pt | null>(null);
+  const shapeDrag = useRef<{ id: number; mode: string; from: Pt; orig: Shape } | null>(null);
   const tolTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [over, setOver] = useState(false);
   const [tool, setTool] = useState<Tool>('move');
   const [tol, setTol] = useState(DEFAULT_TOL);
   const [brush, setBrush] = useState(DEFAULT_BRUSH);
   const [cursor, setCursor] = useState<Pt | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
 
   const brushing = tool === 'erase' || tool === 'restore';
 
-  /** Рисует превью кадра из собранного полотна. */
+  /** Рисует превью кадра из собранного полотна и пометки поверх. */
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -699,12 +896,12 @@ function Frame({
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     drawShot(ctx, shot, shot.composed, D);
-
-  }, [shot, view, viewH, D]);
+    drawShapes(ctx, shot.shapes, D, selected);
+  }, [shot, selected, view, viewH, D]);
 
   useEffect(draw, [draw]);
 
-  /** Зум вокруг точки (cx, cy) в координатах рамки — точка остаётся на месте. */
+  /** Зум вокруг точки (cx, cy) в координатах кадра — точка остаётся на месте. */
   const zoomAt = useCallback(
     (cx: number, cy: number, k: number) => {
       onChange(index, s => {
@@ -714,12 +911,7 @@ function Frame({
         const c = centerOf(s);
         const nx = cx + (c.x - cx) * f;
         const ny = cy + (c.y - cy) * f;
-        return clampPos({
-          ...s,
-          s: ns,
-          tx: nx - (s.nw * ns) / 2,
-          ty: ny - (s.nh * ns) / 2,
-        });
+        return clampPos({ ...s, s: ns, tx: nx - (s.nw * ns) / 2, ty: ny - (s.nh * ns) / 2 });
       });
     },
     [index, onChange],
@@ -729,12 +921,12 @@ function Frame({
     if (tolTimer.current) clearTimeout(tolTimer.current);
   }, []);
 
-  const cover = shot ? coverScale(shot.nw, shot.nh) : 1;
+  const cover = shot ? coverScale(shot.nw, shot.nh, slot.fw, slot.fh) : 1;
   const zoom = shot ? shot.s / cover : 1;
 
   const setZoom = (z: number) => {
     if (!shot) return;
-    zoomAt(FRAME_W / 2, FRAME_H / 2, (cover * z) / shot.s);
+    zoomAt(slot.fw / 2, slot.fh / 2, (cover * z) / shot.s);
   };
 
   // Поворот делим на четверти (кнопки) и мелкую правку завала (ползунок).
@@ -744,7 +936,12 @@ function Frame({
 
   const fit = (mode: 'cover' | 'contain') => {
     onChange(index, s =>
-      centered(s, mode === 'cover' ? coverScale(s.nw, s.nh) : containScale(s.nw, s.nh)),
+      centered(
+        s,
+        mode === 'cover'
+          ? coverScale(s.nw, s.nh, s.fw, s.fh)
+          : containScale(s.nw, s.nh, s.fw, s.fh),
+      ),
     );
   };
 
@@ -755,7 +952,7 @@ function Frame({
     ...patch,
   });
 
-  /** Экран → координаты рамки. */
+  /** Экран → координаты кадра. */
   const toFrame = (clientX: number, clientY: number): Pt => {
     const r = boxRef.current!.getBoundingClientRect();
     return { x: (clientX - r.left) / D, y: (clientY - r.top) / D };
@@ -796,14 +993,14 @@ function Frame({
     draw();
   };
 
-  const chooseTool = (t: Tool) => setTool(prev => (prev === t ? 'move' : t));
-
   const changeTol = (v: number) => {
     setTol(v);
     if (!shot?.bg) return;
     if (tolTimer.current) clearTimeout(tolTimer.current);
     tolTimer.current = setTimeout(() => onBg(index, bgSpec({ tol: v })), 250);
   };
+
+  const chooseTool = (t: Tool) => setTool(prev => (prev === t ? 'move' : t));
 
   const bgOn = !!shot?.bg;
   const painted = !!(shot?.eraseMask || shot?.keepMask);
@@ -819,15 +1016,36 @@ function Frame({
     });
   };
 
+  const addShape = (make: (fw: number, fh: number) => Shape) => {
+    if (!shot) return;
+    const sh = make(slot.fw, slot.fh);
+    setSelected(sh.id);
+    setTool('move');
+    onChange(index, s => ({ ...s, shapes: [...s.shapes, sh] }));
+  };
+
+  const dropShape = () => {
+    if (selected === null) return;
+    const id = selected;
+    setSelected(null);
+    onChange(index, s => ({ ...s, shapes: s.shapes.filter(sh => sh.id !== id) }));
+  };
+
+  const setThickness = (t: number) =>
+    onChange(index, s => ({
+      ...s,
+      shapes: s.shapes.map(sh => (sh.id === selected ? { ...sh, t } : sh)),
+    }));
+
+  const current = shot?.shapes.find(sh => sh.id === selected) ?? null;
+
   return (
     <div className="bb-card p-4 space-y-3" style={{ width: view + CARD_PAD }}>
       <div className="flex items-center justify-between gap-2 h-6">
-        <span className="bb-label truncate">{shot ? filename : `Картинка ${index + 1}`}</span>
-        {shot && (
-          <span className="bb-sub text-[11px] shrink-0">
-            {shot.nw}×{shot.nh}
-          </span>
-        )}
+        <span className="bb-label truncate">{shot ? filename : slot.title}</span>
+        <span className="bb-sub text-[11px] shrink-0">
+          {shot ? `${shot.nw}×${shot.nh}` : `${slot.fw}×${slot.fh}`}
+        </span>
       </div>
 
       <div
@@ -852,6 +1070,20 @@ function Frame({
             return;
           }
           if (tool === 'pick') return;
+
+          // Пометки перехватывают клик раньше, чем начинается перетаскивание кадра.
+          if (slot.annotate && e.button !== 1) {
+            const f = toFrame(e.clientX, e.clientY);
+            const hit = hitTest(shot.shapes, f, selected);
+            setSelected(hit ? hit.id : null);
+            if (hit) {
+              const orig = shot.shapes.find(sh => sh.id === hit.id)!;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              shapeDrag.current = { id: hit.id, mode: hit.mode, from: f, orig };
+              return;
+            }
+          }
+
           e.currentTarget.setPointerCapture(e.pointerId);
           drag.current = { x: e.clientX, y: e.clientY };
         }}
@@ -859,6 +1091,13 @@ function Frame({
           if (brushing) setCursor(toFrame(e.clientX, e.clientY));
           if (paint.current) {
             strokeTo(e.clientX, e.clientY);
+            return;
+          }
+          if (shapeDrag.current) {
+            const { id, mode, from, orig } = shapeDrag.current;
+            const f = toFrame(e.clientX, e.clientY);
+            const next = moveShape(orig, mode, f.x - from.x, f.y - from.y);
+            onChange(index, s => ({ ...s, shapes: s.shapes.map(sh => (sh.id === id ? next : sh)) }));
             return;
           }
           if (!drag.current) return;
@@ -869,6 +1108,7 @@ function Frame({
         }}
         onPointerUp={() => {
           drag.current = null;
+          shapeDrag.current = null;
           if (paint.current) {
             paint.current = null;
             onChange(index, s => ({ ...s, rev: s.rev + 1 }));
@@ -876,6 +1116,7 @@ function Frame({
         }}
         onPointerCancel={() => {
           drag.current = null;
+          shapeDrag.current = null;
           paint.current = null;
         }}
         onPointerLeave={() => setCursor(null)}
@@ -889,7 +1130,6 @@ function Frame({
           width: view,
           height: viewH,
           borderRadius: 18,
-          // Превью честно показывает, что будет в файле: белое для JPG, шашка для PNG.
           background: '#fff',
           border: `2px ${shot ? 'solid' : 'dashed'} ${
             over || tool !== 'move' ? 'var(--aqua-400)' : shot ? 'transparent' : 'var(--sky-200)'
@@ -967,7 +1207,7 @@ function Frame({
         <button
           className="bb-btn bb-btn-ghost text-xs px-3"
           disabled={!shot}
-          onClick={() => zoomAt(FRAME_W / 2, FRAME_H / 2, 1 / 1.15)}
+          onClick={() => zoomAt(slot.fw / 2, slot.fh / 2, 1 / 1.15)}
           title="Уменьшить"
         >
           −
@@ -985,7 +1225,7 @@ function Frame({
         <button
           className="bb-btn bb-btn-ghost text-xs px-3"
           disabled={!shot}
-          onClick={() => zoomAt(FRAME_W / 2, FRAME_H / 2, 1.15)}
+          onClick={() => zoomAt(slot.fw / 2, slot.fh / 2, 1.15)}
           title="Увеличить"
         >
           +
@@ -1046,6 +1286,50 @@ function Frame({
           </button>
         )}
       </div>
+
+      {slot.annotate && (
+        <div className="rounded-2xl p-3 space-y-2" style={{ background: 'var(--sky-50)' }}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="bb-label mr-1">Пометки</span>
+            <button
+              className="bb-btn bb-btn-ghost text-xs"
+              disabled={!shot}
+              onClick={() => addShape(newArrow)}
+            >
+              ➜ Стрелка
+            </button>
+            <button
+              className="bb-btn bb-btn-ghost text-xs"
+              disabled={!shot}
+              onClick={() => addShape(newRect)}
+            >
+              ▭ Рамка
+            </button>
+            {current && (
+              <button className="bb-btn bb-btn-ghost text-xs bb-bad" onClick={dropShape}>
+                Убрать
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="bb-sub text-[11px] w-16">Толщина</span>
+            <input
+              type="range"
+              min={2}
+              max={30}
+              step={1}
+              value={current?.t ?? 10}
+              disabled={!current}
+              onChange={e => setThickness(Number(e.target.value))}
+              className="flex-1 accent-teal-400 disabled:opacity-40"
+            />
+            <span className="bb-sub text-[11px] flex-1 text-right leading-tight">
+              {current ? 'тяните за белые точки' : 'кликните по фигуре, чтобы менять'}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         {/* ── Фон ── */}
@@ -1150,7 +1434,7 @@ function Frame({
         disabled={!shot || shot.busy}
         onClick={() => onDownload(index)}
       >
-        ⬇ Скачать JPG {FRAME_W * EXPORT_SCALE}×{FRAME_H * EXPORT_SCALE}
+        ⬇ Скачать JPG {Math.round(slot.fw * slot.ex)}×{Math.round(slot.fh * slot.ex)}
       </button>
     </div>
   );
