@@ -110,6 +110,15 @@ async function buildApartmentPostText(data: any) {
   return text;
 }
 
+// «📐 Gross area X sqm / Plot area Y sqm» — каждая половина только если есть.
+function buildVillaAreaLine(data: any, esc: (v: string) => string): string {
+  const has = (v: any) => v !== '' && v !== null && v !== undefined && Number(v) > 0;
+  const parts: string[] = [];
+  if (has(data.grossAreaM2)) parts.push('Gross area ' + esc(formatArea2(data.grossAreaM2)) + ' sqm');
+  if (has(data.plotAreaM2)) parts.push('Plot area ' + esc(formatArea2(data.plotAreaM2)) + ' sqm');
+  return parts.length ? '📐 ' + parts.join(' / ') : '';
+}
+
 async function buildVillaPostText(data: any) {
   const cfg = await getConfig2(data.project);
   // DB-sourced posts carry their own island/emoji; use them over CONFIG2 when present.
@@ -140,15 +149,15 @@ async function buildVillaPostText(data: any) {
 
   text += '<b><u>Selling Price:</u> ' + escapeHtml(formatNumberLikeSheet(data.sellingPrice)) + ' AED</b>\n\n';
 
-  text += '📐 Gross area ' + escapeHtml(formatArea2(data.grossAreaM2)) + ' sqm';
-
-  if (data.plotAreaM2 !== '') {
-    text += ' / Plot area ' + escapeHtml(formatArea2(data.plotAreaM2)) + ' sqm';
-  }
-
-  if (data.unit) text += '\n🌳 ' + escapeHtml(formatUnitLabel(data.unit));
-  if (data.rowName) text += '\n📍 ' + escapeHtml(formatRowLabel(data.rowName));
-  if (data.handover) text += '\n🗓 <b>Handover:</b> ' + escapeHtml(data.handover);
+  // Строки собираем списком: у таунхаусов нет площади участка, а у части
+  // юнитов не заполнена и площадь дома — тогда строки просто нет, а не «0,00».
+  const lines: string[] = [];
+  const areaLine = buildVillaAreaLine(data, escapeHtml);
+  if (areaLine) lines.push(areaLine);
+  if (data.unit) lines.push('🌳 ' + escapeHtml(formatUnitLabel(data.unit)));
+  if (data.rowName) lines.push('📍 ' + escapeHtml(formatRowLabel(data.rowName)));
+  if (data.handover) lines.push('🗓 <b>Handover:</b> ' + escapeHtml(data.handover));
+  text += lines.join('\n');
 
   text += '\n\n<b>📞 Contact our broker Nataly:</b>\n';
   text += '📱 <a href="https://wa.me/971508697050">+971508697050</a>';
@@ -253,15 +262,13 @@ async function buildVillaWhatsAppPostText(data: any) {
 
   text += '*Selling Price: ' + formatNumberLikeSheet(data.sellingPrice) + ' AED*\n\n';
 
-  text += '📐 Gross area ' + formatArea2(data.grossAreaM2) + ' sqm';
-
-  if (data.plotAreaM2 !== '') {
-    text += ' / Plot area ' + formatArea2(data.plotAreaM2) + ' sqm';
-  }
-
-  if (data.unit) text += '\n🌳 ' + formatUnitLabel(data.unit);
-  if (data.rowName) text += '\n📍 ' + formatRowLabel(data.rowName);
-  if (data.handover) text += '\n🗓 *Handover:* ' + data.handover;
+  const lines: string[] = [];
+  const areaLine = buildVillaAreaLine(data, (v: string) => v);
+  if (areaLine) lines.push(areaLine);
+  if (data.unit) lines.push('🌳 ' + formatUnitLabel(data.unit));
+  if (data.rowName) lines.push('📍 ' + formatRowLabel(data.rowName));
+  if (data.handover) lines.push('🗓 *Handover:* ' + data.handover);
+  text += lines.join('\n');
 
   text += '\n\n*📞 Contact our broker Nataly:*\n';
   text += '📱 +971508697050';

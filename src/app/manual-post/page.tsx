@@ -442,7 +442,7 @@ function ManualPostForm() {
                       <div className="mt-2 flex items-center gap-2 text-xs bb-ink-3">
                         <span className="bb-ok">✓ Загружен:</span>
                         <span className="font-mono bb-accent">{parsedData.code}</span>
-                        <span className="truncate">{parsedData.unit}</span>
+                        <span className="truncate">{parsedData.unitNumber || parsedData.unit}</span>
                         <span className="bb-ink-4 truncate">· {parsedData.project}</span>
                       </div>
                     )}
@@ -795,11 +795,11 @@ function ManualPostForm() {
               {isVilla && (
                 <div className="grid grid-cols-2 gap-4 border-t bb-edge pt-4">
                   <div>
-                    <label className="block text-xs bb-ink-3 mb-1">Row Name</label>
+                    <label className="block text-xs bb-ink-3 mb-1">Row (Single / Double)</label>
                     <input type="text" value={parsedData.rowName || ''} onChange={(e) => updateField('rowName', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink outline-none focus:ring-2 focus:bb-ring" />
                   </div>
                   <div>
-                    <label className="block text-xs bb-ink-3 mb-1">Unit</label>
+                    <label className="block text-xs bb-ink-3 mb-1">Unit position (Middle / Corner)</label>
                     <input type="text" value={parsedData.unit || ''} onChange={(e) => updateField('unit', e.target.value)} className="w-full px-3 py-2 bb-surface-soft border bb-edge rounded-lg text-sm bb-ink outline-none focus:ring-2 focus:bb-ring" />
                   </div>
                 </div>
