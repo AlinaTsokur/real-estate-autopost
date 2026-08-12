@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /* Кадрирование планировок под пост: две картинки рядом, каждая обрезается
-   под 520×728 и скачивается отдельным файлом в двойном размере (1040×1456).
+   под 520×728 и скачивается отдельным JPG в двойном размере (1040×1456).
    Плюс чистка фона: заливка от краёв, пипетка и две кисти — стереть и вернуть. */
 
 const FRAME_W = 520;
@@ -22,10 +22,7 @@ const MIN_OVERLAP = 60;   // сколько картинки обязано ос
 const DEFAULT_TOL = 24;   // допуск по цвету фона, 0…100
 const DEFAULT_BRUSH = 40; // диаметр кисти в экранных px
 
-const CHECKER = 'repeating-conic-gradient(#e6edf2 0% 25%, #ffffff 0% 50%) 0 0 / 16px 16px';
-
-type Format = 'jpg' | 'png';
-type Tool = 'move' | 'pick' | 'erase' | 'restore' | 'lasso';
+type Tool = 'move' | 'pick' | 'erase' | 'restore';
 
 /** Что именно считаем фоном. Правки применяются всегда к оригиналу. */
 interface BgSpec {
@@ -49,7 +46,6 @@ interface Shot {
   eraseMask: HTMLCanvasElement | null;// где прошлись ластиком
   keepMask: HTMLCanvasElement | null; // где вернули исходник кистью
   composed: HTMLCanvasElement;        // итог: из него рисуем превью и экспорт
-  format: Format;
   busy: boolean;
   rev: number;                        // счётчик правок — холсты мутабельные
 }
@@ -170,7 +166,6 @@ async function loadFile(file: File): Promise<Shot | null> {
     eraseMask: null,
     keepMask: null,
     composed: makeCanvas(nw, nh),
-    format: 'jpg',
     busy: false,
     rev: 0,
   };
@@ -253,43 +248,6 @@ function restoreStroke(shot: Shot, a: Pt, b: Pt, r: number) {
   t.globalCompositeOperation = 'destination-in';
   paintSegment(t, { x: a.x - box.x, y: a.y - box.y }, { x: b.x - box.x, y: b.y - box.y }, r);
   ctx2d(shot.composed).drawImage(tmp, box.x, box.y);
-}
-
-/** Путь обводки; для «снаружи» добавляем рамку во всю картинку и режем evenodd. */
-function lassoPath(
-  ctx: CanvasRenderingContext2D,
-  pts: Pt[],
-  outside: boolean,
-  w: number,
-  h: number,
-) {
-  ctx.beginPath();
-  if (outside) ctx.rect(0, 0, w, h);
-  ctx.moveTo(pts[0].x, pts[0].y);
-  for (const p of pts.slice(1)) ctx.lineTo(p.x, p.y);
-  ctx.closePath();
-}
-
-/** Стирает всё внутри обводки — или, наоборот, всё за её пределами. */
-function lassoErase(shot: Shot, pts: Pt[], outside: boolean) {
-  if (pts.length < 3) return;
-  const rule: CanvasFillRule = outside ? 'evenodd' : 'nonzero';
-
-  if (!shot.eraseMask) shot.eraseMask = makeCanvas(shot.nw, shot.nh);
-  const e = ctx2d(shot.eraseMask);
-  e.fillStyle = '#000';
-  lassoPath(e, pts, outside, shot.nw, shot.nh);
-  e.fill(rule);
-
-  if (shot.keepMask) {
-    const k = ctx2d(shot.keepMask);
-    k.globalCompositeOperation = 'destination-out';
-    lassoPath(k, pts, outside, shot.nw, shot.nh);
-    k.fill(rule);
-    k.globalCompositeOperation = 'source-over';
-  }
-
-  recompose(shot);
 }
 
 /* ── Удаление фона ─────────────────────────────────────────────────────── */
@@ -469,11 +427,9 @@ function exportShot(shot: Shot, filename: string) {
   const canvas = makeCanvas(FRAME_W * EXPORT_SCALE, FRAME_H * EXPORT_SCALE);
   const ctx = ctx2d(canvas);
 
-  // В JPG нет альфы — под картинку кладём белый фон. В PNG оставляем прозрачность.
-  if (shot.format === 'jpg') {
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
+  // В JPG нет альфы — под картинку всегда кладём белый фон.
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
@@ -492,8 +448,8 @@ function exportShot(shot: Shot, filename: string) {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
-    shot.format === 'jpg' ? 'image/jpeg' : 'image/png',
-    shot.format === 'jpg' ? JPEG_QUALITY : undefined,
+    'image/jpeg',
+    JPEG_QUALITY,
   );
 }
 
@@ -633,7 +589,7 @@ export default function PlanCropPage() {
     if (!shot) return '';
     const other = shots[1 - i];
     const suffix = other && other.base === shot.base ? `-${i + 1}` : '';
-    return `${shot.base}${suffix}.${shot.format}`;
+    return `${shot.base}${suffix}.jpg`;
   };
 
   const download = (i: number) => {
@@ -724,11 +680,10 @@ function Frame({
   const [tol, setTol] = useState(DEFAULT_TOL);
   const [brush, setBrush] = useState(DEFAULT_BRUSH);
   const [cursor, setCursor] = useState<Pt | null>(null);
-  const [lasso, setLasso] = useState<Pt[]>([]);
 
   const brushing = tool === 'erase' || tool === 'restore';
 
-  /** Рисует превью кадра из собранного полотна и поверх — обводку. */
+  /** Рисует превью кадра из собранного полотна. */
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -745,33 +700,7 @@ function Frame({
     ctx.imageSmoothingQuality = 'high';
     drawShot(ctx, shot, shot.composed, D);
 
-    if (!lasso.length) return;
-    const rad = (shot.rot * Math.PI) / 180;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-    const c = centerOf(shot);
-    const sx = (p: Pt) =>
-      (c.x + ((p.x - shot.nw / 2) * cos - (p.y - shot.nh / 2) * sin) * shot.s) * D;
-    const sy = (p: Pt) =>
-      (c.y + ((p.x - shot.nw / 2) * sin + (p.y - shot.nh / 2) * cos) * shot.s) * D;
-    ctx.beginPath();
-    ctx.moveTo(sx(lasso[0]), sy(lasso[0]));
-    for (const p of lasso.slice(1)) ctx.lineTo(sx(p), sy(p));
-    if (lasso.length > 2) ctx.closePath();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = 'rgba(255,255,255,.9)';
-    ctx.stroke();
-    ctx.setLineDash([6, 4]);
-    ctx.strokeStyle = '#0f172a';
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#2dd4bf';
-    for (const p of lasso) {
-      ctx.beginPath();
-      ctx.arc(sx(p), sy(p), 3.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }, [shot, lasso, view, viewH, D]);
+  }, [shot, view, viewH, D]);
 
   useEffect(draw, [draw]);
 
@@ -795,19 +724,6 @@ function Frame({
     },
     [index, onChange],
   );
-
-  // React вешает onWheel пассивно, preventDefault там не работает — только нативно.
-  useEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const r = el.getBoundingClientRect();
-      zoomAt((e.clientX - r.left) / D, (e.clientY - r.top) / D, Math.exp(-e.deltaY * 0.0015));
-    };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, [zoomAt, D]);
 
   useEffect(() => () => {
     if (tolTimer.current) clearTimeout(tolTimer.current);
@@ -880,25 +796,7 @@ function Frame({
     draw();
   };
 
-  /** Переключение инструмента: недорисованную обводку выбрасываем. */
-  const chooseTool = (t: Tool) => {
-    setTool(prev => {
-      const next = prev === t ? 'move' : t;
-      if (next !== 'lasso') setLasso([]);
-      return next;
-    });
-  };
-
-  const applyLasso = (outside: boolean) => {
-    if (!shot || lasso.length < 3) return;
-    const pts = lasso;
-    setLasso([]);
-    setTool('move');
-    onChange(index, s => {
-      lassoErase(s, pts, outside);
-      return { ...s, rev: s.rev + 1 };
-    });
-  };
+  const chooseTool = (t: Tool) => setTool(prev => (prev === t ? 'move' : t));
 
   const changeTol = (v: number) => {
     setTol(v);
@@ -953,7 +851,7 @@ function Frame({
             strokeTo(e.clientX, e.clientY);
             return;
           }
-          if (tool === 'pick' || tool === 'lasso') return;
+          if (tool === 'pick') return;
           e.currentTarget.setPointerCapture(e.pointerId);
           drag.current = { x: e.clientX, y: e.clientY };
         }}
@@ -985,7 +883,6 @@ function Frame({
         onClick={e => {
           if (!shot) fileRef.current?.click();
           else if (tool === 'pick') pickAt(e.clientX, e.clientY);
-          else if (tool === 'lasso') setLasso(pts => [...pts, toImage(e.clientX, e.clientY)]);
         }}
         className="relative overflow-hidden select-none touch-none"
         style={{
@@ -993,14 +890,14 @@ function Frame({
           height: viewH,
           borderRadius: 18,
           // Превью честно показывает, что будет в файле: белое для JPG, шашка для PNG.
-          background: shot?.format === 'png' ? CHECKER : '#fff',
+          background: '#fff',
           border: `2px ${shot ? 'solid' : 'dashed'} ${
             over || tool !== 'move' ? 'var(--aqua-400)' : shot ? 'transparent' : 'var(--sky-200)'
           }`,
           boxShadow: 'var(--lift-2)',
           cursor: !shot
             ? 'pointer'
-            : tool === 'pick' || tool === 'lasso'
+            : tool === 'pick'
               ? 'crosshair'
               : brushing
                 ? 'none'
@@ -1043,14 +940,12 @@ function Frame({
           </div>
         )}
 
-        {(tool === 'pick' || tool === 'lasso') && !shot?.busy && (
+        {tool === 'pick' && !shot?.busy && (
           <div
             className="absolute left-0 right-0 bottom-0 text-center py-2 bb-label"
             style={{ background: 'rgba(255,255,255,.85)' }}
           >
-            {tool === 'pick'
-              ? 'Кликните по фону'
-              : `Кликайте по контуру плана — точек: ${lasso.length}`}
+            Кликните по фону
           </div>
         )}
       </div>
@@ -1067,7 +962,16 @@ function Frame({
         }}
       />
 
+      {/* Масштаб меняется только отсюда: колесо оставлено странице для прокрутки. */}
       <div className="flex items-center gap-2">
+        <button
+          className="bb-btn bb-btn-ghost text-xs px-3"
+          disabled={!shot}
+          onClick={() => zoomAt(FRAME_W / 2, FRAME_H / 2, 1 / 1.15)}
+          title="Уменьшить"
+        >
+          −
+        </button>
         <input
           type="range"
           min={0.15}
@@ -1078,6 +982,14 @@ function Frame({
           onChange={e => setZoom(Number(e.target.value))}
           className="flex-1 accent-teal-400 disabled:opacity-40"
         />
+        <button
+          className="bb-btn bb-btn-ghost text-xs px-3"
+          disabled={!shot}
+          onClick={() => zoomAt(FRAME_W / 2, FRAME_H / 2, 1.15)}
+          title="Увеличить"
+        >
+          +
+        </button>
         <span className="bb-sub text-[11px] tabular-nums w-12 text-right">
           {shot ? `${Math.round(shot.s * 100)}%` : '—'}
         </span>
@@ -1233,61 +1145,12 @@ function Frame({
         </div>
       </div>
 
-      {/* ── Контур: единственное, что работает на фотореалистичных рендерах ── */}
-      <div className="rounded-2xl p-3 flex flex-wrap items-center gap-2" style={{ background: 'var(--sky-50)' }}>
-        <span className="bb-label mr-1">Контур</span>
-        <button
-          className={`bb-btn text-xs ${tool === 'lasso' ? 'bb-btn-primary' : 'bb-btn-ghost'}`}
-          disabled={!shot || shot.busy}
-          onClick={() => chooseTool('lasso')}
-          title="Обвести план кликами по углам"
-        >
-          ✂️ Обвести
-        </button>
-        {lasso.length >= 3 && (
-          <>
-            <button className="bb-btn bb-btn-ghost text-xs" onClick={() => applyLasso(true)}>
-              стереть снаружи
-            </button>
-            <button className="bb-btn bb-btn-ghost text-xs" onClick={() => applyLasso(false)}>
-              стереть внутри
-            </button>
-          </>
-        )}
-        {lasso.length > 0 && (
-          <button
-            className="bb-sub text-[11px] underline"
-            onClick={() => setLasso(pts => pts.slice(0, -1))}
-          >
-            назад
-          </button>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <span className="bb-sub text-[11px]">Формат</span>
-        {(['jpg', 'png'] as Format[]).map(f => (
-          <button
-            key={f}
-            className={`bb-btn text-xs ${shot?.format === f ? 'bb-btn-primary' : 'bb-btn-ghost'}`}
-            disabled={!shot}
-            onClick={() => onChange(index, s => ({ ...s, format: f }))}
-          >
-            {f.toUpperCase()}
-          </button>
-        ))}
-        <span className="bb-sub text-[11px] flex-1 text-right">
-          {shot?.format === 'png' ? 'прозрачность сохранится' : 'прозрачное станет белым'}
-        </span>
-      </div>
-
       <button
         className="bb-btn bb-btn-ink w-full"
         disabled={!shot || shot.busy}
         onClick={() => onDownload(index)}
       >
-        ⬇ Скачать {(shot?.format ?? 'jpg').toUpperCase()} {FRAME_W * EXPORT_SCALE}×
-        {FRAME_H * EXPORT_SCALE}
+        ⬇ Скачать JPG {FRAME_W * EXPORT_SCALE}×{FRAME_H * EXPORT_SCALE}
       </button>
     </div>
   );
