@@ -38,7 +38,6 @@ export async function GET() {
         areaM2: p.areaM2,
         grossAreaM2: p.grossAreaM2,
         plotAreaM2: p.plotAreaM2,
-        paymentPlan: p.paymentPlan || '',
         originalPrice: p.originalPrice,
       };
 

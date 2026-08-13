@@ -13,7 +13,6 @@ export interface BudgetItem {
   areaM2?: number | string;      // квартиры
   grossAreaM2?: number | string; // виллы и таунхаусы
   plotAreaM2?: number | string;
-  paymentPlan?: string;
   originalPrice?: number | string; // печатается только когда выше текущей
 }
 
@@ -42,13 +41,12 @@ export function buildBudgetTitle(h: BudgetHeader): string {
 }
 
 interface BlockOptions {
-  paymentPlan?: boolean;   // Quick Sales идут без плана оплаты
-  originalPrice?: boolean; // и без старой цены
+  originalPrice?: boolean; // Quick Sales идут без старой цены
 }
 
 /** Блок одного юнита — общий для бюджетной рассылки и для Quick Sales. */
 function buildItemBlock(item: BudgetItem, opts: BlockOptions = {}): string {
-  const { paymentPlan = true, originalPrice = true } = opts;
+  const { originalPrice = true } = opts;
   let text = '*' + item.type + '*\n';
 
   if (item.isVilla) {
@@ -60,8 +58,6 @@ function buildItemBlock(item: BudgetItem, opts: BlockOptions = {}): string {
     if (item.view) text += item.view + '\n';
     if (hasNum(item.areaM2)) text += areaBoth(item.areaM2!) + '\n';
   }
-
-  if (paymentPlan && item.paymentPlan) text += 'Payment plan: ' + item.paymentPlan + '\n';
 
   // Старую цену показываем, только если она и правда выше — иначе это не скидка.
   if (originalPrice && hasNum(item.originalPrice) && Number(item.originalPrice) > item.price) {
@@ -90,7 +86,7 @@ export function buildQuickSalesText(groups: QuickSaleGroup[]): string {
     if (g.emoji) head += ' ' + g.emoji;
     head += '*';
     const items = g.items
-      .map(i => buildItemBlock(i, { paymentPlan: false, originalPrice: false }))
+      .map(i => buildItemBlock(i, { originalPrice: false }))
       .join('\n\n');
     return head + '\n\n' + items;
   });

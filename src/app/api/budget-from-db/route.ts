@@ -54,7 +54,6 @@ export async function POST(request: Request) {
         areaM2: r.areaM2,
         grossAreaM2: r.grossAreaM2,
         plotAreaM2: r.plotAreaM2,
-        paymentPlan: r.paymentPlan || '',
       };
     });
 
