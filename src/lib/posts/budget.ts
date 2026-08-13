@@ -41,8 +41,14 @@ export function buildBudgetTitle(h: BudgetHeader): string {
   return title;
 }
 
+interface BlockOptions {
+  paymentPlan?: boolean;   // Quick Sales идут без плана оплаты
+  originalPrice?: boolean; // и без старой цены
+}
+
 /** Блок одного юнита — общий для бюджетной рассылки и для Quick Sales. */
-function buildItemBlock(item: BudgetItem): string {
+function buildItemBlock(item: BudgetItem, opts: BlockOptions = {}): string {
+  const { paymentPlan = true, originalPrice = true } = opts;
   let text = '*' + item.type + '*\n';
 
   if (item.isVilla) {
@@ -55,10 +61,10 @@ function buildItemBlock(item: BudgetItem): string {
     if (hasNum(item.areaM2)) text += areaBoth(item.areaM2!) + '\n';
   }
 
-  if (item.paymentPlan) text += 'Payment plan: ' + item.paymentPlan + '\n';
+  if (paymentPlan && item.paymentPlan) text += 'Payment plan: ' + item.paymentPlan + '\n';
 
   // Старую цену показываем, только если она и правда выше — иначе это не скидка.
-  if (hasNum(item.originalPrice) && Number(item.originalPrice) > item.price) {
+  if (originalPrice && hasNum(item.originalPrice) && Number(item.originalPrice) > item.price) {
     text += 'Original Price: ' + formatNumberLikeSheet(item.originalPrice!) + ' AED\n';
   }
 
@@ -66,7 +72,7 @@ function buildItemBlock(item: BudgetItem): string {
 }
 
 export function buildBudgetText(header: BudgetHeader, items: BudgetItem[]): string {
-  return '*' + buildBudgetTitle(header) + '*\n\n' + items.map(buildItemBlock).join('\n\n');
+  return '*' + buildBudgetTitle(header) + '*\n\n' + items.map(i => buildItemBlock(i)).join('\n\n');
 }
 
 export interface QuickSaleGroup {
@@ -83,8 +89,11 @@ export function buildQuickSalesText(groups: QuickSaleGroup[]): string {
     if (g.island) head += ' - ' + g.island;
     if (g.emoji) head += ' ' + g.emoji;
     head += '*';
-    return head + '\n\n' + g.items.map(buildItemBlock).join('\n\n');
+    const items = g.items
+      .map(i => buildItemBlock(i, { paymentPlan: false, originalPrice: false }))
+      .join('\n\n');
+    return head + '\n\n' + items;
   });
 
-  return '*⚡ Quick Sales | Abu Dhabi ⚡*\n\n' + blocks.join('\n\n———\n\n');
+  return '*⚡ Quick Sales | Abu Dhabi ⚡*\n\n' + blocks.join('\n\n');
 }
