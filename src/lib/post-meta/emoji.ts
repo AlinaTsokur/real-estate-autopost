@@ -50,14 +50,7 @@ export async function getPhotosFolderUrl(projectName: string): Promise<string> {
       AND coalesce(photos_folder_url, '') <> ''
     LIMIT 1
   `) as any[];
-  if (rows[0]?.photos_folder_url) return rows[0].photos_folder_url;
-
-  // Названия по корпусам («The Source II») проектов в базе не имеют — они живут
-  // отдельной таблицей псевдонимов, перенесённой из листа PROJECT_MEDIA.
-  const alias = (await sql`
-    SELECT folder_url FROM project_media_alias WHERE name_key = ${key} AND coalesce(folder_url, '') <> ''
-  `) as any[];
-  return alias[0]?.folder_url || '';
+  return rows[0]?.photos_folder_url || '';
 }
 
 export async function setPhotosFolderUrl(projectId: string, url: string) {
@@ -68,52 +61,12 @@ export async function setPhotosFolderUrl(projectId: string, url: string) {
   `;
 }
 
-/* ── Псевдонимы: названия из старого листа, которым нет проекта в базе ── */
-
-export interface MediaAlias {
-  nameKey: string;
-  name: string;
-  folderUrl: string;
-}
-
-export async function ensureAliasTable() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS project_media_alias (
-      name_key   text PRIMARY KEY,
-      name       text NOT NULL,
-      folder_url text,
-      updated_at timestamptz NOT NULL DEFAULT now()
-    )
-  `;
-}
-
-export async function listMediaAliases(): Promise<MediaAlias[]> {
-  await ensureAliasTable();
-  const rows = (await sql`SELECT name_key, name, folder_url FROM project_media_alias ORDER BY name`) as any[];
-  return rows.map(r => ({ nameKey: r.name_key, name: r.name, folderUrl: r.folder_url || '' }));
-}
-
-export async function saveMediaAlias(name: string, folderUrl: string) {
-  await ensureAliasTable();
-  const key = name.trim().toLowerCase().replace(/\s+/g, ' ');
-  await sql`
-    INSERT INTO project_media_alias (name_key, name, folder_url)
-    VALUES (${key}, ${name.trim()}, ${folderUrl || null})
-    ON CONFLICT (name_key) DO UPDATE
-      SET name = EXCLUDED.name, folder_url = EXCLUDED.folder_url, updated_at = now()
-  `;
-}
-
-export async function deleteMediaAlias(nameKey: string) {
-  await ensureAliasTable();
-  await sql`DELETE FROM project_media_alias WHERE name_key = ${nameKey}`;
-}
-
 export async function setProjectEmoji(projectId: string, projectName: string, emoji: string) {
   await sql`
     INSERT INTO project_emoji (project_id, project_name, emoji)
     VALUES (${projectId}, ${projectName}, ${emoji})
-    ON CONFLICT (project_id) DO UPDATE SET emoji = EXCLUDED.emoji, project_name = EXCLUDED.project_name, updated_at = now()
+    ON CONFLICT (project_id) DO UPDATE
+      SET emoji = EXCLUDED.emoji, project_name = EXCLUDED.project_name, updated_at = now()
   `;
 }
 

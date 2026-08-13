@@ -14,17 +14,10 @@ interface Row {
   photosFolderUrl: string;
 }
 
-interface Alias {
-  nameKey: string;
-  name: string;
-  folderUrl: string;
-}
-
 const isFolderUrl = (v: string) => !v || /\/folders\/[a-zA-Z0-9_-]+|[?&]id=[a-zA-Z0-9_-]+/.test(v);
 
 export default function ProjectsPage() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [aliases, setAliases] = useState<Alias[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -34,7 +27,6 @@ export default function ProjectsPage() {
     try {
       const d = await (await fetch('/api/project-emoji')).json();
       setRows(d.projects || []);
-      setAliases(d.aliases || []);
     } finally {
       setLoading(false);
     }
@@ -70,24 +62,6 @@ export default function ProjectsPage() {
       body: JSON.stringify({ projectId: row.projectId, projectName: row.projectName, ...body }),
     });
     flash(row.projectId);
-  };
-
-  const saveAlias = async (a: Alias) => {
-    await fetch('/api/project-emoji', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ alias: a.name, folderUrl: a.folderUrl }),
-    });
-    flash(a.nameKey);
-  };
-
-  const dropAlias = async (a: Alias) => {
-    setAliases(list => list.filter(x => x.nameKey !== a.nameKey));
-    await fetch('/api/project-emoji', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deleteAlias: a.nameKey }),
-    });
   };
 
   const noFolder = rows.filter(r => !r.photosFolderUrl);
@@ -164,40 +138,6 @@ export default function ProjectsPage() {
             {rows.map(row)}
           </div>
 
-          {aliases.length > 0 && (
-            <div className="bb-card p-4 space-y-1">
-              <div className="bb-label mb-1.5">Старые названия из таблицы</div>
-              <p className="bb-sub text-xs mb-2">
-                Проекта с таким именем в базе нет — эти строки нужны постам, собранным вставкой
-                текста по названию корпуса. Можно удалить, если больше не пользуетесь.
-              </p>
-              {aliases.map(a => (
-                <div key={a.nameKey} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bb-hover-soft">
-                  <span className="text-sm bb-ink-2 truncate w-44 shrink-0" title={a.name}>
-                    {a.name}
-                  </span>
-                  <input
-                    value={a.folderUrl}
-                    onChange={e =>
-                      setAliases(list =>
-                        list.map(x => (x.nameKey === a.nameKey ? { ...x, folderUrl: e.target.value } : x)),
-                      )
-                    }
-                    onBlur={() => saveAlias(a)}
-                    className="flex-1 min-w-0 px-2 py-1 bb-surface-soft border bb-edge rounded-md text-xs bb-ink outline-none focus:ring-2 focus:bb-ring"
-                  />
-                  <button
-                    onClick={() => dropAlias(a)}
-                    className="text-xs shrink-0 bb-bad"
-                    title="Удалить строку"
-                  >
-                    ✕
-                  </button>
-                  <span className="w-4 shrink-0 text-xs bb-ok">{savedId === a.nameKey ? '✓' : ''}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </>
       )}
 
