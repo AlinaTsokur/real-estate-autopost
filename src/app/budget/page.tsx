@@ -63,12 +63,9 @@ export default function BudgetPage() {
   const [projects, setProjects] = useState<string[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [project, setProject] = useState('');
-  const [rawText, setRawText] = useState('');
   const [parsedData, setParsedData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
-  // Вставка таблицы осталась запасным путём — для проектов, которых нет в базе.
-  const [showPaste, setShowPaste] = useState(false);
 
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [enabledGroups, setEnabledGroups] = useState<Record<string, boolean>>(
@@ -83,8 +80,8 @@ export default function BudgetPage() {
     setChecked(loadLocal());
     fetchChecked().then(c => { setChecked(c); saveLocal(c); });
 
-    // Список для формы — из таблицы: по этим названиям /api/parse-budget
-    // разбирает вставленный TSV, менять их нельзя.
+    // Запасной список проектов из таблицы — на случай, если база не ответит:
+    // трекеру важно показать плашки, даже когда рассылку собрать нечем.
     fetch('/api/projects')
       .then(r => r.json())
       .then(d => { if (d.projects?.length) setProjects(d.projects); })
@@ -130,25 +127,6 @@ export default function BudgetPage() {
     } catch (e: any) {
       setDbError(e.message);
       setParsedData(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleParse = async () => {
-    if (!project || !rawText) return alert('Select project and paste table');
-    setLoading(true);
-    try {
-      const res = await fetch('/api/parse-budget', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawText, projectName: project })
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setParsedData(data);
-    } catch (e: any) {
-      alert(e.message);
     } finally {
       setLoading(false);
     }
@@ -339,34 +317,6 @@ export default function BudgetPage() {
                 </div>
               )}
 
-              <div className="pt-1" style={{ borderTop: '2px solid var(--sky-50)' }}>
-                <button
-                  onClick={() => setShowPaste(v => !v)}
-                  className="text-xs font-bold pt-3"
-                  style={{ color: 'var(--ink-300)' }}
-                >
-                  {showPaste ? '▾' : '▸'} Собрать из вставленной таблицы
-                </button>
-
-                {showPaste && (
-                  <div className="space-y-3 pt-3">
-                    <textarea
-                      rows={6}
-                      value={rawText}
-                      onChange={e => setRawText(e.target.value)}
-                      className="bb-input font-mono text-sm resize-y"
-                      placeholder="Вставь сюда данные из таблицы..."
-                    />
-                    <button
-                      onClick={handleParse}
-                      disabled={loading || !project || !rawText}
-                      className="bb-btn bb-btn-ghost w-full"
-                    >
-                      {loading ? 'Считаю...' : 'Разобрать таблицу'}
-                    </button>
-                  </div>
-                )}
-              </div>
             </div>
 
             {parsedData && (
@@ -394,8 +344,7 @@ export default function BudgetPage() {
                 </div>
 
                 <div className="mt-3 text-xs text-right" style={{ color: 'var(--ink-300)' }}>
-                  {parsedData.source === 'db' ? 'Из базы: ' : 'Из таблицы: '}
-                  выбрано {parsedData.selectedRows} юнитов из {parsedData.totalRows}
+                  Из базы: выбрано {parsedData.selectedRows} юнитов из {parsedData.totalRows}
                 </div>
 
                 {/* ── Рассылка по группам ── */}
