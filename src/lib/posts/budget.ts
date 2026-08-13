@@ -14,6 +14,7 @@ export interface BudgetItem {
   grossAreaM2?: number | string; // виллы и таунхаусы
   plotAreaM2?: number | string;
   paymentPlan?: string;
+  originalPrice?: number | string; // печатается только когда выше текущей
 }
 
 export interface BudgetHeader {
@@ -40,28 +41,50 @@ export function buildBudgetTitle(h: BudgetHeader): string {
   return title;
 }
 
+/** Блок одного юнита — общий для бюджетной рассылки и для Quick Sales. */
+function buildItemBlock(item: BudgetItem): string {
+  let text = '*' + item.type + '*\n';
+
+  if (item.isVilla) {
+    if (item.unit) text += item.unit + '\n';
+    if (item.rowName) text += 'Row: ' + item.rowName + '\n';
+    if (hasNum(item.grossAreaM2)) text += 'Gross area ' + areaBoth(item.grossAreaM2!) + '\n';
+    if (hasNum(item.plotAreaM2)) text += 'Plot area ' + areaBoth(item.plotAreaM2!) + '\n';
+  } else {
+    if (item.view) text += item.view + '\n';
+    if (hasNum(item.areaM2)) text += areaBoth(item.areaM2!) + '\n';
+  }
+
+  if (item.paymentPlan) text += 'Payment plan: ' + item.paymentPlan + '\n';
+
+  // Старую цену показываем, только если она и правда выше — иначе это не скидка.
+  if (hasNum(item.originalPrice) && Number(item.originalPrice) > item.price) {
+    text += 'Original Price: ' + formatNumberLikeSheet(item.originalPrice!) + ' AED\n';
+  }
+
+  return text + '💰 Price: ' + formatNumberLikeSheet(item.price) + ' AED';
+}
+
 export function buildBudgetText(header: BudgetHeader, items: BudgetItem[]): string {
-  let text = '*' + buildBudgetTitle(header) + '*\n\n';
+  return '*' + buildBudgetTitle(header) + '*\n\n' + items.map(buildItemBlock).join('\n\n');
+}
 
-  items.forEach((item, index) => {
-    if (index > 0) text += '\n\n';
+export interface QuickSaleGroup {
+  project: string;
+  island?: string;
+  emoji?: string;
+  items: BudgetItem[];
+}
 
-    text += '*' + item.type + '*\n';
-
-    if (item.isVilla) {
-      if (item.unit) text += item.unit + '\n';
-      if (item.rowName) text += 'Row: ' + item.rowName + '\n';
-      if (hasNum(item.grossAreaM2)) text += 'Gross area ' + areaBoth(item.grossAreaM2!) + '\n';
-      if (hasNum(item.plotAreaM2)) text += 'Plot area ' + areaBoth(item.plotAreaM2!) + '\n';
-    } else {
-      if (item.view) text += item.view + '\n';
-      if (hasNum(item.areaM2)) text += areaBoth(item.areaM2!) + '\n';
-    }
-
-    if (item.paymentPlan) text += 'Payment plan: ' + item.paymentPlan + '\n';
-
-    text += '💰 Price: ' + formatNumberLikeSheet(item.price) + ' AED';
+/** Quick Sales идут по всему Абу-Даби, поэтому юниты сгруппированы по проектам. */
+export function buildQuickSalesText(groups: QuickSaleGroup[]): string {
+  const blocks = groups.map(g => {
+    let head = '*' + g.project;
+    if (g.island) head += ' - ' + g.island;
+    if (g.emoji) head += ' ' + g.emoji;
+    head += '*';
+    return head + '\n\n' + g.items.map(buildItemBlock).join('\n\n');
   });
 
-  return text;
+  return '*⚡ Quick Sales | Abu Dhabi ⚡*\n\n' + blocks.join('\n\n———\n\n');
 }

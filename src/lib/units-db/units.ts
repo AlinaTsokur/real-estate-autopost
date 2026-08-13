@@ -144,6 +144,35 @@ export async function listAvailableUnits(projectName: string): Promise<RawUnit[]
   return rows as RawUnit[];
 }
 
+// Все срочные продажи по Абу-Даби. В базе это deal_type = 'Distress Deal';
+// в постах и рассылке они называются Quick Sale.
+export async function listQuickSaleUnits(): Promise<RawUnit[]> {
+  const [rows] = await readOnly([
+    sql`
+      SELECT
+        u.id, u.code, u.unit_number, u.project_id,
+        p.name AS project_name,
+        d.name AS island,
+        u.property_type, u.unit_type, u.view, u.floor,
+        u.area_sqm, u.gross_area_sqm, u.plot_area_sqm,
+        u.original_price_aed, u.old_price_aed, u.selling_price_aed,
+        u.approx_rental_rate, u.payment_plan_label, u.readiness::text AS readiness,
+        u.row_type, u.unit_position,
+        u.handover_date AS unit_handover,
+        b.handover_date AS building_handover
+      FROM units u
+      JOIN projects p ON p.id = u.project_id
+      LEFT JOIN districts d ON d.id = p.district_id
+      LEFT JOIN buildings b ON b.id = u.building_ref_id
+      WHERE u.emirate::text = 'Abu Dhabi'
+        AND u.status::text = 'available'
+        AND u.deal_type::text = 'Distress Deal'
+      ORDER BY p.name, u.selling_price_aed
+    `,
+  ]);
+  return rows as RawUnit[];
+}
+
 // Fetch a single unit (with project, island, per-building handover) by its id.
 export async function getRawUnit(id: string): Promise<RawUnit | null> {
   const [rows] = await readOnly([
