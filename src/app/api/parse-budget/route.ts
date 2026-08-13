@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getProjectParseConfig } from '@/lib/google/sheets';
+import { getProjectParseConfig, getConfig2 } from '@/lib/google/sheets';
 import { parseTsvWithQuotedMultiline, isEmptyRow, isHeaderRow, selectLowestByExactType } from '@/lib/parsing/table-parser';
 import { parseRowByFormat } from '@/lib/parsing/row-parser';
-import { extractLeadingNumberText, formatNumberLikeSheet, formatArea2, toNumber } from '@/lib/posts/formatters';
+import { extractLeadingNumberText, formatNumberLikeSheet, formatArea2, toNumber, isVillaObject } from '@/lib/posts/formatters';
+import { buildBudgetText, BudgetItem } from '@/lib/posts/budget';
 
 export async function POST(request: Request) {
   try {
@@ -60,54 +61,35 @@ export async function POST(request: Request) {
       paymentPlan: item.paymentPlan || ''
     }));
 
-    const cfg2 = await import('@/lib/google/sheets').then(m => m.getConfig2(projectName));
-    const isVilla = import('@/lib/posts/formatters').then(m => m.isVillaObject(objectType));
+    const cfg2 = await getConfig2(projectName);
+    const isVilla = isVillaObject(objectType);
 
-    let title = '💰 Best Budget ' + (selected.length === 1 ? 'Unit' : 'Units') + ' | ' + projectName;
-    if (cfg2.island) title += ' - ' + cfg2.island;
-    if (cfg2.emoji) title += ' ' + cfg2.emoji;
+    const items: BudgetItem[] = selected.map(item => ({
+      type: item.type || '',
+      isVilla,
+      price: Number(item.sellingPriceNumber),
+      view: item.view || '',
+      unit: item.unit || '',
+      rowName: item.rowName || '',
+      areaM2: item.areaNumber,
+      grossAreaM2: item.grossAreaNumber,
+      plotAreaM2: item.plotAreaNumber,
+      paymentPlan: item.paymentPlan || '',
+    }));
 
-    let text = '*' + title + '*\n\n';
+    const text = buildBudgetText(
+      { project: projectName, island: cfg2.island, emoji: cfg2.emoji, count: items.length },
+      items,
+    );
 
-    formattedSelected.forEach((item, index) => {
-      if (index > 0) text += '\n\n';
-
-      text += '*' + item.type + '*\n';
-
-      if (objectType.toLowerCase().includes('villa') || objectType.toLowerCase().includes('townhouse')) {
-        if (item.unit) text += item.unit + '\n';
-        if (item.rowName) text += 'Row: ' + item.rowName + '\n';
-
-        if (item.grossAreaM2) {
-          const sqft = new Intl.NumberFormat('de-DE', { useGrouping: true }).format(Math.round(Number(selected[index].grossAreaNumber) * 10.7639));
-          text += 'Gross area ' + item.grossAreaM2 + ' sqm / ' + sqft + ' sqft\n';
-        }
-        if (item.plotAreaM2) {
-          const sqft = new Intl.NumberFormat('de-DE', { useGrouping: true }).format(Math.round(Number(selected[index].plotAreaNumber) * 10.7639));
-          text += 'Plot area ' + item.plotAreaM2 + ' sqm / ' + sqft + ' sqft\n';
-        }
-      } else {
-        if (item.view) text += item.view + '\n';
-
-        if (item.areaM2) {
-          const sqft = new Intl.NumberFormat('de-DE', { useGrouping: true }).format(Math.round(Number(selected[index].areaNumber) * 10.7639));
-          text += item.areaM2 + ' sqm / ' + sqft + ' sqft\n';
-        }
-      }
-
-      if (item.paymentPlan) {
-        text += 'Payment plan: ' + item.paymentPlan + '\n';
-      }
-
-      text += '💰 Price: ' + item.sellingPrice + ' AED';
-    });
 
     return NextResponse.json({
       project: projectName,
       objectType,
       totalRows: parsedRows.length,
       selectedRows: selected.length,
-      text: text,
+      source: 'paste',
+      text,
       selected: formattedSelected,
       rawSelected: selected // for generating text on client or server
     });

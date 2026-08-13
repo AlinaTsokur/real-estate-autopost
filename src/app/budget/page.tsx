@@ -66,6 +66,9 @@ export default function BudgetPage() {
   const [rawText, setRawText] = useState('');
   const [parsedData, setParsedData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
+  // Вставка таблицы осталась запасным путём — для проектов, которых нет в базе.
+  const [showPaste, setShowPaste] = useState(false);
 
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [enabledGroups, setEnabledGroups] = useState<Record<string, boolean>>(
@@ -109,6 +112,28 @@ export default function BudgetPage() {
     persistChecked(toSave);
   };
 
+
+  // Основной путь: список собирается из базы по выбранному проекту.
+  const handleBuildFromDb = async () => {
+    if (!project) return;
+    setLoading(true);
+    setDbError(null);
+    try {
+      const res = await fetch('/api/budget-from-db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectName: project }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setParsedData(data);
+    } catch (e: any) {
+      setDbError(e.message);
+      setParsedData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleParse = async () => {
     if (!project || !rawText) return alert('Select project and paste table');
@@ -216,7 +241,7 @@ export default function BudgetPage() {
                   return (
                     <button
                       key={p}
-                      onClick={() => setProject(p)}
+                      onClick={() => { setProject(p); setParsedData(null); setDbError(null); }}
                       title="Выбрать проект — кружок слева отмечает, что рассылка ушла"
                       className="bb-pop flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full
                                  text-[12px] font-bold leading-none select-none cursor-pointer
@@ -296,24 +321,52 @@ export default function BudgetPage() {
                 )}
               </div>
 
-              <div>
-                <label className="bb-label block mb-2">Таблица целиком (TSV)</label>
-                <textarea
-                  rows={6}
-                  value={rawText}
-                  onChange={e => setRawText(e.target.value)}
-                  className="bb-input font-mono text-sm resize-y"
-                  placeholder="Вставь сюда данные из таблицы..."
-                />
-              </div>
-
               <button
-                onClick={handleParse}
+                onClick={handleBuildFromDb}
                 disabled={loading || !project}
                 className="bb-btn bb-btn-primary w-full"
               >
-                {loading ? 'Считаю...' : '✨ Собрать рассылку'}
+                {loading ? 'Считаю...' : '✨ Собрать из базы'}
               </button>
+
+              <p className="text-xs" style={{ color: 'var(--ink-300)' }}>
+                Берутся доступные юниты проекта, по каждому типу — самый дешёвый.
+              </p>
+
+              {dbError && (
+                <div className="px-4 py-3 text-sm bb-tint-bad" style={{ borderRadius: 'var(--r-md)' }}>
+                  {dbError}
+                </div>
+              )}
+
+              <div className="pt-1" style={{ borderTop: '2px solid var(--sky-50)' }}>
+                <button
+                  onClick={() => setShowPaste(v => !v)}
+                  className="text-xs font-bold pt-3"
+                  style={{ color: 'var(--ink-300)' }}
+                >
+                  {showPaste ? '▾' : '▸'} Собрать из вставленной таблицы
+                </button>
+
+                {showPaste && (
+                  <div className="space-y-3 pt-3">
+                    <textarea
+                      rows={6}
+                      value={rawText}
+                      onChange={e => setRawText(e.target.value)}
+                      className="bb-input font-mono text-sm resize-y"
+                      placeholder="Вставь сюда данные из таблицы..."
+                    />
+                    <button
+                      onClick={handleParse}
+                      disabled={loading || !project || !rawText}
+                      className="bb-btn bb-btn-ghost w-full"
+                    >
+                      {loading ? 'Считаю...' : 'Разобрать таблицу'}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {parsedData && (
@@ -341,7 +394,8 @@ export default function BudgetPage() {
                 </div>
 
                 <div className="mt-3 text-xs text-right" style={{ color: 'var(--ink-300)' }}>
-                  Выбрано {parsedData.selectedRows} юнитов из {parsedData.totalRows}
+                  {parsedData.source === 'db' ? 'Из базы: ' : 'Из таблицы: '}
+                  выбрано {parsedData.selectedRows} юнитов из {parsedData.totalRows}
                 </div>
 
                 {/* ── Рассылка по группам ── */}
