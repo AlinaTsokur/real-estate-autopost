@@ -23,7 +23,7 @@ const navItems = [
   { href: '/drive-audit', label: 'Аудит Drive', icon: '📂' },
   { href: '/wa-monitor', label: 'WA Монитор', icon: '📌' },
   { href: '/plan-crop', label: 'Кадр планировок', icon: '🖼️' },
-  { href: '/project-emoji', label: 'Смайлики проектов', icon: '🎨' },
+  { href: '/project-emoji', label: 'Проекты', icon: '🎨' },
   { href: '/no-posts', label: 'Юниты без постов', icon: '📝' },
   { href: '/broker-check', label: 'Сверка брокеров', icon: '🤝' },
 ];

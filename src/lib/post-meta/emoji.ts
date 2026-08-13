@@ -10,22 +10,103 @@ export interface ProjectMeta {
   projectName: string;
   emoji: string;
   island: string;
+  photosFolderUrl: string; // папка Drive с фотографиями проекта
 }
 
+const toMeta = (r: any): ProjectMeta => ({
+  projectId: r.project_id,
+  projectName: r.project_name || '',
+  emoji: r.emoji || '',
+  island: r.island || '',
+  photosFolderUrl: r.photos_folder_url || '',
+});
+
 export async function getProjectMeta(projectId: string): Promise<ProjectMeta | null> {
+  await ensureFolderColumn();
   const rows = (await sql`
-    SELECT project_id, project_name, emoji, island FROM project_emoji WHERE project_id = ${projectId}
+    SELECT project_id, project_name, emoji, island, photos_folder_url
+    FROM project_emoji WHERE project_id = ${projectId}
   `) as any[];
-  if (!rows.length) return null;
-  const r = rows[0];
-  return { projectId: r.project_id, projectName: r.project_name || '', emoji: r.emoji || '', island: r.island || '' };
+  return rows.length ? toMeta(rows[0]) : null;
 }
 
 export async function listProjectMeta(): Promise<ProjectMeta[]> {
+  await ensureArchivedColumn();
+  await ensureFolderColumn();
   const rows = (await sql`
-    SELECT project_id, project_name, emoji, island FROM project_emoji ORDER BY project_name
+    SELECT project_id, project_name, emoji, island, photos_folder_url
+    FROM project_emoji WHERE archived_at IS NULL ORDER BY project_name
   `) as any[];
-  return rows.map(r => ({ projectId: r.project_id, projectName: r.project_name || '', emoji: r.emoji || '', island: r.island || '' }));
+  return rows.map(toMeta);
+}
+
+/** Папка с фото по имени проекта. Имя приходит из поста, поэтому сверяем нестрого. */
+export async function getPhotosFolderUrl(projectName: string): Promise<string> {
+  await ensureFolderColumn();
+  const key = projectName.trim().toLowerCase().replace(/\s+/g, ' ');
+  const rows = (await sql`
+    SELECT photos_folder_url FROM project_emoji
+    WHERE lower(regexp_replace(trim(project_name), '\\s+', ' ', 'g')) = ${key}
+      AND coalesce(photos_folder_url, '') <> ''
+    LIMIT 1
+  `) as any[];
+  if (rows[0]?.photos_folder_url) return rows[0].photos_folder_url;
+
+  // Названия по корпусам («The Source II») проектов в базе не имеют — они живут
+  // отдельной таблицей псевдонимов, перенесённой из листа PROJECT_MEDIA.
+  const alias = (await sql`
+    SELECT folder_url FROM project_media_alias WHERE name_key = ${key} AND coalesce(folder_url, '') <> ''
+  `) as any[];
+  return alias[0]?.folder_url || '';
+}
+
+export async function setPhotosFolderUrl(projectId: string, url: string) {
+  await ensureFolderColumn();
+  await sql`
+    UPDATE project_emoji SET photos_folder_url = ${url || null}, updated_at = now()
+    WHERE project_id = ${projectId}
+  `;
+}
+
+/* ── Псевдонимы: названия из старого листа, которым нет проекта в базе ── */
+
+export interface MediaAlias {
+  nameKey: string;
+  name: string;
+  folderUrl: string;
+}
+
+export async function ensureAliasTable() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS project_media_alias (
+      name_key   text PRIMARY KEY,
+      name       text NOT NULL,
+      folder_url text,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+}
+
+export async function listMediaAliases(): Promise<MediaAlias[]> {
+  await ensureAliasTable();
+  const rows = (await sql`SELECT name_key, name, folder_url FROM project_media_alias ORDER BY name`) as any[];
+  return rows.map(r => ({ nameKey: r.name_key, name: r.name, folderUrl: r.folder_url || '' }));
+}
+
+export async function saveMediaAlias(name: string, folderUrl: string) {
+  await ensureAliasTable();
+  const key = name.trim().toLowerCase().replace(/\s+/g, ' ');
+  await sql`
+    INSERT INTO project_media_alias (name_key, name, folder_url)
+    VALUES (${key}, ${name.trim()}, ${folderUrl || null})
+    ON CONFLICT (name_key) DO UPDATE
+      SET name = EXCLUDED.name, folder_url = EXCLUDED.folder_url, updated_at = now()
+  `;
+}
+
+export async function deleteMediaAlias(nameKey: string) {
+  await ensureAliasTable();
+  await sql`DELETE FROM project_media_alias WHERE name_key = ${nameKey}`;
 }
 
 export async function setProjectEmoji(projectId: string, projectName: string, emoji: string) {
@@ -39,6 +120,12 @@ export async function setProjectEmoji(projectId: string, projectName: string, em
 /** Проекты, которые ушли из источника, помечаются датой — строку со смайликом не удаляем. */
 async function ensureArchivedColumn() {
   await sql`ALTER TABLE project_emoji ADD COLUMN IF NOT EXISTS archived_at timestamptz`;
+}
+
+// Ссылка на папку Drive с фотографиями проекта. Раньше лежала в листе
+// PROJECT_MEDIA гугл-таблицы, теперь здесь — рядом со смайликом.
+async function ensureFolderColumn() {
+  await sql`ALTER TABLE project_emoji ADD COLUMN IF NOT EXISTS photos_folder_url text`;
 }
 
 // Названия активных проектов — из НАШЕЙ базы. Её наполняет ночная синхронизация,

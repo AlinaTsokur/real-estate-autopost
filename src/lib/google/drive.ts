@@ -1,47 +1,25 @@
 import { google } from 'googleapis';
-import { getGoogleSheetsClient } from './sheets';
-import { normalizeText } from '../posts/formatters';
 import { getGoogleAuthClient } from './auth';
+import { getPhotosFolderUrl } from '../post-meta/emoji';
 
 export async function getGoogleDriveClient() {
   const auth = await getGoogleAuthClient();
   return google.drive({ version: 'v3', auth });
 }
 
+/** ID папки Drive с фотографиями проекта. Ссылка живёт в нашей базе
+    (страница «Проекты»), раньше лежала в листе PROJECT_MEDIA. */
 export async function getProjectPhotoFolderId(projectName: string): Promise<string> {
-  const sheets = await getGoogleSheetsClient();
-  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID;
-  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_CONFIG_ID not configured');
-
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: 'PROJECT_MEDIA',
-  });
-
-  const data = response.data.values || [];
-  if (data.length < 2) throw new Error('PROJECT_MEDIA sheet is empty');
-
-  const headers = data[0].map(h => String(h).trim());
-  const projectCol = headers.indexOf('Project Name');
-  const folderCol = headers.indexOf('Photos Folder URL');
-
-  if (projectCol === -1 || folderCol === -1) {
-    throw new Error('PROJECT_MEDIA missing required columns');
+  const url = await getPhotosFolderUrl(projectName);
+  if (!url) {
+    throw new Error(
+      `Не задана папка с фото для проекта «${projectName}» — добавьте ссылку на странице «Проекты»`,
+    );
   }
 
-  const target = normalizeText(projectName);
-  for (let i = 1; i < data.length; i++) {
-    if (normalizeText(data[i][projectCol]) === target) {
-      const url = String(data[i][folderCol] || '').trim();
-      if (!url) throw new Error(`Photos Folder URL is empty for project ${projectName}`);
-      
-      const match = url.match(/\/folders\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-      if (match) return match[1];
-      throw new Error(`Could not parse Folder ID from URL: ${url}`);
-    }
-  }
-
-  throw new Error(`Project ${projectName} not found in PROJECT_MEDIA`);
+  const match = url.match(/\/folders\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (!match) throw new Error(`Не разобрать ID папки из ссылки: ${url}`);
+  return match[1];
 }
 
 export async function getDriveImageUrls(folderId: string, limit = 5): Promise<string[]> {
