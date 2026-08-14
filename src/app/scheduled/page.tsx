@@ -57,7 +57,9 @@ export default function ScheduledPage() {
     setConfig(data.config);
     setItems(data.items || []);
     setState(data.state || 'unknown');
-    setChatId(data.config?.wa_chatid || '37257957905@c.us');
+    // Без запасного значения: раньше сюда подставлялся личный номер, и при
+    // пустой настройке рассылка ушла бы человеку, а не в рабочую группу.
+    setChatId(data.config?.wa_chatid || '');
   };
 
   const refreshState = async () => {
@@ -221,7 +223,7 @@ export default function ScheduledPage() {
             type="text"
             value={chatId}
             onChange={e => setChatId(e.target.value)}
-            placeholder="37257957905@c.us или 120363...@g.us"
+            placeholder="120363...@g.us для группы или номер@c.us для личного чата"
             className="flex-1 px-3 py-2 bb-surface-soft border bb-edge rounded-xl text-sm bb-ink outline-none focus:ring-2 focus:bb-ring font-mono"
           />
           <button

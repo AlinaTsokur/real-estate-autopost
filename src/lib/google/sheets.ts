@@ -475,7 +475,9 @@ async function ensureWaQueueSheet(sheets: Awaited<ReturnType<typeof getGoogleShe
       requestBody: { requests: [{ addSheet: { properties: { title: WA_QUEUE_SHEET } } }] },
     });
     const headers = ['id', 'created_at', 'label', 'wa_text', 'drive_file_id', 'scheduled_at', 'status', '', 'cfg_wa_chatid'];
-    const configRow = ['CONFIG', '', '', '', '', '', '', '', '37257957905@c.us'];
+    // Chat ID пустой намеренно: его задают на странице «Расписание WA».
+    // Раньше здесь стоял личный номер, и свежесозданный лист слал бы рассылку ему.
+    const configRow = ['CONFIG', '', '', '', '', '', '', '', ''];
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${WA_QUEUE_SHEET}!A1`,
