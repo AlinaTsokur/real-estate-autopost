@@ -141,7 +141,6 @@ export default function CatalogPage() {
   const [projectSearch, setProjectSearch] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [project, setProject] = useState('');
-  const [rawText, setRawText] = useState('');
 
   // Step: 'input' → 'preview' → 'saved'
   const [step, setStep] = useState<'input' | 'preview' | 'saved'>('input');
@@ -157,10 +156,11 @@ export default function CatalogPage() {
   const [itemsLoading, setItemsLoading] = useState(false);
   const [manageCovers, setManageCovers] = useState<Record<string, string>>({});
 
+  // Проекты из нашей базы — те же, что в трекере «Рассылок».
   useEffect(() => {
-    fetch('/api/projects')
+    fetch('/api/project-emoji?names=1')
       .then(r => r.json())
-      .then(d => { if (d.projects?.length) setProjects(d.projects); })
+      .then(d => { if (d.names?.length) setProjects(d.names); })
       .catch(() => {})
       .finally(() => setProjectsLoading(false));
   }, []);
@@ -185,14 +185,14 @@ export default function CatalogPage() {
   }, [tab, loadItems]);
 
   const handleParse = async () => {
-    if (!project || !rawText) return;
+    if (!project) return;
     setParsing(true);
     setError('');
     try {
-      const res = await fetch('/api/catalog-parse', {
+      const res = await fetch('/api/catalog-from-db', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawText, projectName: project }),
+        body: JSON.stringify({ projectName: project }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -218,7 +218,6 @@ export default function CatalogPage() {
       if (data.error) throw new Error(data.error);
       setSavedRows(previewRows);
       setStep('saved');
-      setRawText('');
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -291,20 +290,17 @@ export default function CatalogPage() {
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium bb-ink-2 mb-2">Paste Full Table (TSV)</label>
-                  <textarea rows={8} value={rawText} onChange={e => setRawText(e.target.value)}
-                    className="w-full px-4 py-3 bb-surface-soft border bb-edge rounded-xl focus:ring-2 focus:bb-ring focus:bb-edge outline-none transition-all bb-ink bb-ph font-mono text-sm"
-                    placeholder="Paste table data here (all unit types at once)..." />
-                </div>
+                <p className="text-xs bb-ink-3">
+                  Юниты берутся из базы: по каждому типу — самый дешёвый доступный.
+                </p>
 
                 {error && (
                   <div className="px-4 py-3 bb-tint-bad border bb-edge rounded-xl bb-bad text-sm">{error}</div>
                 )}
 
-                <button onClick={handleParse} disabled={parsing || !project || !rawText}
+                <button onClick={handleParse} disabled={parsing || !project}
                   className="w-full bb-fill-accent hover: hover: bb-ink font-medium py-3 px-6 rounded-xl transition-all shadow-lg bb-lift active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none">
-                  {parsing ? 'Parsing...' : 'Parse →'}
+                  {parsing ? 'Собираю…' : 'Собрать из базы →'}
                 </button>
               </div>
             </div>
