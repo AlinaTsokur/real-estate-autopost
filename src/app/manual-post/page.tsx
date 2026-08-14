@@ -5,6 +5,12 @@ import { useSearchParams } from 'next/navigation';
 import Segmented from '@/components/Segmented';
 
 // useSearchParams в пререндеренной странице требует Suspense-границы (Next 16).
+// Варианты для поля «Floor». Раньше читались из колонки F листа CONFIG —
+// ради четырёх неизменных слов приложение ходило в таблицу на каждой загрузке.
+// Регистр как в базе: там «Low floor», а в таблице было «Low Floor», из-за чего
+// в списке появлялись оба варианта.
+const FLOOR_OPTIONS = ['Ground floor', 'Low floor', 'Middle floor', 'High floor'];
+
 export default function ManualPostPage() {
   return (
     <Suspense fallback={null}>
@@ -15,7 +21,6 @@ export default function ManualPostPage() {
 
 function ManualPostForm() {
   const searchParams = useSearchParams();
-  const [floors, setFloors] = useState<string[]>([]);
   const [project, setProject] = useState('');
   const [postType, setPostType] = useState('NEW');
   const [parsedData, setParsedData] = useState<any>(null);
@@ -139,14 +144,6 @@ function ManualPostForm() {
   };
 
 
-  // Список этажей для поля «Floor» — единственное, что осталось нужным из
-  // справочников таблицы после отказа от вставки текста.
-  useEffect(() => {
-    fetch('/api/projects')
-      .then(res => res.json())
-      .then(data => { if (data.floors?.length) setFloors(data.floors); })
-      .catch(err => console.error('Failed to load floors:', err));
-  }, []);
 
   // Live preview update
   useEffect(() => {
@@ -623,7 +620,7 @@ function ManualPostForm() {
                   {!isVilla && (
                     <div>
                       <label className="block text-xs bb-ink-3 mb-1">Floor</label>
-                      {floors.length > 0 ? (
+                      {FLOOR_OPTIONS.length > 0 ? (
                         <select
                           value={parsedData.floor || ''}
                           onChange={(e) => updateField('floor', e.target.value)}
@@ -631,10 +628,10 @@ function ManualPostForm() {
                         >
                           <option value="">Select floor...</option>
                           {/* value from the DB may not be in the sheet list — keep it selectable */}
-                          {parsedData.floor && !floors.includes(parsedData.floor) && (
+                          {parsedData.floor && !FLOOR_OPTIONS.includes(parsedData.floor) && (
                             <option value={parsedData.floor}>{parsedData.floor}</option>
                           )}
-                          {floors.map((f, idx) => (
+                          {FLOOR_OPTIONS.map((f, idx) => (
                             <option key={idx} value={f}>{f}</option>
                           ))}
                         </select>

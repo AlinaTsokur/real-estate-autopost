@@ -258,7 +258,7 @@ export default function CatalogPage() {
 
           {/* STEP 1: Input */}
           {step === 'input' && (
-            <div className="p-6 rounded-2xl bb-surface border bb-edge relative overflow-hidden max-w-2xl">
+            <div className="p-6 rounded-2xl bb-surface border bb-edge relative max-w-2xl">
               <div className="space-y-6">
                 <div className="relative">
                   <label className="block text-sm font-medium bb-ink-2 mb-2">Project Name</label>
