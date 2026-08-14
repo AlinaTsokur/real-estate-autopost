@@ -3,9 +3,9 @@ import {
   getWaQueue,
   updateWaQueueItemSchedule,
   updateWaQueueConfig,
-  deleteWaQueueRow,
-  deleteWaQueueRows,
-} from '@/lib/google/sheets';
+  deleteWaQueueItemById,
+  deleteWaQueueItems,
+} from '@/lib/wa-queue/store';
 import { dispatchWaItem } from '@/lib/whatsapp/dispatch';
 import { getInstanceState } from '@/lib/whatsapp/green-api';
 
@@ -29,18 +29,18 @@ export async function POST(req: Request) {
 
     // Set/clear a per-post scheduled time
     if (body.action === 'schedule') {
-      const { rowIndex, scheduledAt } = body as { rowIndex: number; scheduledAt: string };
-      await updateWaQueueItemSchedule(rowIndex, scheduledAt || '');
+      const { id, scheduledAt } = body as { id: string; scheduledAt: string };
+      await updateWaQueueItemSchedule(id, scheduledAt || '');
       return NextResponse.json({ ok: true });
     }
 
     // Manually send one post right now, then remove it from the queue
     if (body.action === 'send-one') {
-      const { rowIndex } = body as { rowIndex: number };
+      const { id } = body as { id: string };
       const { config, items } = await getWaQueue();
       if (!config.wa_chatid) return NextResponse.json({ error: 'Chat ID не настроен' }, { status: 400 });
 
-      const item = items.find(i => i.rowIndex === rowIndex);
+      const item = items.find(i => i.id === id);
       if (!item) return NextResponse.json({ error: 'Пост не найден' }, { status: 404 });
 
       const state = await getInstanceState().catch(() => 'unknown');
@@ -54,29 +54,29 @@ export async function POST(req: Request) {
         const detail = e?.response?.data ? JSON.stringify(e.response.data) : e.message;
         return NextResponse.json({ error: detail }, { status: 500 });
       }
-      await deleteWaQueueRow(rowIndex);
+      await deleteWaQueueItemById(id);
       return NextResponse.json({ ok: true });
     }
 
     // Delete a post from the queue without sending
     if (body.action === 'delete') {
-      const { rowIndex } = body as { rowIndex: number };
-      await deleteWaQueueRow(rowIndex);
+      const { id } = body as { id: string };
+      await deleteWaQueueItemById(id);
       return NextResponse.json({ ok: true });
     }
 
-    // Clear the whole queue (delete every post, keep the CONFIG row).
-    // Delete highest rowIndex first so earlier deletions don't shift the rest.
+    // Clear the whole queue. Настройка чата лежит отдельной таблицей, так что
+    // чистка очереди её не задевает.
     if (body.action === 'clear-all') {
       const { items } = await getWaQueue();
-      const cleared = await deleteWaQueueRows(items.map(i => i.rowIndex));
+      const cleared = await deleteWaQueueItems(items.map(i => i.id));
       return NextResponse.json({ ok: true, cleared });
     }
 
     // Save the WhatsApp chat id
     if (body.action === 'config') {
-      const { configRowIndex, waChatId } = body as { configRowIndex: number; waChatId: string };
-      await updateWaQueueConfig(configRowIndex, waChatId);
+      const { waChatId } = body as { waChatId: string };
+      await updateWaQueueConfig(waChatId);
       return NextResponse.json({ ok: true });
     }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { addWaQueueItem } from '@/lib/google/sheets';
+import { addWaQueueItem } from '@/lib/wa-queue/store';
 
 const INTERVAL_MINUTES = 2;
 

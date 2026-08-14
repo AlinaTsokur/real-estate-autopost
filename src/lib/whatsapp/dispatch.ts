@@ -1,4 +1,4 @@
-import { WaQueueItem } from '../google/sheets';
+import { WaQueueItem } from '../wa-queue/store';
 import { downloadFromDrive } from '../google/drive';
 import { sendWhatsAppImage, sendWhatsAppText } from './green-api';
 

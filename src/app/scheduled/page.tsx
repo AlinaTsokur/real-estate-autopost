@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 
 interface WaItem {
-  rowIndex: number;
   id: string;
   created_at: string;
   label: string;
@@ -15,12 +14,11 @@ interface WaItem {
 
 interface WaConfig {
   wa_chatid: string;
-  configRowIndex: number;
 }
 
 export default function ScheduledPage() {
   const [items, setItems] = useState<WaItem[]>([]);
-  const [config, setConfig] = useState<WaConfig>({ wa_chatid: '', configRowIndex: -1 });
+  const [config, setConfig] = useState<WaConfig>({ wa_chatid: '' });
   const [loading, setLoading] = useState(true);
   const [savingConfig, setSavingConfig] = useState(false);
   const [chatId, setChatId] = useState('');
@@ -99,7 +97,7 @@ export default function ScheduledPage() {
     await fetch('/api/wa-schedule', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'schedule', rowIndex: item.rowIndex, scheduledAt }),
+      body: JSON.stringify({ action: 'schedule', id: item.id, scheduledAt }),
     });
   };
 
@@ -107,7 +105,7 @@ export default function ScheduledPage() {
     setConfirmSendId(null);
     setBusyId(item.id);
     try {
-      await postAction({ action: 'send-one', rowIndex: item.rowIndex });
+      await postAction({ action: 'send-one', id: item.id });
       await load();
     } catch (e: any) {
       setErrorMsg('Ошибка отправки: ' + e.message);
@@ -138,7 +136,7 @@ export default function ScheduledPage() {
   const deleteOne = async (item: WaItem) => {
     setBusyId(item.id);
     try {
-      await postAction({ action: 'delete', rowIndex: item.rowIndex });
+      await postAction({ action: 'delete', id: item.id });
       await load();
     } catch (e: any) {
       setErrorMsg('Ошибка удаления: ' + e.message);
@@ -153,7 +151,7 @@ export default function ScheduledPage() {
     setSavingConfig(true);
     setConfigMsg(null);
     try {
-      await postAction({ action: 'config', configRowIndex: config.configRowIndex, waChatId: chatId.trim() });
+      await postAction({ action: 'config', waChatId: chatId.trim() });
       setConfig(prev => ({ ...prev, wa_chatid: chatId.trim() }));
       setConfigMsg({ ok: true, text: 'Сохранено' });
     } catch (e: any) {

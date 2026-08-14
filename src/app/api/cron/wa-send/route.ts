@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getWaQueue, deleteWaQueueRow } from '@/lib/google/sheets';
+import { getWaQueue, deleteWaQueueItemById } from '@/lib/wa-queue/store';
 import { dispatchWaItem, isDue } from '@/lib/whatsapp/dispatch';
 import { getInstanceState } from '@/lib/whatsapp/green-api';
 
@@ -25,10 +25,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, skipped: `state=${state}` });
   }
 
-  // Highest rowIndex first so deletions don't shift the rows we still need.
-  const due = items
-    .filter(i => i.status === 'WAITING' && i.scheduled_at && isDue(i.scheduled_at))
-    .sort((a, b) => b.rowIndex - a.rowIndex);
+  // Порядок больше не важен: у записи постоянный id, удаление соседа её не сдвигает.
+  const due = items.filter(i => i.status === 'WAITING' && i.scheduled_at && isDue(i.scheduled_at));
 
   const results: { label: string; ok?: boolean; error?: string }[] = [];
 
@@ -36,7 +34,7 @@ export async function GET(req: Request) {
     try {
       const chatId = item.item_chatid || config.wa_chatid;
       await dispatchWaItem(item, chatId);
-      await deleteWaQueueRow(item.rowIndex);
+      await deleteWaQueueItemById(item.id);
       results.push({ label: item.label, ok: true });
     } catch (e: any) {
       results.push({ label: item.label, error: e?.response?.data ? JSON.stringify(e.response.data) : e.message });

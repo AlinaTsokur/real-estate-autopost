@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { approveUnitRow, getWaQueue, deleteWaQueueItemById, WaQueueItem } from '@/lib/google/sheets';
+import { approveUnitRow } from '@/lib/google/sheets';
+import { getWaQueue, deleteWaQueueItemById, WaQueueItem } from '@/lib/wa-queue/store';
 import { getBot } from '@/lib/telegram/bot';
 import { dispatchWaItem } from '@/lib/whatsapp/dispatch';
 import { getInstanceState } from '@/lib/whatsapp/green-api';

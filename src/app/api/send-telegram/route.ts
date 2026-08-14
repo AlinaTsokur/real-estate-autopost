@@ -5,7 +5,8 @@ import { getBot, sendMediaGroupWithCaption, sendTextMessage, sendPlainTextMessag
 // to Sheets. 60 с не хватало — отправка падала с 504 (Task timed out).
 export const maxDuration = 300;
 import { getDriveImages, getProjectPhotoFolderId, uploadToWaQueue, compressImageBuffer } from '@/lib/google/drive';
-import { getConfig2, addWaQueueItem } from '@/lib/google/sheets';
+import { getConfig2 } from '@/lib/google/sheets';
+import { addWaQueueItem } from '@/lib/wa-queue/store';
 import { buildTelegramHtmlPost, buildWhatsAppMarkdown, PostData } from '@/lib/posts/templates';
 import { validatePostData } from '@/lib/posts/validators';
 
