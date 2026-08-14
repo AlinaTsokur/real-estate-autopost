@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
       `⚠️ <b>Истекает пермит сегодня</b>\n\n` +
       `Юнит: <b>${unit}</b>\n` +
       `Код: <b>${code}</b>\n\n` +
-      `@dariaksn @alina_tskr`;
+      `@dariaksn`;
 
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
