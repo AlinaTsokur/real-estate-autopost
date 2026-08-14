@@ -33,7 +33,7 @@ export interface PostData {
   slideName?: string;
   oldPostUrl?: string;
   // Optional header overrides used by DB-sourced posts. When absent, the
-  // builders fall back to остров/смайлик из базы, как раньше — из листа CONFIG2.
+  // builders берут остров и смайлик проекта из базы.
   island?: string;
   emoji?: string;
 }
@@ -66,7 +66,7 @@ export async function buildWhatsAppMarkdown(data: any) {
 
 async function buildApartmentPostText(data: any) {
   const cfg = await getProjectConfig(data.project);
-  // DB-sourced posts carry their own island/emoji; use them over CONFIG2 when present.
+  // У юнита из базы остров и смайлик уже свои — они точнее общих по проекту.
   if (data.island) cfg.island = data.island;
   if (data.emoji) cfg.emoji = data.emoji;
 
@@ -121,7 +121,7 @@ function buildVillaAreaLine(data: any, esc: (v: string) => string): string {
 
 async function buildVillaPostText(data: any) {
   const cfg = await getProjectConfig(data.project);
-  // DB-sourced posts carry their own island/emoji; use them over CONFIG2 when present.
+  // У юнита из базы остров и смайлик уже свои — они точнее общих по проекту.
   if (data.island) cfg.island = data.island;
   if (data.emoji) cfg.emoji = data.emoji;
 
@@ -198,7 +198,7 @@ function buildReducedPriceText(data: any, cfg: any) {
 
 async function buildApartmentWhatsAppPostText(data: any) {
   const cfg = await getProjectConfig(data.project);
-  // DB-sourced posts carry their own island/emoji; use them over CONFIG2 when present.
+  // У юнита из базы остров и смайлик уже свои — они точнее общих по проекту.
   if (data.island) cfg.island = data.island;
   if (data.emoji) cfg.emoji = data.emoji;
   const title = getPostTitle(data.postType);
@@ -239,7 +239,7 @@ async function buildApartmentWhatsAppPostText(data: any) {
 
 async function buildVillaWhatsAppPostText(data: any) {
   const cfg = await getProjectConfig(data.project);
-  // DB-sourced posts carry their own island/emoji; use them over CONFIG2 when present.
+  // У юнита из базы остров и смайлик уже свои — они точнее общих по проекту.
   if (data.island) cfg.island = data.island;
   if (data.emoji) cfg.emoji = data.emoji;
   const title = getPostTitle(data.postType);

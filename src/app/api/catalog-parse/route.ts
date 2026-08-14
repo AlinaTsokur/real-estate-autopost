@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getProjectParseConfig, getConfig2Handover, getCatalogRows } from '@/lib/google/sheets';
-import { getProjectConfig } from '@/lib/post-meta/project-config';
+import { getProjectParseConfig, getCatalogRows } from '@/lib/google/sheets';
+import { getProjectConfig, getHandoverByCode } from '@/lib/post-meta/project-config';
 import { parseTsvWithQuotedMultiline, isEmptyRow, isHeaderRow, selectLowestByExactType } from '@/lib/parsing/table-parser';
 import { parseRowByFormat } from '@/lib/parsing/row-parser';
 import { toNumber, extractLeadingNumberText, formatArea2, formatNumberLikeSheet, formatUnitLabel, formatHandoverDate } from '@/lib/posts/formatters';
@@ -129,15 +129,12 @@ export async function POST(request: Request) {
 
     const selected = selectLowestByExactType(parsedRows);
 
-    // Fetch handover from CONFIG2 for each selected row
+    // Дата сдачи здания — из базы, если в строке её нет
     const withHandover = await Promise.all(selected.map(async (item) => {
       let handover = String(item.handover || '').trim();
-      if (!handover) {
-        const codePrefix = String(item.code || '').replace(/\D/g, '').slice(0, 4);
-        if (codePrefix) {
-          const h = await getConfig2Handover(projectName, codePrefix);
-          handover = h.value ? formatHandoverDate(h.value) : '';
-        }
+      if (!handover && item.code) {
+        const h = await getHandoverByCode(projectName, String(item.code));
+        handover = h.value ? formatHandoverDate(h.value) : '';
       }
       return { ...item, handover };
     }));

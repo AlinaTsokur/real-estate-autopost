@@ -1,4 +1,5 @@
-import { getProjectParseConfig, getConfig2Handover, findApproxRentalRateForObject } from '../google/sheets';
+import { getProjectParseConfig, findApproxRentalRateForObject } from '../google/sheets';
+import { getHandoverByCode } from '../post-meta/project-config';
 import { normalizeText, extractLeadingNumberText, formatHandoverDate } from '../posts/formatters';
 
 export function splitPastedRow(raw: string): string[] {
@@ -234,9 +235,9 @@ export async function getAutoHandoverForPostBuilder(projectName: string, code: s
     return 'Ready to move';
   }
 
-  // Use CONFIG2 handover prefix logic (already have getConfig2Handover from Catalog Builder logic)
-  const codePrefix = String(code).replace(/\D/g, '').slice(0, 4);
-  const result = await getConfig2Handover(projectName, codePrefix);
+  // Дата сдачи здания — из базы. Код передаём целиком: он разбирается и в
+  // старом формате из таблицы, и в нынешнем из базы.
+  const result = await getHandoverByCode(projectName, String(code));
 
   if (!result || !result.value) {
     return '';

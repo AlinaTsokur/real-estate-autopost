@@ -46,55 +46,6 @@ export async function getProjectParseConfig(projectName: string) {
   return { objectType: 'Apartment', parseFormat: 'APART_STANDARD' };
 }
 
-export async function getConfig2Handover(projectName: string, codePrefix: string) {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID || '';
-  const data = await getSheetData(spreadsheetId, 'CONFIG2');
-  if (data.length < 2) return { value: '', warning: 'CONFIG2 is empty' };
-
-  const headers = data[0].map(h => normalizeText(String(h).trim()));
-  const projectCol = headers.findIndex(h => h === normalizeText('Project Name') || h === normalizeText('Проект'));
-  const prefixCol = headers.findIndex(h => h === normalizeText('Code Prefix') || h === normalizeText('Код префикс'));
-  const handoverCol = headers.findIndex(h => h === normalizeText('Handover Date') || h === normalizeText('Дата сдачи'));
-
-  if (projectCol === -1 || prefixCol === -1 || handoverCol === -1) {
-    return { value: '', warning: 'Required columns missing in CONFIG2' };
-  }
-
-  const targetProject = normalizeText(projectName);
-
-  // 1. Exact match
-  let foundEmptyMatch = false;
-  for (let i = 1; i < data.length; i++) {
-    const rowProject = normalizeText(data[i][projectCol]);
-    const rowPrefix = String(data[i][prefixCol]).replace(/\D/g, '').slice(0, 4);
-
-    if (rowProject === targetProject && rowPrefix === codePrefix) {
-      const value = String(data[i][handoverCol] || '').trim();
-      if (value) {
-        return { value, warning: '' };
-      }
-      foundEmptyMatch = true;
-    }
-  }
-
-  // 2. Prefix only match
-  for (let i = 1; i < data.length; i++) {
-    const rowPrefix = String(data[i][prefixCol]).replace(/\D/g, '').slice(0, 4);
-    if (rowPrefix === codePrefix) {
-      const value = String(data[i][handoverCol] || '').trim();
-      if (value) {
-        return { value, warning: '' };
-      }
-    }
-  }
-
-  if (foundEmptyMatch) {
-    return { value: '', warning: 'Handover empty for prefix ' + codePrefix };
-  }
-
-  return { value: '', warning: 'Handover not found in CONFIG2 for prefix ' + codePrefix };
-}
-
 export async function findApproxRentalRateForObject(projectName: string, code: string, unit: string) {
   const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
   if (!spreadsheetId) return '';
