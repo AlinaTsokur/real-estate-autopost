@@ -46,32 +46,6 @@ export async function getProjectParseConfig(projectName: string) {
   return { objectType: 'Apartment', parseFormat: 'APART_STANDARD' };
 }
 
-export async function getConfig2(projectName: string) {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID || '';
-  const data = await getSheetData(spreadsheetId, 'CONFIG2');
-  if (data.length < 2) return { island: '', emoji: '' };
-
-  const headers = data[0].map(h => normalizeText(String(h).trim()));
-  const projectCol = headers.findIndex(h => h === normalizeText('Project Name') || h === normalizeText('Проект'));
-  const islandCol = headers.findIndex(h => h === normalizeText('Island') || h === normalizeText('Остров'));
-  const emojiCol = headers.findIndex(h => h === normalizeText('Emoji') || h === normalizeText('Эмоджи'));
-
-  if (projectCol === -1) return { island: '', emoji: '' };
-
-  const target = normalizeText(projectName);
-
-  for (let i = 1; i < data.length; i++) {
-    if (normalizeText(data[i][projectCol]) === target) {
-      return {
-        island: islandCol !== -1 ? String(data[i][islandCol] || '').trim() : '',
-        emoji: emojiCol !== -1 ? String(data[i][emojiCol] || '').trim() : '',
-      };
-    }
-  }
-
-  return { island: '', emoji: '' };
-}
-
 export async function getConfig2Handover(projectName: string, codePrefix: string) {
   const spreadsheetId = process.env.GOOGLE_SHEETS_CONFIG_ID || '';
   const data = await getSheetData(spreadsheetId, 'CONFIG2');

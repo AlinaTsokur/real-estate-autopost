@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getProjectParseConfig, getConfig2, getConfig2Handover, getCatalogRows } from '@/lib/google/sheets';
+import { getProjectParseConfig, getConfig2Handover, getCatalogRows } from '@/lib/google/sheets';
+import { getProjectConfig } from '@/lib/post-meta/project-config';
 import { parseTsvWithQuotedMultiline, isEmptyRow, isHeaderRow, selectLowestByExactType } from '@/lib/parsing/table-parser';
 import { parseRowByFormat } from '@/lib/parsing/row-parser';
 import { toNumber, extractLeadingNumberText, formatArea2, formatNumberLikeSheet, formatUnitLabel, formatHandoverDate } from '@/lib/posts/formatters';
@@ -79,7 +80,7 @@ export async function POST(request: Request) {
 
     const [config, cfg2, existingCatalog] = await Promise.all([
       getProjectParseConfig(projectName),
-      getConfig2(projectName),
+      getProjectConfig(projectName),
       getCatalogRows().catch(() => [] as Record<string, string>[]),
     ]);
 
