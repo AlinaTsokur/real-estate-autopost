@@ -15,19 +15,13 @@ export default function ManualPostPage() {
 
 function ManualPostForm() {
   const searchParams = useSearchParams();
-  const [projects, setProjects] = useState<string[]>([]);
   const [floors, setFloors] = useState<string[]>([]);
   const [project, setProject] = useState('');
   const [postType, setPostType] = useState('NEW');
-  const [rawText, setRawText] = useState('');
   const [parsedData, setParsedData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
-  const [projectsLoading, setProjectsLoading] = useState(true);
   const [postPreview, setPostPreview] = useState('');
 
-  const [projectSearch, setProjectSearch] = useState('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const [searchingOldPrice, setSearchingOldPrice] = useState(false);
   const [oldPostsResult, setOldPostsResult] = useState<any>(null);
@@ -45,7 +39,7 @@ function ManualPostForm() {
   const [showWaSource, setShowWaSource] = useState(false);
 
   // ── source: paste (Sheets), db (Neon), c3 (C3 autopost from Sheets+Drive) ──
-  const [source, setSource] = useState<'paste' | 'db' | 'c3'>('paste');
+  const [source, setSource] = useState<'db' | 'c3'>('db');
   const [c3Units, setC3Units] = useState<string[]>([]);
   const [c3Unit, setC3Unit] = useState('');
   const [c3Loading, setC3Loading] = useState(false);
@@ -145,26 +139,14 @@ function ManualPostForm() {
   };
 
 
-  // Fetch projects and floors from Google Sheets on page load
+  // Список этажей для поля «Floor» — единственное, что осталось нужным из
+  // справочников таблицы после отказа от вставки текста.
   useEffect(() => {
     fetch('/api/projects')
       .then(res => res.json())
-      .then(data => {
-        if (data.projects && data.projects.length > 0) {
-          setProjects(data.projects);
-        }
-        if (data.floors && data.floors.length > 0) {
-          setFloors(data.floors);
-        }
-      })
-      .catch(err => console.error('Failed to load metadata:', err))
-      .finally(() => setProjectsLoading(false));
+      .then(data => { if (data.floors?.length) setFloors(data.floors); })
+      .catch(err => console.error('Failed to load floors:', err));
   }, []);
-
-  // Filter projects based on search
-  const filteredProjects = projects.filter(p => 
-    p.toLowerCase().includes(projectSearch.toLowerCase())
-  );
 
   // Live preview update
   useEffect(() => {
@@ -194,26 +176,6 @@ function ManualPostForm() {
     return () => clearTimeout(debounce);
   }, [parsedData, postType, project, editedByUser]);
 
-  const handleParse = async () => {
-    if (!project || !rawText) return alert('Select project and paste text');
-    setLoading(true);
-    setEditedByUser(false); // new post → let the preview re-seed the editable fields
-    try {
-      const res = await fetch('/api/parse-row', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawText, projectName: project })
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setParsedData(data.parsed);
-    } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSend = async () => {
     if (!parsedData) return;
     setSending(true);
@@ -230,12 +192,10 @@ function ManualPostForm() {
       if (data.messageIds?.length) {
         setSentPost({ messageIds: data.messageIds, chatId: data.chatId });
       }
-      setRawText('');
       setParsedData(null);
       setPostPreview('');
       setOldPostsResult(null);
       setProject('');
-      setProjectSearch('');
     } catch (e: any) {
       alert(e.message);
     } finally {
@@ -316,22 +276,11 @@ function ManualPostForm() {
     }
   };
 
-  const convertRuToEn = (str: string) => {
-    const ru = 'йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,';
-    const en = 'qwertyuiop[]asdfghjkl;\'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL:"ZXCVBNM<>?';
-    let res = '';
-    for (let i = 0; i < str.length; i++) {
-      const idx = ru.indexOf(str[i]);
-      res += idx !== -1 ? en[idx] : str[i];
-    }
-    return res;
-  };
-
   return (
     <div className="max-w-6xl mx-auto w-full">
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight mb-2" style={{ color: 'var(--ink-900)' }}>Посты</h1>
-        <p className="bb-ink-3">Разбери строку из таблицы и собери из неё пост.</p>
+        <p className="bb-ink-3">Возьми юнит из базы или из C3 — и собери пост.</p>
       </div>
 
       {lastSent && (
@@ -405,7 +354,6 @@ function ManualPostForm() {
                   if (val === 'c3' && postType !== 'READY_TO_MOVE' && postType !== 'NEW_PRICE') setPostType('READY_TO_MOVE');
                 }}
                 options={[
-                  { value: 'paste', label: 'Вставить текст', icon: '📋' },
                   { value: 'db', label: 'Из базы', icon: '🗄' },
                   { value: 'c3', label: 'C3', icon: '⭐' },
                 ] as const}
@@ -480,63 +428,6 @@ function ManualPostForm() {
                 </div>
               )}
 
-              {source === 'paste' && (
-              <div className="relative">
-                <label className="block text-sm font-medium bb-ink-2 mb-2">Project</label>
-                {projectsLoading ? (
-                  <div className="w-full px-4 py-3 bb-surface-soft border bb-edge rounded-xl bb-ink-4 flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 bb-spin rounded-full animate-spin" />
-                    Loading projects...
-                  </div>
-                ) : projects.length > 0 ? (
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={projectSearch}
-                      onChange={(e) => {
-                        const enVal = convertRuToEn(e.target.value);
-                        setProjectSearch(enVal);
-                        setIsDropdownOpen(true);
-                      }}
-                      onFocus={() => setIsDropdownOpen(true)}
-                      onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
-                      placeholder="Search project..."
-                      className="w-full px-4 py-3 bb-surface-soft border bb-edge rounded-xl focus:ring-2 focus:bb-ring focus:bb-edge outline-none transition-all bb-ink bb-ph"
-                    />
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <svg className="w-4 h-4 bb-ink-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                    
-                    {isDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-2 bb-surface border bb-edge rounded-xl shadow-xl bb-lift max-h-60 overflow-y-auto overflow-x-hidden p-1 custom-scrollbar">
-                        {filteredProjects.length > 0 ? (
-                          filteredProjects.map((p) => (
-                            <div
-                              key={p}
-                              onClick={() => {
-                                setProject(p);
-                                setProjectSearch(p);
-                                setIsDropdownOpen(false);
-                              }}
-                              className={`px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-colors ${project === p ? 'bb-tint-accent bb-accent font-medium' : 'bb-ink-2 hover:bb-surface-soft hover:bb-ink'}`}
-                            >
-                              {p}
-                            </div>
-                          ))
-                        ) : (
-                          <div className="px-4 py-3 text-sm bb-ink-4 text-center">No projects found</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="w-full px-4 py-3 bb-tint-bad border bb-edge rounded-xl bb-bad text-sm">
-                    Failed to load projects.
-                  </div>
-                )}
-              </div>
-              )}
-
               <div>
                 <label className="block text-sm font-medium bb-ink-2 mb-2">Post Type</label>
                 <select
@@ -562,28 +453,6 @@ function ManualPostForm() {
                 </select>
               </div>
 
-              {source === 'paste' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium bb-ink-2 mb-2">Paste Row (from Canva/Sheets)</label>
-                    <textarea
-                      rows={4}
-                      value={rawText}
-                      onChange={(e) => setRawText(e.target.value)}
-                      className="w-full px-4 py-3 bb-surface-soft border bb-edge rounded-xl focus:ring-2 focus:bb-ring focus:bb-edge outline-none transition-all bb-ink bb-ph font-mono text-sm"
-                      placeholder="Paste TSV row here..."
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleParse}
-                    disabled={loading || !project}
-                    className="w-full bb-fill-accent hover: hover: bb-ink font-medium py-3 px-6 rounded-xl transition-all shadow-lg bb-lift active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-                  >
-                    {loading ? 'Parsing...' : 'Parse Data'}
-                  </button>
-                </>
-              )}
             </div>
           </div>
 

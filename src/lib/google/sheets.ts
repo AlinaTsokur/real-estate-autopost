@@ -121,82 +121,6 @@ export async function getConfig2Handover(projectName: string, codePrefix: string
   return { value: '', warning: 'Handover not found in CONFIG2 for prefix ' + codePrefix };
 }
 
-export async function updatePublicationDate(unitCode: string) {
-  // Finds the unit in OBJECTS sheet and writes today's date to "Publication Date" or similar column
-  const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
-  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_OBJECTS_ID not configured');
-
-  const sheets = await getGoogleSheetsClient();
-  const sheetName = 'OBJECTS';
-  const data = await getSheetData(spreadsheetId, sheetName);
-
-  if (data.length < 2) throw new Error('OBJECTS sheet is empty');
-
-  const headers = data[0].map(h => normalizeText(String(h).trim()));
-  const codeCol = headers.findIndex(h => h === normalizeText('Code'));
-  const unitCol = headers.findIndex(h => h === normalizeText('Unit'));
-  
-  // Find date column, or create one? Try to find existing "Publication Date" or "Date"
-  let dateCol = headers.findIndex(h => h === normalizeText('Publication Date') || h === normalizeText('Дата публикации') || h === normalizeText('Output Date'));
-  
-  if (codeCol === -1 && unitCol === -1) {
-    throw new Error('No Code or Unit column in OBJECTS');
-  }
-
-  const targetCode = normalizeText(unitCode.replace(/\\s+/g, '').toLowerCase());
-
-  let targetRowIndex = -1;
-  for (let i = 1; i < data.length; i++) {
-    const rowCode = codeCol !== -1 ? normalizeText(String(data[i][codeCol]).replace(/\\s+/g, '').toLowerCase()) : '';
-    const rowUnit = unitCol !== -1 ? normalizeText(String(data[i][unitCol]).replace(/\\s+/g, '').toLowerCase()) : '';
-
-    if (rowCode === targetCode || rowUnit === targetCode) {
-      targetRowIndex = i;
-      break;
-    }
-  }
-
-  if (targetRowIndex === -1) {
-    throw new Error(`Unit ${unitCode} not found in OBJECTS`);
-  }
-
-  // If date column is not found, we should probably append a new header
-  if (dateCol === -1) {
-    dateCol = headers.length; // Append to the end
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${sheetName}!${getColLetter(dateCol)}1`,
-      valueInputOption: 'USER_ENTERED',
-      requestBody: {
-        values: [['Publication Date']]
-      }
-    });
-  }
-
-  const today = new Date().toLocaleDateString('ru-RU'); // Or desired format
-  
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${sheetName}!${getColLetter(dateCol)}${targetRowIndex + 1}`, // +1 because rows are 1-indexed
-    valueInputOption: 'USER_ENTERED',
-    requestBody: {
-      values: [[today]]
-    }
-  });
-
-  return true;
-}
-
-function getColLetter(index: number) {
-  let temp = index;
-  let letter = '';
-  while (temp >= 0) {
-    letter = String.fromCharCode((temp % 26) + 65) + letter;
-    temp = Math.floor(temp / 26) - 1;
-  }
-  return letter;
-}
-
 export async function findApproxRentalRateForObject(projectName: string, code: string, unit: string) {
   const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
   if (!spreadsheetId) return '';
@@ -273,6 +197,16 @@ export async function getOriginalPriceForObject(unitCode: string) {
 // #d9ead3 — approved green
 const APPROVED_COLOR = { red: 217 / 255, green: 234 / 255, blue: 211 / 255 };
 const APPROVED_SHEET_GID = 1747337860;
+
+function getColLetter(index: number) {
+  let temp = index;
+  let letter = '';
+  while (temp >= 0) {
+    letter = String.fromCharCode((temp % 26) + 65) + letter;
+    temp = Math.floor(temp / 26) - 1;
+  }
+  return letter;
+}
 
 export async function approveUnitRow(code: string, unit?: string): Promise<{ row: number; sheet: string }> {
   const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID ?? '';
