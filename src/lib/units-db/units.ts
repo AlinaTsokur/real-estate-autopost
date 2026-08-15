@@ -89,6 +89,45 @@ export async function searchUnits(query: string, projectId?: string): Promise<Un
   }));
 }
 
+export interface UnitPrices {
+  code: string;
+  project: string;
+  originalPrice: number | null;
+  oldPrice: number | null;
+  sellingPrice: number | null;
+}
+
+// Цены одного юнита по коду — из них строится поиск старого поста в канале.
+// Код сверяем по цифрам: в базе он «041·02·004», а прийти может «041.02.004»
+// или «04102004».
+export async function getUnitPricesByCode(code: string): Promise<UnitPrices | null> {
+  const digits = String(code || '').replace(/\D/g, '');
+  if (!digits) return null;
+
+  const [rows] = await readOnly([
+    sql`
+      SELECT u.code, p.name AS project,
+             u.original_price_aed, u.old_price_aed, u.selling_price_aed
+      FROM units u JOIN projects p ON p.id = u.project_id
+      WHERE u.emirate::text = 'Abu Dhabi'
+        AND regexp_replace(u.code, '[^0-9]', '', 'g') = ${digits}
+      LIMIT 1
+    `,
+  ]);
+
+  const r = (rows as any[])[0];
+  if (!r) return null;
+
+  const num = (v: any): number | null => (v == null || v === '' ? null : Number(v));
+  return {
+    code: String(r.code || ''),
+    project: String(r.project || ''),
+    originalPrice: num(r.original_price_aed),
+    oldPrice: num(r.old_price_aed),
+    sellingPrice: num(r.selling_price_aed),
+  };
+}
+
 export interface RawUnit {
   id: string;
   code: string;

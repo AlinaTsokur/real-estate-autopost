@@ -1,45 +1,27 @@
 import { NextResponse } from 'next/server';
-import { getOriginalPriceForObject } from '@/lib/google/sheets';
-import { searchOldPosts } from '@/lib/telegram/mtproto';
+import { getUnitPricesByCode } from '@/lib/units-db/units';
+import { searchOldPosts, SearchedPost } from '@/lib/telegram/mtproto';
 
-function cleanPriceForSearch(price: string): string {
-  // Typical prices might be "7.559.557,70" or "7 559 557"
-  // We want to just search for the main integer part with dots for Telegram channel
-  // e.g. "7.559.557"
-  
-  // 1. Remove all spaces, currencies, etc.
-  let p = price.replace(/[^\d.,]/g, '');
-  
-  // 2. Try to drop the decimal part if it exists (usually after a comma)
-  if (p.includes(',')) {
-    p = p.split(',')[0];
-  } else if (p.includes('.') && p.lastIndexOf('.') > p.length - 4 && (p.length - p.lastIndexOf('.') <= 3)) {
-    // maybe it uses dot as decimal separator (e.g. 123.45)
-    // if the last dot is very close to the end, assume it's a decimal
-    const parts = p.split('.');
-    if (parts[parts.length - 1].length <= 2) {
-      parts.pop();
-      p = parts.join('');
-    }
+// Варианты написания цены для поиска по каналу: «7.284.965».
+// Филсы в постах не печатают, но округляли их по-разному, поэтому пробуем
+// и округление, и отбрасывание копеек — иначе старый пост не находится.
+function priceQueries(price: number): string[] {
+  const variants = [Math.round(price), Math.floor(price), Math.ceil(price)];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const v of variants) {
+    if (!Number.isFinite(v) || v <= 0) continue;
+    const s = new Intl.NumberFormat('de-DE').format(v);
+    if (!seen.has(s)) { seen.add(s); out.push(s); }
   }
-
-  // 3. Remove remaining dots just to get the raw number
-  const rawNumStr = p.replace(/[.,]/g, '');
-  const rawNum = parseInt(rawNumStr, 10);
-  
-  if (isNaN(rawNum)) return '';
-
-  // 4. Format with dots for telegram search "7.559.557"
-  return new Intl.NumberFormat('de-DE').format(rawNum);
+  return out;
 }
 
 function extractOldSellingPrice(text: string): string | null {
-  // Looks for "Selling Price: 8.490.000 AED" or "Selling Price: 8 490 000"
+  // Ловит и «Selling Price: 8.490.000 AED» обычного поста,
+  // и «New Selling price: …» поста об изменении цены.
   const match = text.match(/Selling Price:\s*([\d.,\s]+)/i);
-  if (match && match[1]) {
-    return match[1].trim();
-  }
-  return null;
+  return match && match[1] ? match[1].trim() : null;
 }
 
 export async function POST(req: Request) {
@@ -50,50 +32,52 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unit is required' }, { status: 400 });
     }
 
-    // 1. Get original price from Google Sheets
-    const originalPrice = await getOriginalPriceForObject(unit);
-    
-    if (!originalPrice) {
-      return NextResponse.json({ 
-        originalPrice: '', 
-        posts: [], 
-        message: 'Original Price not found in Google Sheets for this Unit.' 
+    // 1. Цены юнита — из нашей базы, как и всё остальное в посте (только чтение)
+    const prices = await getUnitPricesByCode(unit);
+
+    if (!prices) {
+      return NextResponse.json({
+        originalPrice: '',
+        posts: [],
+        message: `Юнит ${unit} не найден в базе.`,
       });
     }
 
-    // 2. Format price for search
-    const searchStr = cleanPriceForSearch(originalPrice);
-    
-    if (!searchStr) {
-       return NextResponse.json({ 
-        originalPrice, 
-        posts: [], 
-        message: 'Could not format price for search.' 
+    if (!prices.originalPrice) {
+      return NextResponse.json({
+        originalPrice: '',
+        posts: [],
+        message: `У юнита ${prices.code} в базе не заполнена Original Price — по ней ищется старый пост.`,
       });
     }
 
-    // 3. Search via MTProto
-    const posts = await searchOldPosts(searchStr);
+    // 2. Ищем в канале пост с этой Original Price: она не меняется от поста
+    // к посту, поэтому по ней и находится предыдущее объявление юнита.
+    const queries = priceQueries(prices.originalPrice);
+    let posts: SearchedPost[] = [];
+    let searchStr = queries[0] || '';
 
-    // 4. Try to extract old selling price from posts
-    const enrichedPosts = posts.map(post => {
-      return {
-        ...post,
-        extractedSellingPrice: extractOldSellingPrice(post.text)
-      };
-    });
-
-    let extractedOldPrice = '';
-    if (enrichedPosts && enrichedPosts.length > 0) {
-      const p = enrichedPosts[0].extractedSellingPrice;
-      if (p) extractedOldPrice = p;
+    for (const q of queries) {
+      const found = await searchOldPosts(q);
+      if (found.length) { posts = found; searchStr = q; break; }
     }
+
+    // 3. Достаём из найденных постов их Selling Price — это и есть старая цена
+    const enrichedPosts = posts.map(post => ({
+      ...post,
+      extractedSellingPrice: extractOldSellingPrice(post.text),
+    }));
+
+    const extractedOldPrice = enrichedPosts[0]?.extractedSellingPrice || '';
 
     return NextResponse.json({
-      originalPrice,
+      originalPrice: new Intl.NumberFormat('de-DE').format(Math.round(prices.originalPrice)) + ' AED',
       extractedOldPrice, // the first one found, for auto-fill
       searchStr,
-      posts: enrichedPosts
+      posts: enrichedPosts,
+      message: enrichedPosts.length
+        ? ''
+        : `В канале нет поста с Original Price ${searchStr} — старую цену придётся вписать вручную.`,
     });
   } catch (error: any) {
     console.error('Search old post error:', error);
