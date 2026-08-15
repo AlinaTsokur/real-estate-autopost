@@ -157,6 +157,25 @@ export default function CatalogPage() {
   const [itemsLoading, setItemsLoading] = useState(false);
   const [manageCovers, setManageCovers] = useState<Record<string, string>>({});
 
+  // Таблица-черновик по всем проектам — из неё вручную заполняют каталог в Meta.
+  const [draft, setDraft] = useState<{ url: string; title: string; projects: number; listings: number } | null>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
+
+  const makeDraftSheet = async () => {
+    setDraftBusy(true);
+    setError('');
+    try {
+      const d = await fetch('/api/catalog-draft-sheet', { method: 'POST' }).then(r => r.json());
+      if (d.error) throw new Error(d.error);
+      setDraft(d);
+      window.open(d.url, '_blank', 'noopener');
+    } catch (e: any) {
+      setError('Не удалось собрать таблицу: ' + e.message);
+    } finally {
+      setDraftBusy(false);
+    }
+  };
+
   // Проекты из нашей базы — те же, что в трекере «Рассылок».
   useEffect(() => {
     fetch('/api/project-emoji?names=1')
@@ -251,7 +270,26 @@ export default function CatalogPage() {
           className="bb-btn bb-btn-ghost py-2 px-4 text-[13px]">
           Фид для Meta ↗
         </a>
+        <button
+          onClick={makeDraftSheet}
+          disabled={draftBusy}
+          title="Соберёт гугл-таблицу по всем проектам — заголовки и тексты для ручного ввода"
+          className="bb-btn bb-btn-ghost py-2 px-4 text-[13px] disabled:opacity-50">
+          {draftBusy ? 'Собираю таблицу…' : '📄 Таблица для ручного ввода'}
+        </button>
       </div>
+
+      {draft && (
+        <div className="p-3 rounded-xl bb-tint-ok border bb-edge text-sm flex items-center gap-3 flex-wrap">
+          <span className="bb-ok">✓ Готово: {draft.projects} проектов, {draft.listings} карточек</span>
+          <a href={draft.url} target="_blank" rel="noopener noreferrer" className="bb-accent underline">
+            {draft.title} ↗
+          </a>
+          <span className="bb-ink-4 text-xs">
+            Описание разложено по строкам: выдели столбик ячеек и копируй — вставится без кавычек.
+          </span>
+        </div>
+      )}
 
       {/* ── ADD TAB ── */}
       {tab === 'add' && (
