@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCatalogRows, updateCatalogCover } from '@/lib/google/sheets';
+import { getCatalogRows, updateCatalogCover } from '@/lib/catalog/store';
 
 export async function GET() {
   try {

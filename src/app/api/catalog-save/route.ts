@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { saveCatalogRows, CatalogRow } from '@/lib/google/sheets';
+import { saveCatalogRows, CatalogRow } from '@/lib/catalog/store';
 
 export async function POST(request: Request) {
   try {

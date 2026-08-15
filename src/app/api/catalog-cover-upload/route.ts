@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadCatalogCover } from '@/lib/google/drive';
-import { updateCatalogCover } from '@/lib/google/sheets';
+import { updateCatalogCover } from '@/lib/catalog/store';
 
 export const maxDuration = 60;
 

@@ -14,7 +14,8 @@ const convertRuToEn = (str: string) => {
   return res;
 };
 
-const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1VufwiqgAPjX1LhmWYuiBDUgFY4SobjV3gnBiLNYKmkw/edit#gid=0';
+// Адрес фида для Meta Commerce Manager — его же можно просто открыть и посмотреть.
+const FEED_URL = '/api/catalog-feed';
 
 type PreviewRow = {
   home_listing_id: string;
@@ -246,9 +247,9 @@ export default function CatalogPage() {
             { value: 'manage', label: 'Каталог', icon: '📋' },
           ] as const}
         />
-        <a href={SHEET_URL} target="_blank" rel="noopener noreferrer"
+        <a href={FEED_URL} target="_blank" rel="noopener noreferrer"
           className="bb-btn bb-btn-ghost py-2 px-4 text-[13px]">
-          Открыть таблицу CATALOG ↗
+          Фид для Meta ↗
         </a>
       </div>
 

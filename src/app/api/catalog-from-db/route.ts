@@ -3,7 +3,7 @@ import { listAvailableUnits } from '@/lib/units-db/units';
 import { mapRawUnitToPostData } from '@/lib/units-db/map';
 import { getProjectMeta } from '@/lib/post-meta/emoji';
 import { selectLowestByExactType } from '@/lib/parsing/table-parser';
-import { getCatalogRows } from '@/lib/google/sheets';
+import { getCatalogRows } from '@/lib/catalog/store';
 import { getProjectPhotoFolderId, getDriveImageUrls } from '@/lib/google/drive';
 import { buildCatalogRow, makeCatalogId } from '@/lib/catalog/build-row';
 
