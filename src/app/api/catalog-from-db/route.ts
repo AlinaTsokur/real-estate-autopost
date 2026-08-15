@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     // Обложки, уже сохранённые для этих карточек, и общие фото проекта.
     const [existingCovers, photoUrls] = await Promise.all([
       getCatalogRows().then(
-        (r: any[]) => new Map(r.map(x => [String(x.home_listing_id || ''), String(x.image0 || '')])),
+        (r: any[]) => new Map(r.map(x => [String(x.home_listing_id || ''), String(x['image[0].url'] || '')])),
       ).catch(() => new Map<string, string>()),
       getProjectPhotoFolderId(projectName)
         .then(id => getDriveImageUrls(id, 5))

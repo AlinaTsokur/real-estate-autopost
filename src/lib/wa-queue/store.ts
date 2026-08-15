@@ -83,12 +83,22 @@ export async function addWaQueueItem(
   itemChatId = '',
 ): Promise<string> {
   await ensureTables();
-  const id = Date.now().toString();
-  await sql`
-    INSERT INTO wa_queue (id, label, wa_text, drive_file_id, scheduled_at, status, item_chatid)
-    VALUES (${id}, ${label}, ${waText}, ${driveFileId}, ${scheduledAt}, 'WAITING', ${itemChatId})
-  `;
-  return id;
+  // id — это метка времени, и он же первичный ключ. Рассылка добавляет посты
+  // подряд в цикле, так что две вставки могут попасть в одну миллисекунду;
+  // тогда берём следующую свободную. Формат остаётся числовым: id уходит в
+  // callback-кнопку Telegram, где важна длина.
+  let id = Date.now();
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const rows = (await sql`
+      INSERT INTO wa_queue (id, label, wa_text, drive_file_id, scheduled_at, status, item_chatid)
+      VALUES (${String(id)}, ${label}, ${waText}, ${driveFileId}, ${scheduledAt}, 'WAITING', ${itemChatId})
+      ON CONFLICT (id) DO NOTHING
+      RETURNING id
+    `) as any[];
+    if (rows.length) return String(id);
+    id++;
+  }
+  throw new Error('Не удалось подобрать свободный id для очереди WhatsApp');
 }
 
 export async function updateWaQueueItemStatus(id: string, status: string) {
