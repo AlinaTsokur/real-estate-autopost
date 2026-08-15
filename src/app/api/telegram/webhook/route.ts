@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { approveUnitRow } from '@/lib/google/sheets';
+import { approveUnitRow, setC3PostDate } from '@/lib/google/sheets';
 import { getWaQueue, deleteWaQueueItemById, WaQueueItem } from '@/lib/wa-queue/store';
 import { getBot } from '@/lib/telegram/bot';
 import { dispatchWaItem } from '@/lib/whatsapp/dispatch';
@@ -36,8 +36,9 @@ export async function POST(request: Request) {
       const chatId = cb.message.chat.id;
       const messageId = cb.message.message_id;
 
-      if (data.startsWith('approve_')) {
-        const code = data.replace('approve_', '');
+      if (data.startsWith('approve_') || data.startsWith('approvec3_')) {
+        const isC3Post = data.startsWith('approvec3_');
+        const code = data.replace(/^approve(c3)?_/, '');
 
         // Acknowledge the tap IMMEDIATELY so mobile Telegram doesn't time out.
         await bot.telegram.answerCbQuery(cb.id, '⏳ Обрабатываю…').catch(() => {});
@@ -59,7 +60,15 @@ export async function POST(request: Request) {
         };
 
         try {
-          if (isDbUnit) {
+          if (isC3Post) {
+            // C3 живёт в отдельном листе, и дату там перезаписываем: по одному
+            // юниту пост делают повторно, нужна дата последнего.
+            const r = await setC3PostDate(code);
+            await bot.telegram.editMessageText(chatId, messageId, undefined,
+              `✅ Approved (${code})\n\nДата поста ${r.date} записана в лист «C3 Garden Res», строка ${r.row}.`);
+            await (bot.telegram as any).callApi('setMessageReaction', { chat_id: chatId, message_id: messageId, reaction: heart });
+            await deleteWaPhoto();
+          } else if (isDbUnit) {
             // New DB unit: no sheet row to colour — just remind to log the post date.
             await bot.telegram.editMessageText(chatId, messageId, undefined,
               `✅ Approved (${code})\n\n⚠️ Занеси дату поста в базу (поле «Дата первого поста» для этого юнита).`);

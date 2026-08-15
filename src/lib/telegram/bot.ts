@@ -12,11 +12,14 @@ export function getBot() {
 // The WA button carries the queue item's own id when we have it. Matching by unit code
 // is ambiguous — a short C3 unit like "109" is a substring of codes such as "#210914",
 // so the bot used to pick a completely unrelated post.
-function reviewKeyboard(unitCode: string, waQueueId?: string) {
+// Пост C3 помечаем в самой кнопке: его строка живёт в отдельном листе, а
+// номера юнитов у C3 и Abu Dhabi местами совпадают (например «108»), так что
+// угадать источник по номеру нельзя.
+function reviewKeyboard(unitCode: string, waQueueId?: string, isC3 = false) {
   return {
     inline_keyboard: [
       [
-        { text: '✅ Approved', callback_data: `approve_${unitCode}` },
+        { text: '✅ Approved', callback_data: `${isC3 ? 'approvec3_' : 'approve_'}${unitCode}` },
         { text: '🗑 Удалить', callback_data: `delete_${unitCode}` },
       ],
       [
@@ -31,7 +34,8 @@ export async function sendMediaGroupWithCaption(
   chatId: string,
   mediaUrlsOrIds: { type: 'photo'; media: string | { source: Buffer, filename?: string } }[],
   captionHtml: string,
-  unitCode: string
+  unitCode: string,
+  isC3 = false,
 ) {
   const bot = getBot();
 
@@ -76,7 +80,7 @@ export async function sendMediaGroupWithCaption(
 
   const reviewMsg = await bot.telegram.sendMessage(chatId, `Review post for ${unitCode}:`, {
     reply_parameters: { message_id: firstMsgId },
-    reply_markup: reviewKeyboard(unitCode),
+    reply_markup: reviewKeyboard(unitCode, undefined, isC3),
   });
   ids.push(reviewMsg.message_id);
 
@@ -90,6 +94,7 @@ export async function updateReviewMessage(
   allIds: number[],
   mainIds?: number[],
   waQueueId?: string,
+  isC3 = false,
 ) {
   const bot = getBot();
   const mainPart = mainIds ? `\nmain_ids:${mainIds.join(',')}` : '';
@@ -98,7 +103,7 @@ export async function updateReviewMessage(
     reviewMsgId,
     undefined,
     `Review post for ${unitCode}:${mainPart}\nids:${allIds.join(',')}`,
-    { reply_markup: reviewKeyboard(unitCode, waQueueId) }
+    { reply_markup: reviewKeyboard(unitCode, waQueueId, isC3) }
   );
 }
 

@@ -87,7 +87,12 @@ export async function POST(request: Request) {
 
     console.log(`Sending telegram media group with ${media.length} items`);
 
-    const r1 = await sendMediaGroupWithCaption(chatId, media, telegramHtml, data.code || data.unit || 'Unknown');
+    // Пост C3 помечаем, чтобы кнопка Approved знала, в какой лист писать дату.
+    // У C3 строка ищется по номеру юнита, у остальных — по коду: у юнитов из
+    // базы поле unit это положение дома («Middle»), а не номер.
+    const isC3 = /c3 garden residence/i.test(String(data.project || ''));
+    const unitLabel = (isC3 ? data.unit || data.code : data.code || data.unit) || 'Unknown';
+    const r1 = await sendMediaGroupWithCaption(chatId, media, telegramHtml, unitLabel, isC3);
     mark('sendMediaGroup');
     const allIds: number[] = [...r1.ids];
 
@@ -107,7 +112,7 @@ export async function POST(request: Request) {
       console.error('WA queue save error:', e);
     }
 
-    await updateReviewMessage(chatId, r1.reviewMsgId, data.code || data.unit || 'Unknown', allIds, r1.mainIds, waQueueId).catch(() => {});
+    await updateReviewMessage(chatId, r1.reviewMsgId, unitLabel, allIds, r1.mainIds, waQueueId, isC3).catch(() => {});
     mark('ГОТОВО');
 
     return NextResponse.json({ ok: true, whatsappText, messageIds: allIds, chatId });

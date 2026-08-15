@@ -133,6 +133,51 @@ function getColLetter(index: number) {
   return letter;
 }
 
+const C3_SHEET = 'C3 Garden Res';
+
+/**
+ * Ставит сегодняшнюю дату в колонку «Дата объявления» листа C3.
+ * В отличие от листа Abu Dhabi здесь дата именно перезаписывается: по одному
+ * юниту C3 пост делают повторно, и нужна дата последнего.
+ */
+export async function setC3PostDate(unit: string): Promise<{ row: number; date: string }> {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID ?? '';
+  if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_OBJECTS_ID not configured');
+
+  const sheets = await getGoogleSheetsClient();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: C3_SHEET });
+  const rows = res.data.values ?? [];
+  if (rows.length < 2) throw new Error(`Лист «${C3_SHEET}» пуст`);
+
+  const headers = (rows[0] as unknown[]).map(h => String(h).trim().toLowerCase());
+  const unitCol = headers.indexOf('unit');
+  const dateCol = headers.indexOf('дата объявления');
+  if (unitCol === -1) throw new Error(`В листе «${C3_SHEET}» нет колонки Unit`);
+  if (dateCol === -1) throw new Error(`В листе «${C3_SHEET}» нет колонки «Дата объявления»`);
+
+  const norm = (v: unknown) =>
+    String(v ?? '').replace(/\u00a0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase();
+  const target = norm(unit);
+
+  let rowIndex = -1;
+  for (let i = 1; i < rows.length; i++) {
+    if (norm((rows[i] as unknown[])[unitCol]) === target) { rowIndex = i; break; }
+  }
+  if (rowIndex === -1) throw new Error(`Юнит ${unit} не найден в листе «${C3_SHEET}»`);
+
+  const now = new Date();
+  const date = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `'${C3_SHEET}'!${getColLetter(dateCol)}${rowIndex + 1}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [[date]] },
+  });
+
+  return { row: rowIndex + 1, date };
+}
+
 export async function approveUnitRow(code: string, unit?: string): Promise<{ row: number; sheet: string }> {
   const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID ?? '';
   if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_OBJECTS_ID not configured');
