@@ -7,8 +7,15 @@
 // спотыкаться о разное написание названий.
 import { neon } from '@neondatabase/serverless';
 
-const units = neon(process.env.UNITS_DB_URL!);
+const unitsDb = neon(process.env.UNITS_DB_URL!);
 const meta = neon(process.env.META_DB_URL!);
+
+// В базу IT-команды мы только читаем. Запрос идёт в транзакции READ ONLY, так
+// что случайная запись будет отклонена самим Postgres, а не только уговором.
+async function units<T = any>(q: any): Promise<T[]> {
+  const [rows] = await unitsDb.transaction([q], { readOnly: true });
+  return rows as T[];
+}
 
 /** Имена приходят из постов и вставленных строк — сверяем без регистра и лишних пробелов. */
 const norm = (s: string) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -16,13 +23,13 @@ const norm = (s: string) => String(s || '').trim().toLowerCase().replace(/\s+/g,
 interface ProjectRow { id: string; code: string; island: string }
 
 async function lookup(key: string): Promise<ProjectRow | null> {
-  const rows = (await units`
+  const rows = (await units(unitsDb`
     SELECT p.id, p.code::text AS code, coalesce(d.name, '') AS island
     FROM projects p LEFT JOIN districts d ON d.id = p.district_id
     WHERE lower(regexp_replace(trim(p.name), '\\s+', ' ', 'g')) = ${key}
     ORDER BY (p.emirate::text = 'Abu Dhabi') DESC
     LIMIT 1
-  `) as any[];
+  `)) as any[];
   return rows.length ? { id: rows[0].id, code: rows[0].code, island: rows[0].island } : null;
 }
 
@@ -94,12 +101,12 @@ export async function getHandoverByCode(
   const parts = splitUnitCode(code);
   if (!parts) return { value: '', warning: `Не разобрать код юнита: ${code}` };
 
-  const rows = (await units`
+  const rows = (await units(unitsDb`
     SELECT to_char(handover_date, 'DD/MM/YYYY') AS handover, name
     FROM buildings
     WHERE project_id = ${proj.id} AND code::int = ${parts.building}
     LIMIT 1
-  `) as any[];
+  `)) as any[];
 
   if (!rows.length) return { value: '', warning: `Здание ${parts.building} не найдено в проекте ${projectName}` };
   if (!rows[0].handover) return { value: '', warning: `Дата сдачи не задана: ${projectName} / ${rows[0].name}` };
