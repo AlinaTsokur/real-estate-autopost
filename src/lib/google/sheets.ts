@@ -88,37 +88,6 @@ export async function findApproxRentalRateForObject(projectName: string, code: s
   return '';
 }
 
-export async function getOriginalPriceForObject(unitCode: string) {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_OBJECTS_ID;
-  if (!spreadsheetId) return '';
-
-  const data = await getSheetData(spreadsheetId, 'Abu Dhabi');
-  if (data.length < 2) return '';
-
-  const headers = data[0].map(h => normalizeText(String(h || '').trim()));
-  
-  const codeCol = headers.findIndex(h => h === normalizeText('Code') || h === normalizeText('Код'));
-  const unitCol = headers.findIndex(h => h === normalizeText('Unit'));
-  const priceCol = headers.findIndex(h => h === normalizeText('Original Price') || h === normalizeText('Цена'));
-
-  if ((codeCol === -1 && unitCol === -1) || priceCol === -1) return '';
-
-  const targetCode = String(unitCode || '').replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase();
-
-  if (!targetCode) return '';
-
-  for (let i = 1; i < data.length; i++) {
-    const rowCode = codeCol !== -1 ? String(data[i][codeCol]).replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase() : '';
-    const rowUnit = unitCol !== -1 ? String(data[i][unitCol]).replace(/\u00A0/g, ' ').replace(/\s+/g, '').replace(/^#/, '').trim().toLowerCase() : '';
-
-    if (rowCode === targetCode || rowUnit === targetCode) {
-      return String(data[i][priceCol] || '').trim();
-    }
-  }
-
-  return '';
-}
-
 // #d9ead3 — approved green
 const APPROVED_COLOR = { red: 217 / 255, green: 234 / 255, blue: 211 / 255 };
 const APPROVED_SHEET_GID = 1747337860;

@@ -206,10 +206,12 @@ function ManualPostForm() {
 
   const [lastSearchedUnit, setLastSearchedUnit] = useState('');
 
+  // Ищем по коду юнита: поле unit у виллы — это положение дома в ряду
+  // («Middle»), искать по нему нечего.
   const handleSearchOldPrice = async (overrideUnit?: string) => {
-    const unit = overrideUnit || parsedData?.code || parsedData?.unit;
+    const unit = overrideUnit || parsedData?.code;
     if (!unit) {
-      if (!overrideUnit) alert("Please enter a Unit/Code first.");
+      if (!overrideUnit) alert("Сначала укажите код юнита.");
       return;
     }
     setSearchingOldPrice(true);
@@ -225,14 +227,11 @@ function ManualPostForm() {
       
       setOldPostsResult(data);
       
-      // If exactly one post is found, auto-fill it
-      if (data.posts && data.posts.length === 1) {
-        if (data.extractedOldPrice) {
-          setParsedData((prev: any) => ({ ...prev, oldPrice: data.extractedOldPrice, oldPostUrl: data.posts[0].url }));
-        } else if (data.originalPrice) {
-          // Fallback if we couldn't extract Selling Price
-          setParsedData((prev: any) => ({ ...prev, oldPrice: data.originalPrice, oldPostUrl: data.posts[0].url }));
-        }
+      // Нашёлся ровно один пост — подставляем его цену продажи как старую.
+      // Original Price сюда не годится: это цена от застройщика, а не прошлая
+      // цена объявления.
+      if (data.posts?.length === 1 && data.extractedOldPrice) {
+        setParsedData((prev: any) => ({ ...prev, oldPrice: data.extractedOldPrice, oldPostUrl: data.posts[0].url }));
       }
     } catch (e: any) {
       if (!overrideUnit) alert("Error searching: " + e.message);
@@ -245,7 +244,7 @@ function ManualPostForm() {
     if (!parsedData) return;
     if (postType !== 'PRICE_CHANGE' && postType !== 'NEW_PRICE') return;
     
-    const unit = parsedData.code || parsedData.unit;
+    const unit = parsedData.code;
     if (unit && unit !== lastSearchedUnit) {
       setLastSearchedUnit(unit);
       handleSearchOldPrice(unit);
@@ -560,7 +559,7 @@ function ManualPostForm() {
                     
                     {oldPostsResult && (
                       <div className="mt-3 p-3 bb-surface-soft border bb-edge rounded-lg max-h-60 overflow-y-auto custom-scrollbar">
-                        <div className="text-xs bb-ink-3 mb-2">Original Price: <strong className="bb-ink">{oldPostsResult.originalPrice || 'Not found'}</strong></div>
+                        <div className="text-xs bb-ink-3 mb-2">Ищем по Original Price из базы: <strong className="bb-ink">{oldPostsResult.originalPrice || '—'}</strong></div>
                         {oldPostsResult.posts?.length > 0 ? (
                           <div className="space-y-2">
                             {oldPostsResult.posts.map((post: any) => (
@@ -569,18 +568,20 @@ function ManualPostForm() {
                                 <p className="text-[10px] bb-ink-3 line-clamp-3 mb-2 pr-12">{post.text}</p>
                                 <div className="flex items-center justify-between">
                                   <a href={post.url} target="_blank" rel="noreferrer" className="text-[10px] bb-accent hover:underline">View Post</a>
-                                  <button onClick={() => {
-                                    updateField('oldPrice', post.extractedSellingPrice || oldPostsResult.originalPrice);
-                                    updateField('oldPostUrl', post.url);
-                                  }} className="text-[10px] bb-tint-accent bb-accent px-2 py-0.5 rounded hover:bb-tint-accent">
-                                    Use Price {post.extractedSellingPrice ? `(${post.extractedSellingPrice})` : ''}
-                                  </button>
+                                  {post.extractedSellingPrice && (
+                                    <button onClick={() => {
+                                      updateField('oldPrice', post.extractedSellingPrice);
+                                      updateField('oldPostUrl', post.url);
+                                    }} className="text-[10px] bb-tint-accent bb-accent px-2 py-0.5 rounded hover:bb-tint-accent">
+                                      Use Price ({post.extractedSellingPrice})
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <div className="text-[10px] bb-bad">No posts found.</div>
+                          <div className="text-[10px] bb-bad">{oldPostsResult.message || 'Старый пост не найден.'}</div>
                         )}
                       </div>
                     )}
